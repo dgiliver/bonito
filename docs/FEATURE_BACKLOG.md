@@ -4,7 +4,339 @@ Prioritized list of features beyond the core MVP.
 
 ---
 
+## ⚠️ Strategy Architecture Limitations
+
+**Analysis from a senior quant trader perspective:** The current DSL can express basic retail strategies (MA crossovers, RSI mean reversion) but hits walls quickly with anything institutional-grade. Here's what a hedge fund PM would ask for that we can't do:
+
+### Critical Gaps
+
+#### 1. **Long-Only Constraint**
+The engine only supports BUY orders. Can't short, can't hedge, can't do market-neutral strategies. A PM would immediately ask: "Can I short TSLA when it goes overbought?" — **No.**
+
+*Impact:* Eliminates ~50% of strategy universe. No pair trading, no stat arb, no long/short equity.
+
+#### 2. **Single Symbol Execution**
+Even though `symbols` accepts a list, the engine only trades `symbols[0]`. Can't express:
+- "Buy AAPL when MSFT breaks out" (cross-asset signals)
+- "Long XLK, short XLF when tech/financials ratio crosses threshold" (sector rotation)
+- "Buy gold when VIX spikes" (flight-to-safety)
+
+*Impact:* No relative value, no cross-asset, no macro strategies.
+
+#### 3. **No Position Memory / State**
+Strategies are stateless. Can't track:
+- "Bars since entry" (for time-based exits)
+- "Number of adds to this position" (for pyramiding)
+- "Previous trade outcome" (for anti-martingale)
+- "Consecutive losing trades" (for risk adjustment)
+
+*Impact:* Can't implement sophisticated position management or adaptive sizing.
+
+#### 4. **Static Position Sizing**
+Position size is determined once at entry. Can't do:
+- Volatility targeting ("maintain 15% annualized vol")
+- Kelly criterion ("size based on edge")
+- ATR-based sizing ("risk $X per ATR")
+- Conviction-based ("RSI at 10 = full size, RSI at 25 = half size")
+
+*Impact:* Suboptimal capital allocation, can't implement proper risk management.
+
+#### 5. **All-or-Nothing Execution**
+No scaling in/out. Real traders:
+- Scale into positions (buy 25% at first signal, add on confirmation)
+- Scale out (take 50% profit at 2R, let rest run)
+- Average down in mean reversion strategies
+
+*Impact:* Binary entry/exit doesn't match how professionals trade.
+
+### Moderate Gaps
+
+#### 6. **No Lookback Window Conditions**
+Current: "IF RSI < 30" (point-in-time check)
+Need: "IF RSI was below 30 at any point in last 5 bars" (window check)
+Need: "IF close is at 20-day high" (rolling extrema)
+Need: "IF volume > 2x 20-day average" (relative comparisons)
+
+#### 7. **Single Timeframe Only**
+Can't combine:
+- Daily trend direction + hourly entry timing
+- Weekly regime + daily signals
+- 1h structure + 5m precision entries
+
+This is how most professionals trade. MTF analysis is table stakes.
+
+#### 8. **Flat Rule Logic**
+Only AND/OR within a rule. Can't express:
+- "At least 2 of 3 conditions must be true"
+- "Score: RSI<30 = +1, MACD cross = +1, above SMA = +1, enter if score >= 2"
+- Weighted condition importance
+
+#### 9. **No Time-Based Filters**
+Can't restrict:
+- Trading hours (only trade 9:30-10:30 AM)
+- Day of week (no Mondays)
+- Events (avoid FOMC days, earnings weeks)
+- Seasonality (sell in May)
+
+#### 10. **No Trailing Stops**
+Only fixed stops. Can't do:
+- "Trail stop at 2 ATR below highest close since entry"
+- "Move stop to breakeven after 1R profit"
+- Chandelier exits
+
+#### 11. **No Re-Entry Logic**
+Can't specify:
+- "Don't re-enter within 5 bars of exit"
+- "Max 3 trades per day"
+- "No new positions if already stopped out today"
+
+#### 12. **No Regime Awareness**
+Can't adapt to market conditions:
+- "Only mean revert when VIX > 25"
+- "Use tighter stops in low-vol environments"
+- "Switch to trend-following when ADX > 25"
+
+### What This Means for Custom Strategies (F002)
+
+The plugin interface becomes **critical** — it's not just "nice to have" for power users. It's the escape hatch for anyone who wants to implement real strategies. The DSL should handle 80% of retail use cases, but the plugin system handles the 20% that makes strategies actually tradeable.
+
+**Priority should be:**
+1. F002 (Plugin Interface) — immediate, opens up everything
+2. Short selling support — doubles strategy universe
+3. Multi-symbol execution — enables relative value
+4. State/memory — enables position management
+5. MTF analysis — professional standard
+
+---
+
+## ⚠️ Indicator Gap Analysis
+
+**Current indicators (7):** SMA, EMA, RSI, MACD, ATR, Bollinger Bands, Stochastic
+
+**What a senior trader would immediately ask for:**
+
+### Missing: Volume-Based Indicators (we have ZERO)
+Volume analysis is fundamental to institutional trading. Without it, you can't distinguish real moves from fakeouts.
+
+| Indicator | Use Case | Priority |
+|-----------|----------|----------|
+| **VWAP** | Institutional benchmark, mean reversion anchor | 🔥 Critical |
+| **OBV** (On-Balance Volume) | Accumulation/distribution, divergence | High |
+| **CMF** (Chaikin Money Flow) | Money flow strength | Medium |
+| **MFI** (Money Flow Index) | RSI but volume-weighted | Medium |
+| **A/D Line** | Accumulation/Distribution | Medium |
+| **Volume SMA** | Relative volume spikes | High |
+
+*"Is this breakout real or fake?"* — Can't answer without volume.
+
+### Missing: Trend Strength
+We have trend direction (MA crossovers) but not trend *strength*.
+
+| Indicator | Use Case | Priority |
+|-----------|----------|----------|
+| **ADX** | "Is this trending or ranging?" — changes strategy entirely | 🔥 Critical |
+| **Parabolic SAR** | Trailing stop placement, trend reversals | Medium |
+| **SuperTrend** | Cleaner trend signals than MA crosses | Medium |
+| **Ichimoku Cloud** | Full system: trend, momentum, S/R | Nice-to-have |
+
+*"Should I use mean reversion or trend following right now?"* — Need ADX.
+
+### Missing: Channels & Breakout Tools
+
+| Indicator | Use Case | Priority |
+|-----------|----------|----------|
+| **Donchian Channels** | Breakout trading (Turtle strategy) | High |
+| **Keltner Channels** | Volatility-adjusted channels | Medium |
+| **Pivot Points** | Daily S/R levels | Medium |
+| **ATR Bands** | Volatility envelopes | Medium |
+
+### Missing: Momentum Variants
+
+| Indicator | Use Case | Priority |
+|-----------|----------|----------|
+| **CCI** | Mean reversion, different math than RSI | Medium |
+| **Williams %R** | Fast overbought/oversold | Low |
+| **ROC** (Rate of Change) | Pure momentum | Medium |
+| **TSI** (True Strength Index) | Smoothed momentum | Low |
+
+### Missing: Computed/Derived Values
+Not indicators per se, but essential calculations:
+
+| Calculation | Use Case | Priority |
+|-------------|----------|----------|
+| **Rolling High/Low** | "20-day high", breakout detection | 🔥 Critical |
+| **Z-Score** | Mean reversion setups | High |
+| **Percentile Rank** | "RSI is in bottom 5% of last 100 readings" | High |
+| **Normalized ATR** | ATR as % of price for cross-asset comparison | Medium |
+| **Ratio/Spread** | Pairs trading, relative value | High |
+
+### Recommendation: Integrate pandas-ta
+
+Rather than implementing 50+ indicators by hand, integrate **pandas-ta** (130+ indicators) or **TA-Lib** (150+ indicators).
+
+**pandas-ta advantages:**
+- Pure Python/NumPy/Pandas (no C dependencies like TA-Lib)
+- 130+ indicators across all categories
+- Active maintenance
+- Easy integration with our existing NumPy arrays
+
+**Implementation approach:**
+```python
+# In indicators.py
+import pandas_ta as ta
+
+def compute_indicators(data: BarData, indicators: list[IndicatorConfig]) -> dict:
+    df = pd.DataFrame({
+        'open': data.open, 'high': data.high,
+        'low': data.low, 'close': data.close, 'volume': data.volume
+    })
+
+    for config in indicators:
+        if config.type == "vwap":
+            df.ta.vwap(append=True)
+        elif config.type == "adx":
+            df.ta.adx(length=config.params.get("period", 14), append=True)
+        # ... etc
+```
+
+**Effort estimate:** 1-2 days to integrate pandas-ta, then all 130+ indicators available.
+
+---
+
 ## 🔥 High Priority (Post-MVP Phase 1)
+
+### F019: pandas-ta Integration
+**Status**: Planned
+**Effort**: 1-2 days
+**Value**: Very High - 130+ indicators instantly available
+
+Replace hand-rolled indicators with pandas-ta library. Unlocks:
+- Volume indicators (VWAP, OBV, MFI, CMF)
+- Trend strength (ADX, Parabolic SAR, SuperTrend)
+- Channels (Donchian, Keltner)
+- 100+ more indicators
+
+**Requirements**:
+- Add pandas-ta to dependencies
+- Adapter layer to convert BarData → DataFrame → back to numpy
+- Update IndicatorType enum dynamically or use string matching
+- Maintain backward compatibility with existing strategies
+
+**Example usage in strategy:**
+```json
+{
+  "indicators": [
+    {"type": "vwap", "name": "vwap"},
+    {"type": "adx", "name": "adx", "params": {"length": 14}},
+    {"type": "donchian", "name": "dc", "params": {"lower_length": 20, "upper_length": 20}}
+  ]
+}
+```
+
+---
+
+### F020: Short Selling Support
+**Status**: Planned
+**Effort**: 2-3 days
+**Value**: Critical - Doubles strategy universe
+
+Add ability to short. Requires:
+- New `side` field in entry rules: `"side": "short"` or `"side": "long"`
+- Short P&L calculation (entry - exit, not exit - entry)
+- Short position tracking in engine
+- Margin/buying power considerations (optional for backtest)
+
+**Example:**
+```json
+{
+  "entry_rules": [
+    {
+      "side": "short",
+      "conditions": [{"left": "rsi", "comparison": "gt", "right": 80}]
+    }
+  ]
+}
+```
+
+---
+
+### F022: Rolling Lookback Conditions
+**Status**: Planned
+**Effort**: 2-3 days
+**Value**: High - Enables real breakout/window-based strategies
+
+Add ability to reference rolling windows in conditions:
+
+**New condition syntax:**
+```json
+{
+  "left": "close",
+  "comparison": "gte",
+  "right": "rolling_max(close, 20)"  // 20-day high breakout
+}
+// or
+{
+  "left": "rsi",
+  "comparison": "was_below",
+  "right": 30,
+  "lookback": 5  // RSI was below 30 at some point in last 5 bars
+}
+// or
+{
+  "left": "volume",
+  "comparison": "gt",
+  "right": "sma(volume, 20) * 2"  // Volume > 2x average
+}
+```
+
+**New computed values:**
+- `rolling_max(series, period)` - N-period high
+- `rolling_min(series, period)` - N-period low
+- `rolling_mean(series, period)` - Same as SMA but inline
+- `zscore(series, period)` - Z-score for mean reversion
+- `percentile(series, period)` - Percentile rank
+
+**Engine changes:**
+- Pre-compute rolling stats as "virtual indicators"
+- Parse expressions in condition right-hand side
+- Add `was_above` / `was_below` comparisons with lookback
+
+---
+
+### F021: Trailing Stops
+**Status**: Planned
+**Effort**: 1 day
+**Value**: High - Essential for trend-following
+
+Add trailing stop capability:
+- Trail by fixed percent from high-water mark
+- Trail by ATR multiple
+- Move to breakeven after X% profit
+
+**New stop_loss types:**
+```json
+{
+  "stop_loss": {
+    "type": "trailing_percent",
+    "value": 0.05
+  }
+}
+// or
+{
+  "stop_loss": {
+    "type": "trailing_atr",
+    "value": 2.0,
+    "atr_period": 14
+  }
+}
+```
+
+**Engine changes:**
+- Track highest price since entry per position
+- Update stop level each bar
+- Check against trailing stop, not just entry-based stop
+
+---
 
 ### F001: Custom Formula Indicators
 **Status**: Planned
