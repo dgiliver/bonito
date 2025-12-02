@@ -8,14 +8,14 @@ from pydantic import BaseModel, Field
 
 class OrderSide(str, Enum):
     """Order side."""
-    
+
     BUY = "buy"
     SELL = "sell"
 
 
 class Trade(BaseModel):
     """A completed trade."""
-    
+
     symbol: str
     side: OrderSide
     entry_time: datetime
@@ -30,7 +30,7 @@ class Trade(BaseModel):
 
 class BacktestConfig(BaseModel):
     """Configuration for a backtest run."""
-    
+
     start_date: datetime
     end_date: datetime
     initial_capital: float = Field(default=100_000.0)
@@ -40,17 +40,17 @@ class BacktestConfig(BaseModel):
 
 class PerformanceMetrics(BaseModel):
     """Performance metrics for a backtest."""
-    
+
     # Returns
     total_return: float = Field(..., description="Total return as decimal (0.25 = 25%)")
     annualized_return: float = Field(..., description="Annualized return")
-    
+
     # Risk metrics
     sharpe_ratio: float = Field(..., description="Sharpe ratio (assuming 0% risk-free rate)")
     sortino_ratio: float = Field(..., description="Sortino ratio")
     max_drawdown: float = Field(..., description="Maximum drawdown as decimal")
     max_drawdown_duration_days: int = Field(..., description="Longest drawdown duration")
-    
+
     # Trade statistics
     total_trades: int
     winning_trades: int
@@ -61,17 +61,17 @@ class PerformanceMetrics(BaseModel):
     average_loss: float = Field(..., description="Average losing trade return")
     largest_win: float
     largest_loss: float
-    
+
     # Exposure
     avg_exposure: float = Field(..., description="Average capital exposure")
-    
+
     # Additional
     calmar_ratio: float = Field(..., description="Annualized return / max drawdown")
 
 
 class BacktestResult(BaseModel):
     """Complete backtest result."""
-    
+
     # Metadata
     strategy_name: str
     symbol: str
@@ -79,20 +79,20 @@ class BacktestResult(BaseModel):
     end_date: datetime
     initial_capital: float
     final_capital: float
-    
+
     # Core results
     metrics: PerformanceMetrics
     trades: list[Trade]
-    
+
     # Time series (for charting)
     equity_curve: list[float] = Field(..., description="Daily equity values")
     equity_dates: list[datetime] = Field(..., description="Dates for equity curve")
     drawdown_curve: list[float] = Field(..., description="Drawdown at each point")
-    
+
     # Execution details
     total_commission: float
     total_slippage: float
-    
+
     def summary(self) -> str:
         """Generate a text summary of the results."""
         m = self.metrics
@@ -106,7 +106,7 @@ Final Capital: ${self.final_capital:,.2f}
 RETURNS
   Total Return: {m.total_return:.2%}
   Annualized Return: {m.annualized_return:.2%}
-  
+
 RISK
   Sharpe Ratio: {m.sharpe_ratio:.2f}
   Sortino Ratio: {m.sortino_ratio:.2f}
@@ -124,4 +124,3 @@ COSTS
   Total Commission: ${self.total_commission:,.2f}
   Total Slippage: ${self.total_slippage:,.2f}
 """
-

@@ -10,11 +10,11 @@ from quant_agent.tools.base import Tool, ToolResult
 
 class ValidateStrategyTool(Tool):
     """Validate a strategy configuration."""
-    
+
     @property
     def name(self) -> str:
         return "validate_strategy"
-    
+
     @property
     def description(self) -> str:
         return """Validate a strategy configuration before backtesting.
@@ -26,7 +26,7 @@ Checks:
 - Position sizing is reasonable
 
 Returns validation errors if any issues found."""
-    
+
     @property
     def parameters(self) -> dict:
         return {
@@ -39,19 +39,19 @@ Returns validation errors if any issues found."""
             },
             "required": ["strategy"],
         }
-    
+
     async def execute(self, strategy: dict, **kwargs: Any) -> ToolResult:
         """Validate the strategy."""
         errors: list[str] = []
         warnings: list[str] = []
-        
+
         try:
             config = StrategyConfig(**strategy)
-            
+
             # Additional semantic validation
             indicator_names = {ind.name for ind in config.indicators}
             indicator_names.update({"open", "high", "low", "close", "volume"})
-            
+
             # Check entry rules reference valid indicators
             for rule in config.entry_rules:
                 for cond in rule.conditions:
@@ -62,7 +62,7 @@ Returns validation errors if any issues found."""
                             float(cond.right)
                         except ValueError:
                             errors.append(f"Entry rule references unknown indicator: {cond.right}")
-            
+
             # Check exit rules
             for rule in config.exit_rules:
                 for cond in rule.conditions:
@@ -73,17 +73,19 @@ Returns validation errors if any issues found."""
                             float(cond.right)
                         except ValueError:
                             errors.append(f"Exit rule references unknown indicator: {cond.right}")
-            
+
             # Warnings
             if not config.stop_loss:
                 warnings.append("No stop loss configured - unlimited downside risk")
-            
+
             if not config.exit_rules and not config.take_profit:
                 warnings.append("No exit rules or take profit - positions may never close")
-            
+
             if config.position_size.value > 50:
-                warnings.append(f"Large position size ({config.position_size.value}%) - high concentration risk")
-            
+                warnings.append(
+                    f"Large position size ({config.position_size.value}%) - high concentration risk"
+                )
+
             if errors:
                 return ToolResult(
                     success=False,
@@ -93,7 +95,7 @@ Returns validation errors if any issues found."""
                         "warnings": warnings,
                     },
                 )
-            
+
             return ToolResult(
                 success=True,
                 data={
@@ -102,7 +104,7 @@ Returns validation errors if any issues found."""
                     "strategy_summary": config.to_prompt_description(),
                 },
             )
-            
+
         except ValidationError as e:
             return ToolResult(
                 success=False,
@@ -117,4 +119,3 @@ Returns validation errors if any issues found."""
                 success=False,
                 error=f"Validation error: {str(e)}",
             )
-

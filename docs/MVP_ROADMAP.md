@@ -173,12 +173,12 @@
 
 ## Success Criteria (MVP)
 
-✅ Agent can generate a working strategy from "Create a momentum strategy for SPY"  
-✅ Backtest runs in <5 seconds  
-✅ Agent autonomously refines strategy at least once  
-✅ Final metrics are reasonable (not obviously broken)  
-✅ Entire flow completes in <2 minutes  
-✅ User can save the resulting strategy  
+✅ Agent can generate a working strategy from "Create a momentum strategy for SPY"
+✅ Backtest runs in <5 seconds
+✅ Agent autonomously refines strategy at least once
+✅ Final metrics are reasonable (not obviously broken)
+✅ Entire flow completes in <2 minutes
+✅ User can save the resulting strategy
 
 ---
 
@@ -208,4 +208,3 @@
 | 4 | Agent works | Agent generates + tests strategy |
 | 5 | CLI works | Interactive demo |
 | 6 | Polish | Investor-ready demo |
-

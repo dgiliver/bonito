@@ -7,8 +7,7 @@ from quant_agent.backtest.strategy import StrategyConfig
 __all__ = [
     "BacktestEngine",
     "BacktestConfig",
-    "BacktestResult", 
+    "BacktestResult",
     "Trade",
     "StrategyConfig",
 ]
-

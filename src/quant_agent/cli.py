@@ -27,6 +27,7 @@ console = Console()
 def _get_store():
     """Get a MarketDataStore instance."""
     from quant_agent.data.store import MarketDataStore
+
     return MarketDataStore()
 
 
@@ -40,31 +41,86 @@ def main(
 
 
 @app.command()
-def chat() -> None:
+def chat(
+    model: str = typer.Option("anthropic", "--model", "-m", help="LLM provider: anthropic, openai"),
+    verbose: bool = typer.Option(False, "--verbose", "-v", help="Show tool calls and thinking"),
+) -> None:
     """Start an interactive chat session with the quant agent."""
+    import asyncio
+
+    asyncio.run(_chat_loop(model, verbose))
+
+
+async def _chat_loop(model: str, verbose: bool) -> None:
+    """Async chat loop with the agent."""
+    from quant_agent.agent.llm import get_llm_client
+    from quant_agent.agent.orchestrator import (
+        AgentOrchestrator,
+        ErrorEvent,
+        ResponseEvent,
+        ToolCallEvent,
+        ToolResultEvent,
+    )
+    from quant_agent.agent.tools import get_agent_tools
+
+    # Initialize
+    try:
+        llm = get_llm_client(model)
+    except ValueError as e:
+        console.print(f"[red]Error: {e}[/red]")
+        return
+
+    registry, _, _ = get_agent_tools()
+    agent = AgentOrchestrator(llm=llm, tools=registry)
+
     console.print(
         Panel.fit(
             "[bold blue]Quant Agent[/bold blue]\n"
-            "AI-native algorithmic trading platform\n\n"
-            "Type your request or 'quit' to exit.",
+            "AI-native algorithmic trading assistant\n\n"
+            "Ask me to create and backtest trading strategies.\n"
+            "Type 'quit' to exit, 'reset' to clear history.",
             border_style="blue",
         )
     )
-    
+
     while True:
         try:
             user_input = Prompt.ask("\n[bold green]You[/bold green]")
-            
+
             if user_input.lower() in ("quit", "exit", "q"):
                 console.print("[dim]Goodbye![/dim]")
                 break
-            
-            # TODO: Integrate with agent
-            console.print(
-                f"\n[bold blue]Agent[/bold blue]: "
-                f"[dim](Agent not yet implemented. You said: {user_input})[/dim]"
-            )
-            
+
+            if user_input.lower() == "reset":
+                agent.reset()
+                console.print("[dim]Conversation reset.[/dim]")
+                continue
+
+            if not user_input.strip():
+                continue
+
+            # Process with agent
+            console.print()
+            async for event in agent.process(user_input):
+                if isinstance(event, ToolCallEvent):
+                    if verbose:
+                        console.print(
+                            f"[yellow]→ {event.tool_name}[/yellow] " f"[dim]{event.arguments}[/dim]"
+                        )
+                    else:
+                        console.print(f"[yellow]→ {event.tool_name}[/yellow]")
+
+                elif isinstance(event, ToolResultEvent):
+                    if verbose:
+                        status = "[green]✓[/green]" if event.success else "[red]✗[/red]"
+                        console.print(f"  {status} {event.tool_name} completed")
+
+                elif isinstance(event, ResponseEvent):
+                    console.print(f"\n[bold blue]Agent[/bold blue]: {event.content}")
+
+                elif isinstance(event, ErrorEvent):
+                    console.print(f"[red]Error: {event.error}[/red]")
+
         except KeyboardInterrupt:
             console.print("\n[dim]Interrupted. Goodbye![/dim]")
             break
@@ -80,12 +136,12 @@ def ingest(
     """Download historical market data from Yahoo Finance."""
     if end is None:
         end = datetime.now().strftime("%Y-%m-%d")
-    
+
     store = _get_store()
     total_bars = 0
-    
+
     console.print(f"\n[dim]Downloading data from {start} to {end} ({timeframe})[/dim]\n")
-    
+
     with Progress(
         SpinnerColumn(),
         TextColumn("[progress.description]{task.description}"),
@@ -102,17 +158,13 @@ def ingest(
                 )
                 total_bars += count
                 progress.update(
-                    task, 
-                    description=f"[green]✓[/green] {symbol.upper()}: {count:,} bars"
+                    task, description=f"[green]✓[/green] {symbol.upper()}: {count:,} bars"
                 )
             except Exception as e:
-                progress.update(
-                    task, 
-                    description=f"[red]✗[/red] {symbol.upper()}: {str(e)}"
-                )
-    
+                progress.update(task, description=f"[red]✗[/red] {symbol.upper()}: {str(e)}")
+
     store.close()
-    
+
     console.print(f"\n[green]Done![/green] Ingested {total_bars:,} total bars")
     console.print(f"[dim]Data stored in {store.db_path}[/dim]")
 
@@ -122,18 +174,18 @@ def data_list() -> None:
     """List all symbols with available data."""
     store = _get_store()
     symbols = store.list_symbols()
-    
+
     if not symbols:
         console.print("[yellow]No data found. Run 'quant ingest <SYMBOL>' first.[/yellow]")
         store.close()
         return
-    
+
     table = Table(title="Available Market Data")
     table.add_column("Symbol", style="cyan", no_wrap=True)
     table.add_column("Start Date", style="dim")
     table.add_column("End Date", style="dim")
     table.add_column("Bars", justify="right")
-    
+
     for symbol in symbols:
         date_range = store.get_date_range(symbol)
         if date_range:
@@ -144,7 +196,7 @@ def data_list() -> None:
                 date_range[1].strftime("%Y-%m-%d"),
                 f"{bar_count:,}",
             )
-    
+
     store.close()
     console.print(table)
 
@@ -157,17 +209,18 @@ def data_info(
     """Show detailed information about a symbol's data."""
     store = _get_store()
     symbol = symbol.upper()
-    
+
     date_range = store.get_date_range(symbol)
     if not date_range:
         console.print(f"[red]No data found for {symbol}[/red]")
         console.print("[dim]Run 'quant ingest {symbol}' to download data.[/dim]")
         store.close()
         return
-    
+
     # Get statistics
-    stats = store.conn.execute("""
-        SELECT 
+    stats = store.conn.execute(
+        """
+        SELECT
             COUNT(*) as bars,
             MIN(close) as min_price,
             MAX(close) as max_price,
@@ -175,44 +228,53 @@ def data_info(
             AVG(volume) as avg_volume,
             MIN(volume) as min_volume,
             MAX(volume) as max_volume
-        FROM bars 
+        FROM bars
         WHERE symbol = ?
-    """, [symbol]).fetchone()
-    
+    """,
+        [symbol],
+    ).fetchone()
+
     console.print(f"\n[bold cyan]{symbol}[/bold cyan] Data Summary\n")
-    console.print(f"  📅 Date Range:  {date_range[0].strftime('%Y-%m-%d')} to {date_range[1].strftime('%Y-%m-%d')}")
+    console.print(
+        f"  📅 Date Range:  {date_range[0].strftime('%Y-%m-%d')} to {date_range[1].strftime('%Y-%m-%d')}"
+    )
     console.print(f"  📊 Total Bars:  {stats[0]:,}")
     console.print(f"  💰 Price Range: ${stats[1]:.2f} - ${stats[2]:.2f}")
     console.print(f"  📈 Avg Price:   ${stats[3]:.2f}")
     console.print(f"  📦 Avg Volume:  {stats[4]:,.0f}")
-    
+
     # Get most recent bars
-    recent = store.conn.execute("""
+    recent = store.conn.execute(
+        """
         SELECT timestamp, open, high, low, close, volume
         FROM bars
         WHERE symbol = ?
         ORDER BY timestamp DESC
         LIMIT 5
-    """, [symbol]).fetchall()
-    
+    """,
+        [symbol],
+    ).fetchall()
+
     if recent:
         console.print("\n  [dim]Recent bars:[/dim]")
         for row in recent:
-            ts, o, h, l, c, v = row
-            console.print(f"    {ts.strftime('%Y-%m-%d')}: O={o:.2f} H={h:.2f} L={l:.2f} C={c:.2f} V={v:,.0f}")
-    
+            ts, open_price, high, low, close, vol = row
+            console.print(
+                f"    {ts.strftime('%Y-%m-%d')}: O={open_price:.2f} H={high:.2f} L={low:.2f} C={close:.2f} V={vol:,.0f}"
+            )
+
     # Validation
     if validate:
         console.print("\n  [dim]Running validation...[/dim]")
         result = store.validate_bars(symbol)
-        
+
         if result["valid"]:
             console.print("  [green]✓ Data validation passed[/green]")
         else:
             console.print("  [yellow]⚠ Data quality issues found:[/yellow]")
             for issue in result["issues"]:
                 console.print(f"    - {issue}")
-    
+
     store.close()
 
 
@@ -223,7 +285,7 @@ def data_delete(
 ) -> None:
     """Delete data for a symbol."""
     symbol = symbol.upper()
-    
+
     if not force:
         confirm = Prompt.ask(
             f"[yellow]Delete all data for {symbol}?[/yellow]",
@@ -233,31 +295,173 @@ def data_delete(
         if confirm != "y":
             console.print("[dim]Cancelled.[/dim]")
             return
-    
+
     store = _get_store()
     # DuckDB doesn't return row count from DELETE, so we count first
     count = store.get_bar_count(symbol)
-    
+
     if count == 0:
         console.print(f"[yellow]No data found for {symbol}[/yellow]")
     else:
         store.conn.execute("DELETE FROM bars WHERE symbol = ?", [symbol])
         console.print(f"[green]Deleted {count:,} bars for {symbol}[/green]")
-    
+
     store.close()
 
 
 @app.command()
 def backtest(
-    strategy: str = typer.Argument(..., help="Path to strategy config JSON file"),
-    symbol: str = typer.Option("SPY", help="Symbol to backtest"),
-    start: str = typer.Option("2020-01-01", help="Start date (YYYY-MM-DD)"),
-    end: str = typer.Option("2024-01-01", help="End date (YYYY-MM-DD)"),
+    strategy_file: str = typer.Argument(..., help="Path to strategy config JSON file"),
+    symbol: str = typer.Option(None, "--symbol", "-s", help="Override strategy symbol"),
+    start: str = typer.Option("2020-01-01", "--start", help="Start date (YYYY-MM-DD)"),
+    end: str = typer.Option(None, "--end", "-e", help="End date (YYYY-MM-DD), defaults to today"),
+    capital: float = typer.Option(100000, "--capital", "-c", help="Initial capital"),
+    output: str = typer.Option(None, "--output", "-o", help="Save results to JSON file"),
 ) -> None:
     """Run a backtest for a strategy configuration."""
-    console.print(f"[dim]Backtesting {strategy} on {symbol} from {start} to {end}...[/dim]")
-    # TODO: Implement in Week 2
-    console.print("[yellow]Backtest engine not yet implemented. Coming in Week 2![/yellow]")
+    import json
+    from pathlib import Path
+
+    from quant_agent.backtest.engine import BacktestEngine
+    from quant_agent.backtest.models import BacktestConfig
+    from quant_agent.backtest.strategy import StrategyConfig
+
+    # Load strategy
+    strategy_path = Path(strategy_file)
+    if not strategy_path.exists():
+        console.print(f"[red]Strategy file not found: {strategy_file}[/red]")
+        raise typer.Exit(1)
+
+    with open(strategy_path) as f:
+        strategy_data = json.load(f)
+
+    try:
+        strategy = StrategyConfig(**strategy_data)
+    except Exception as e:
+        console.print(f"[red]Invalid strategy configuration: {e}[/red]")
+        raise typer.Exit(1) from None
+
+    # Override symbol if provided
+    if symbol:
+        strategy = strategy.model_copy(update={"symbols": [symbol.upper()]})
+
+    target_symbol = strategy.symbols[0]
+
+    # Parse dates
+    start_date = datetime.strptime(start, "%Y-%m-%d")
+    end_date = datetime.strptime(end, "%Y-%m-%d") if end else datetime.now()
+
+    # Load data
+    store = _get_store()
+
+    console.print(f"\n[bold]Loading data for {target_symbol}...[/bold]")
+    data = store.get_bars(target_symbol, start_date, end_date, strategy.timeframe)
+    store.close()
+
+    if data is None:
+        console.print(f"[red]No data found for {target_symbol}[/red]")
+        console.print(f"[dim]Run 'quant ingest {target_symbol}' first.[/dim]")
+        raise typer.Exit(1)
+
+    console.print(
+        f"[dim]Loaded {len(data)} bars from {data.timestamps[0].strftime('%Y-%m-%d')} to {data.timestamps[-1].strftime('%Y-%m-%d')}[/dim]"
+    )
+
+    # Run backtest
+    console.print(f"\n[bold]Running backtest: {strategy.name}[/bold]")
+
+    config = BacktestConfig(
+        start_date=start_date,
+        end_date=end_date,
+        initial_capital=capital,
+    )
+    engine = BacktestEngine(config)
+
+    with console.status("[bold blue]Backtesting...[/bold blue]"):
+        result = engine.run(strategy, data)
+
+    # Display results
+    console.print(result.summary())
+
+    # Metrics table
+    m = result.metrics
+    metrics_table = Table(title="Performance Metrics", show_header=False)
+    metrics_table.add_column("Metric", style="cyan")
+    metrics_table.add_column("Value", justify="right")
+
+    metrics_table.add_row("Total Return", f"{m.total_return:.2%}")
+    metrics_table.add_row("Annualized Return", f"{m.annualized_return:.2%}")
+    metrics_table.add_row("Sharpe Ratio", f"{m.sharpe_ratio:.2f}")
+    metrics_table.add_row("Sortino Ratio", f"{m.sortino_ratio:.2f}")
+    metrics_table.add_row("Max Drawdown", f"{m.max_drawdown:.2%}")
+    metrics_table.add_row("Win Rate", f"{m.win_rate:.1%}")
+    metrics_table.add_row("Profit Factor", f"{m.profit_factor:.2f}")
+    metrics_table.add_row("Total Trades", str(m.total_trades))
+
+    console.print(metrics_table)
+
+    # Trade table
+    if result.trades:
+        console.print("\n[bold]Recent Trades:[/bold]")
+
+        trade_table = Table()
+        trade_table.add_column("Entry Date", style="dim")
+        trade_table.add_column("Exit Date", style="dim")
+        trade_table.add_column("Entry $", justify="right")
+        trade_table.add_column("Exit $", justify="right")
+        trade_table.add_column("P&L", justify="right")
+        trade_table.add_column("Return", justify="right")
+        trade_table.add_column("Reason")
+
+        for trade in result.trades[-10:]:  # Last 10 trades
+            pnl_style = "green" if trade.pnl > 0 else "red"
+            trade_table.add_row(
+                trade.entry_time.strftime("%Y-%m-%d"),
+                trade.exit_time.strftime("%Y-%m-%d"),
+                f"${trade.entry_price:.2f}",
+                f"${trade.exit_price:.2f}",
+                f"[{pnl_style}]${trade.pnl:,.2f}[/{pnl_style}]",
+                f"[{pnl_style}]{trade.pnl_percent:.2%}[/{pnl_style}]",
+                trade.exit_reason,
+            )
+
+        console.print(trade_table)
+
+    # Save results if requested
+    if output:
+        output_path = Path(output)
+        result_data = {
+            "strategy_name": result.strategy_name,
+            "symbol": result.symbol,
+            "period": f"{start} to {end_date.strftime('%Y-%m-%d')}",
+            "initial_capital": result.initial_capital,
+            "final_capital": result.final_capital,
+            "metrics": {
+                "total_return": result.metrics.total_return,
+                "annualized_return": result.metrics.annualized_return,
+                "sharpe_ratio": result.metrics.sharpe_ratio,
+                "sortino_ratio": result.metrics.sortino_ratio,
+                "max_drawdown": result.metrics.max_drawdown,
+                "total_trades": result.metrics.total_trades,
+                "win_rate": result.metrics.win_rate,
+                "profit_factor": result.metrics.profit_factor,
+            },
+            "trades": [
+                {
+                    "entry_time": t.entry_time.isoformat(),
+                    "exit_time": t.exit_time.isoformat(),
+                    "entry_price": t.entry_price,
+                    "exit_price": t.exit_price,
+                    "pnl": t.pnl,
+                    "pnl_percent": t.pnl_percent,
+                    "exit_reason": t.exit_reason,
+                }
+                for t in result.trades
+            ],
+        }
+        with open(output_path, "w") as f:
+            json.dump(result_data, f, indent=2, default=str)
+        console.print(f"\n[dim]Results saved to {output_path}[/dim]")
 
 
 if __name__ == "__main__":

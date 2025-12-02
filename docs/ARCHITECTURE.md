@@ -94,14 +94,14 @@ class StrategyConfig:
     name: str
     symbols: list[str]
     timeframe: str  # "1m", "5m", "1h", "1d"
-    
+
     # Indicators are pre-defined, parameterized
     indicators: list[IndicatorConfig]
-    
+
     # Entry/exit rules use a mini-DSL
     entry_rules: list[Rule]
     exit_rules: list[Rule]
-    
+
     # Risk parameters
     position_size: PositionSizer
     stop_loss: StopLossConfig | None
@@ -147,15 +147,15 @@ class Tool(ABC):
     @property
     @abstractmethod
     def name(self) -> str: ...
-    
+
     @property
     @abstractmethod
     def description(self) -> str: ...
-    
+
     @property
     @abstractmethod
     def parameters(self) -> dict: ...  # JSON Schema
-    
+
     @abstractmethod
     async def execute(self, **kwargs) -> ToolResult: ...
 ```
@@ -297,4 +297,3 @@ Post-MVP: Consider WASM sandbox or subprocess isolation
 | Interactive Brokers | Live trading | Medium |
 | OpenBB | Alternative data | Medium |
 | Weights & Biases | Experiment tracking | Low |
-

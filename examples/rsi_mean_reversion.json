@@ -21,12 +21,12 @@
       "conditions": [
         {
           "left": "rsi",
-          "comparison": "<",
+          "comparison": "lt",
           "right": 30
         },
         {
           "left": "close",
-          "comparison": ">",
+          "comparison": "gt",
           "right": "sma_200"
         }
       ],
@@ -38,7 +38,7 @@
       "conditions": [
         {
           "left": "rsi",
-          "comparison": ">",
+          "comparison": "gt",
           "right": 70
         }
       ],
@@ -59,4 +59,3 @@
     "value": 0.08
   }
 }
-

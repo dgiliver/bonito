@@ -9,11 +9,11 @@ from quant_agent.tools.base import Tool, ToolResult
 
 class GetBarsTool(Tool):
     """Get historical bar data."""
-    
+
     @property
     def name(self) -> str:
         return "get_bars"
-    
+
     @property
     def description(self) -> str:
         return """Get historical OHLCV bar data for a symbol.
@@ -24,7 +24,7 @@ Returns:
 - Volume
 
 Use this to analyze price history or verify data availability."""
-    
+
     @property
     def parameters(self) -> dict:
         return {
@@ -55,7 +55,7 @@ Use this to analyze price history or verify data availability."""
             },
             "required": ["symbol", "start_date", "end_date"],
         }
-    
+
     async def execute(
         self,
         symbol: str,
@@ -70,18 +70,18 @@ Use this to analyze price history or verify data availability."""
             store = MarketDataStore()
             start = datetime.strptime(start_date, "%Y-%m-%d")
             end = datetime.strptime(end_date, "%Y-%m-%d")
-            
+
             data = store.get_bars(symbol, start, end, timeframe)
-            
+
             if data is None:
                 return ToolResult(
                     success=False,
                     error=f"No data found for {symbol}",
                 )
-            
+
             # Limit data for response size
             n = min(limit, len(data))
-            
+
             return ToolResult(
                 success=True,
                 data={
@@ -110,7 +110,7 @@ Use this to analyze price history or verify data availability."""
                     ],
                 },
             )
-            
+
         except Exception as e:
             return ToolResult(
                 success=False,
@@ -120,18 +120,18 @@ Use this to analyze price history or verify data availability."""
 
 class ListSymbolsTool(Tool):
     """List available symbols in the data store."""
-    
+
     @property
     def name(self) -> str:
         return "list_symbols"
-    
+
     @property
     def description(self) -> str:
         return """List all symbols available in the data store.
 
 Returns a list of ticker symbols that have historical data loaded.
 Use this to see what symbols are available for backtesting."""
-    
+
     @property
     def parameters(self) -> dict:
         return {
@@ -139,24 +139,26 @@ Use this to see what symbols are available for backtesting."""
             "properties": {},
             "required": [],
         }
-    
+
     async def execute(self, **kwargs: Any) -> ToolResult:
         """List symbols."""
         try:
             store = MarketDataStore()
             symbols = store.list_symbols()
-            
+
             # Get date ranges for each symbol
             symbol_info = []
             for symbol in symbols:
                 date_range = store.get_date_range(symbol)
                 if date_range:
-                    symbol_info.append({
-                        "symbol": symbol,
-                        "start": date_range[0].isoformat(),
-                        "end": date_range[1].isoformat(),
-                    })
-            
+                    symbol_info.append(
+                        {
+                            "symbol": symbol,
+                            "start": date_range[0].isoformat(),
+                            "end": date_range[1].isoformat(),
+                        }
+                    )
+
             return ToolResult(
                 success=True,
                 data={
@@ -165,10 +167,9 @@ Use this to see what symbols are available for backtesting."""
                     "details": symbol_info,
                 },
             )
-            
+
         except Exception as e:
             return ToolResult(
                 success=False,
                 error=f"Failed to list symbols: {str(e)}",
             )
-

@@ -1,7 +1,7 @@
 # Makefile for quant-agent development
 # Usage: make <target>
 
-.PHONY: help install install-dev test lint format typecheck pre-commit clean
+.PHONY: help install install-dev test lint format typecheck pre-commit clean api docker-build docker-up docker-down
 
 # Default target
 help:
@@ -17,6 +17,12 @@ help:
 	@echo "  pre-commit   - Run all pre-commit hooks"
 	@echo "  clean        - Remove build artifacts"
 	@echo "  setup        - Complete dev environment setup"
+	@echo "  api          - Run the API server (port 8000)"
+	@echo "  chat         - Start CLI chat with agent"
+	@echo "  docker-build - Build Docker image"
+	@echo "  docker-up    - Start containers"
+	@echo "  docker-down  - Stop containers"
+	@echo "  docker-logs  - View container logs"
 
 # Installation
 install:
@@ -74,3 +80,23 @@ setup: install-dev
 	@echo "  1. Run 'make test-fast' to verify setup"
 	@echo "  2. Run 'make pre-commit' to check code quality"
 
+# API Server
+api:
+	uvicorn quant_agent.api.main:app --reload --host 0.0.0.0 --port 8000
+
+# CLI Chat
+chat:
+	python -m quant_agent.cli chat -v
+
+# Docker
+docker-build:
+	docker build -t quant-agent .
+
+docker-up:
+	docker-compose up -d
+
+docker-down:
+	docker-compose down
+
+docker-logs:
+	docker-compose logs -f api

@@ -9,7 +9,7 @@ Traditional quant platforms (QuantConnect, Tradestation, etc.) were built in a p
 **Quant Agent** inverts this:
 
 - **Agent-first**: An AI agent generates, tests, and refines strategies
-- **Tool-based**: Modular MCP-style tools for backtesting, data, and analysis  
+- **Tool-based**: Modular MCP-style tools for backtesting, data, and analysis
 - **Fast iteration**: Sub-second backtests for rapid experimentation
 - **Observable**: Every decision is traced and explainable
 
@@ -59,7 +59,7 @@ Final Capital: $142,350.00
 RETURNS
   Total Return: 42.35%
   Annualized Return: 9.25%
-  
+
 RISK
   Sharpe Ratio: 1.15
   Max Drawdown: 12.3%
@@ -227,4 +227,3 @@ See [docs/MVP_ROADMAP.md](docs/MVP_ROADMAP.md) for the detailed development plan
 ## License
 
 MIT
-

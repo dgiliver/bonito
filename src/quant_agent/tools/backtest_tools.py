@@ -12,11 +12,11 @@ from quant_agent.tools.base import Tool, ToolResult
 
 class BacktestRunTool(Tool):
     """Run a backtest for a strategy configuration."""
-    
+
     @property
     def name(self) -> str:
         return "backtest_run"
-    
+
     @property
     def description(self) -> str:
         return """Run a backtest for a trading strategy.
@@ -29,7 +29,7 @@ Takes a strategy configuration and returns performance metrics including:
 - List of all trades
 
 Use this to evaluate how a strategy would have performed historically."""
-    
+
     @property
     def parameters(self) -> dict:
         return {
@@ -55,7 +55,7 @@ Use this to evaluate how a strategy would have performed historically."""
             },
             "required": ["strategy", "start_date", "end_date"],
         }
-    
+
     async def execute(
         self,
         strategy: dict,
@@ -68,22 +68,22 @@ Use this to evaluate how a strategy would have performed historically."""
         try:
             # Parse strategy config
             strategy_config = StrategyConfig(**strategy)
-            
+
             # Parse dates
             start = datetime.strptime(start_date, "%Y-%m-%d")
             end = datetime.strptime(end_date, "%Y-%m-%d")
-            
+
             # Get data
             store = MarketDataStore()
             symbol = strategy_config.symbols[0]  # MVP: single symbol
             data = store.get_bars(symbol, start, end, strategy_config.timeframe)
-            
+
             if data is None:
                 return ToolResult(
                     success=False,
                     error=f"No data found for {symbol}. Please ingest data first.",
                 )
-            
+
             # Run backtest
             config = BacktestConfig(
                 start_date=start,
@@ -92,7 +92,7 @@ Use this to evaluate how a strategy would have performed historically."""
             )
             engine = BacktestEngine(config)
             result = engine.run(strategy_config, data)
-            
+
             # Return summary data (not full equity curve to save tokens)
             return ToolResult(
                 success=True,
@@ -118,7 +118,7 @@ Use this to evaluate how a strategy would have performed historically."""
                     "summary": result.summary(),
                 },
             )
-            
+
         except Exception as e:
             return ToolResult(
                 success=False,
@@ -128,11 +128,11 @@ Use this to evaluate how a strategy would have performed historically."""
 
 class BacktestExplainTool(Tool):
     """Explain why specific trades were taken."""
-    
+
     @property
     def name(self) -> str:
         return "backtest_explain"
-    
+
     @property
     def description(self) -> str:
         return """Explain the reasoning behind trades in a backtest.
@@ -143,7 +143,7 @@ Provides detailed information about:
 - Why stop losses or take profits were hit
 
 Use this to understand and debug strategy behavior."""
-    
+
     @property
     def parameters(self) -> dict:
         return {
@@ -169,7 +169,7 @@ Use this to understand and debug strategy behavior."""
             },
             "required": ["strategy", "start_date", "end_date"],
         }
-    
+
     async def execute(
         self,
         strategy: dict,
@@ -181,10 +181,10 @@ Use this to understand and debug strategy behavior."""
         """Execute the explanation."""
         # TODO: Implement detailed trade explanation
         # For MVP, this returns a simplified version
-        
+
         try:
             strategy_config = StrategyConfig(**strategy)
-            
+
             return ToolResult(
                 success=True,
                 data={
@@ -197,4 +197,3 @@ Use this to understand and debug strategy behavior."""
                 success=False,
                 error=f"Explanation failed: {str(e)}",
             )
-

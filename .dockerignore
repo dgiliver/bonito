@@ -1,0 +1,54 @@
+# Git
+.git
+.gitignore
+
+# Python
+__pycache__
+*.py[cod]
+*$py.class
+*.so
+.Python
+.venv
+venv
+ENV
+env
+
+# Testing
+.pytest_cache
+.coverage
+htmlcov
+.tox
+.nox
+
+# IDE
+.idea
+.vscode
+*.swp
+*.swo
+.cursor
+
+# Build
+build
+dist
+*.egg-info
+.eggs
+
+# Docs (not needed in container)
+docs
+
+# Tests (not needed in container)
+tests
+
+# Local development files
+.env
+.env.local
+*.log
+
+# Data files (mounted as volumes)
+data/*.duckdb
+strategies/*.json
+
+# Misc
+.DS_Store
+Thumbs.db
+*.bak

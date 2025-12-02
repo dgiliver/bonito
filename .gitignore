@@ -61,3 +61,8 @@ htmlcov/
 # Jupyter
 .ipynb_checkpoints/
 
+# Frontend (Next.js)
+web/node_modules/
+web/.next/
+web/out/
+web/.env.local

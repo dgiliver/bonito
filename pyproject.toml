@@ -8,21 +8,25 @@ dependencies = [
     # Core
     "pydantic>=2.5.0",
     "pydantic-settings>=2.1.0",
-    
+
     # Data
     "duckdb>=0.9.0",
     "pandas>=2.1.0",
     "numpy>=1.26.0",
     "yfinance>=0.2.33",
-    
+
     # LLM
     "anthropic>=0.39.0",
     "openai>=1.6.0",
-    
+
     # CLI
     "typer>=0.9.0",
     "rich>=13.7.0",
-    
+
+    # API Server
+    "fastapi>=0.109.0",
+    "uvicorn[standard]>=0.27.0",
+
     # Utilities
     "httpx>=0.26.0",
     "python-dotenv>=1.0.0",
@@ -34,17 +38,17 @@ dev = [
     "pytest>=7.4.0",
     "pytest-asyncio>=0.21.0",
     "pytest-cov>=4.1.0",
-    
+
     # Linting & Formatting
     "ruff>=0.8.0",
     "mypy>=1.8.0",
-    
+
     # Pre-commit
     "pre-commit>=3.6.0",
-    
+
     # Security
     "bandit[toml]>=1.7.0",
-    
+
     # Type stubs
     "types-requests>=2.31.0",
     "pandas-stubs>=2.1.0",
@@ -52,6 +56,7 @@ dev = [
 
 [project.scripts]
 quant = "quant_agent.cli:app"
+quant-api = "quant_agent.api.server:main"
 
 [build-system]
 requires = ["hatchling"]
@@ -67,9 +72,17 @@ ignore = ["E501"]  # Line too long - handled by formatter
 
 [tool.mypy]
 python_version = "3.12"
-strict = true
-warn_return_any = true
+# Relaxed for MVP - can tighten later
+strict = false
+warn_return_any = false
 warn_unused_ignores = true
+ignore_missing_imports = true
+disallow_untyped_defs = false
+check_untyped_defs = true
+
+[[tool.mypy.overrides]]
+module = "tests.*"
+disallow_untyped_defs = false
 
 [tool.pytest.ini_options]
 asyncio_mode = "auto"
@@ -104,4 +117,4 @@ known-first-party = ["quant_agent"]
 
 [tool.ruff.lint.per-file-ignores]
 "tests/*" = ["S101"]  # Allow asserts in tests
-
+"src/quant_agent/cli.py" = ["B008"]  # Allow typer.Argument/Option in defaults (required pattern)

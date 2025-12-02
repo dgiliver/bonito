@@ -24,9 +24,8 @@ def pytest_collection_modifyitems(config, items):
     """Skip slow tests unless --run-slow is provided."""
     if config.getoption("--run-slow"):
         return
-    
+
     skip_slow = pytest.mark.skip(reason="Need --run-slow option to run")
     for item in items:
         if "slow" in item.keywords:
             item.add_marker(skip_slow)
-

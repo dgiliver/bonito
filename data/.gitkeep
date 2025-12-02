@@ -1,3 +1,2 @@
 # This directory stores market data (DuckDB files)
 # The .duckdb files are gitignored
-
