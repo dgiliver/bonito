@@ -16,7 +16,8 @@
 | 1-2 | F019: pandas-ta | 1.5 days | "130+ indicators" is a marketing hook |
 | 2 | F021: Trailing stops | 0.5 day | Quick win, enables "let winners run" |
 | 3-4 | F020: Short selling | 1.5 days | "Long AND short" doubles appeal |
-| 5 | Polish & bug fixes | 1 day | Don't ship broken |
+| 4-5 | **Supabase Auth** | 1.5 days | User accounts, data isolation |
+| 5 | Polish & bug fixes | 0.5 day | Don't ship broken |
 
 **Skip for launch:** F022 (rolling lookback), F002 (plugins) — nice to have, not essential for v1
 
@@ -24,8 +25,269 @@
 - [ ] User can select VWAP, ADX, Donchian in strategy
 - [ ] User can create short strategies
 - [ ] Trailing stops work
+- [ ] **User can sign up / sign in (email + Google)**
+- [ ] **Each user only sees their own strategies**
 - [ ] No crashes on happy path
 - [ ] Mobile-responsive (people will check on phones)
+
+---
+
+## Phase 1.5: Supabase Authentication (HIGH PRIORITY)
+
+### What Supabase Provides
+
+| Feature | What It Does | Cost |
+|---------|--------------|------|
+| **Auth** | Email/password, Google, GitHub OAuth | Free |
+| **PostgreSQL** | Database for strategies, user data | Free (500MB) |
+| **Row Level Security** | Each user only sees their data | Built-in |
+| **Edge Functions** | Serverless functions (optional) | Free tier |
+| **Realtime** | Live updates (optional) | Free tier |
+
+**Free tier limits:** 50,000 monthly active users, 500MB database, 1GB file storage
+
+### Architecture with Supabase
+
+```
+┌─────────────────────────────────────────────────────────────────────┐
+│                           FRONTEND (Vercel)                          │
+│  Next.js + @supabase/supabase-js + @supabase/auth-helpers-nextjs    │
+└───────────────────────────────┬─────────────────────────────────────┘
+                                │
+                    ┌───────────┴───────────┐
+                    │                       │
+                    ▼                       ▼
+        ┌───────────────────┐   ┌───────────────────────────┐
+        │     Supabase      │   │      Railway (API)        │
+        │  ┌─────────────┐  │   │                           │
+        │  │    Auth     │  │   │  FastAPI + DuckDB         │
+        │  │  (sessions) │  │   │  (backtesting engine)     │
+        │  └─────────────┘  │   │                           │
+        │  ┌─────────────┐  │   │  Validates Supabase JWT   │
+        │  │  PostgreSQL │  │   │                           │
+        │  │ (strategies)│  │   └───────────────────────────┘
+        │  └─────────────┘  │
+        └───────────────────┘
+```
+
+### Database Schema (Supabase PostgreSQL)
+
+```sql
+-- Users table (auto-created by Supabase Auth)
+-- auth.users
+
+-- Strategies table
+CREATE TABLE strategies (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    user_id UUID REFERENCES auth.users(id) ON DELETE CASCADE,
+    name TEXT NOT NULL,
+    description TEXT,
+    config JSONB NOT NULL,
+    version INT DEFAULT 1,
+    tags TEXT[] DEFAULT '{}',
+    last_backtest JSONB,
+    created_at TIMESTAMPTZ DEFAULT NOW(),
+    updated_at TIMESTAMPTZ DEFAULT NOW(),
+
+    UNIQUE(user_id, name)
+);
+
+-- Row Level Security: Users only see their own strategies
+ALTER TABLE strategies ENABLE ROW LEVEL SECURITY;
+
+CREATE POLICY "Users can view own strategies"
+    ON strategies FOR SELECT
+    USING (auth.uid() = user_id);
+
+CREATE POLICY "Users can insert own strategies"
+    ON strategies FOR INSERT
+    WITH CHECK (auth.uid() = user_id);
+
+CREATE POLICY "Users can update own strategies"
+    ON strategies FOR UPDATE
+    USING (auth.uid() = user_id);
+
+CREATE POLICY "Users can delete own strategies"
+    ON strategies FOR DELETE
+    USING (auth.uid() = user_id);
+
+-- Chat history table (optional, for conversation persistence)
+CREATE TABLE conversations (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    user_id UUID REFERENCES auth.users(id) ON DELETE CASCADE,
+    title TEXT,
+    messages JSONB DEFAULT '[]',
+    created_at TIMESTAMPTZ DEFAULT NOW(),
+    updated_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+ALTER TABLE conversations ENABLE ROW LEVEL SECURITY;
+
+CREATE POLICY "Users can manage own conversations"
+    ON conversations FOR ALL
+    USING (auth.uid() = user_id);
+```
+
+### Frontend Implementation (Next.js)
+
+**1. Install packages:**
+```bash
+cd web
+npm install @supabase/supabase-js @supabase/auth-helpers-nextjs
+```
+
+**2. Environment variables:**
+```bash
+# .env.local
+NEXT_PUBLIC_SUPABASE_URL=https://xxxxx.supabase.co
+NEXT_PUBLIC_SUPABASE_ANON_KEY=eyJhbGciOiJIUzI1NiIs...
+```
+
+**3. Create Supabase client:**
+```typescript
+// lib/supabase.ts
+import { createClientComponentClient } from '@supabase/auth-helpers-nextjs'
+
+export const supabase = createClientComponentClient()
+```
+
+**4. Auth UI component:**
+```typescript
+// components/Auth.tsx
+import { Auth } from '@supabase/auth-ui-react'
+import { ThemeSupa } from '@supabase/auth-ui-shared'
+import { supabase } from '@/lib/supabase'
+
+export function AuthForm() {
+  return (
+    <Auth
+      supabaseClient={supabase}
+      appearance={{ theme: ThemeSupa }}
+      providers={['google']}
+      redirectTo={`${window.location.origin}/auth/callback`}
+    />
+  )
+}
+```
+
+**5. Protect routes:**
+```typescript
+// middleware.ts
+import { createMiddlewareClient } from '@supabase/auth-helpers-nextjs'
+import { NextResponse } from 'next/server'
+import type { NextRequest } from 'next/server'
+
+export async function middleware(req: NextRequest) {
+  const res = NextResponse.next()
+  const supabase = createMiddlewareClient({ req, res })
+  const { data: { session } } = await supabase.auth.getSession()
+
+  // Redirect to login if not authenticated
+  if (!session && req.nextUrl.pathname !== '/login') {
+    return NextResponse.redirect(new URL('/login', req.url))
+  }
+
+  return res
+}
+
+export const config = {
+  matcher: ['/((?!_next/static|_next/image|favicon.ico|login|auth).*)']
+}
+```
+
+### Backend: Validate Supabase JWT (FastAPI)
+
+```python
+# api/auth.py
+from fastapi import Depends, HTTPException, Request
+from jose import jwt, JWTError
+import httpx
+
+SUPABASE_URL = os.getenv("SUPABASE_URL")
+SUPABASE_JWT_SECRET = os.getenv("SUPABASE_JWT_SECRET")
+
+async def get_current_user(request: Request) -> str:
+    """Extract and validate user ID from Supabase JWT."""
+    auth_header = request.headers.get("Authorization")
+    if not auth_header or not auth_header.startswith("Bearer "):
+        raise HTTPException(status_code=401, detail="Missing auth token")
+
+    token = auth_header.split(" ")[1]
+
+    try:
+        payload = jwt.decode(
+            token,
+            SUPABASE_JWT_SECRET,
+            algorithms=["HS256"],
+            audience="authenticated"
+        )
+        user_id = payload.get("sub")
+        if not user_id:
+            raise HTTPException(status_code=401, detail="Invalid token")
+        return user_id
+    except JWTError:
+        raise HTTPException(status_code=401, detail="Invalid token")
+
+# Use in routes
+@app.get("/api/strategies")
+async def list_strategies(user_id: str = Depends(get_current_user)):
+    # user_id is guaranteed to be the authenticated user
+    strategies = await get_user_strategies(user_id)
+    return strategies
+```
+
+### Supabase Setup Checklist
+
+```
+[ ] Create Supabase project (supabase.com)
+[ ] Get project URL and anon key
+[ ] Enable Google OAuth provider (optional but nice)
+    - Create Google Cloud OAuth credentials
+    - Add to Supabase Auth settings
+[ ] Run SQL schema (strategies table + RLS policies)
+[ ] Add environment variables to:
+    - Vercel (frontend)
+    - Railway (backend)
+[ ] Install npm packages in web/
+[ ] Create auth components
+[ ] Add middleware for protected routes
+[ ] Update API routes to validate JWT
+[ ] Test: signup → create strategy → logout → login → see strategy
+```
+
+### User Experience Flow
+
+```
+1. User visits site
+   ↓
+2. Sees landing page with [Sign Up] [Log In]
+   ↓
+3. Clicks Sign Up → Supabase Auth UI
+   - Email/password OR
+   - "Continue with Google" (one click)
+   ↓
+4. Redirected to app, session stored
+   ↓
+5. Creates strategies (saved to their account)
+   ↓
+6. Can log out, log back in, see their strategies
+   ↓
+7. Different device? Log in, same strategies
+```
+
+### What Users See
+
+**Not logged in:**
+- Landing page
+- Login/signup forms
+- Demo video
+- "Try free" CTA
+
+**Logged in:**
+- Chat interface
+- Their saved strategies
+- Their backtest history
+- Account settings (change password, delete account)
 
 ---
 
@@ -81,23 +343,26 @@
 ### Deployment Checklist
 
 ```
-Day 6:
+Day 5-6 (Supabase + Deploy):
+[ ] Create Supabase project
+[ ] Run database schema (strategies table + RLS)
+[ ] Enable Google OAuth in Supabase
 [ ] Buy domain
 [ ] Set up Vercel project, connect GitHub
 [ ] Set up Railway project
-[ ] Configure environment variables
+[ ] Configure environment variables (both services)
 [ ] Deploy API to Railway
 [ ] Deploy frontend to Vercel
-[ ] Test end-to-end
+[ ] Test end-to-end auth flow
 
-Day 7:
-[ ] Set up Supabase auth (optional for v1, can skip)
+Day 7 (Polish):
 [ ] Configure Cloudflare DNS
 [ ] Set up Sentry error tracking
 [ ] Set up PostHog analytics
 [ ] Add basic rate limiting
 [ ] Test on mobile
 [ ] SSL working (automatic with Vercel)
+[ ] Test: signup → strategy → logout → login → see strategy
 ```
 
 ### Environment Variables Needed
@@ -444,11 +709,18 @@ posthog.capture('signup')  // if you add auth
 
 ```
 WEEK 1: BUILD
-[ ] pandas-ta integration
-[ ] Short selling
-[ ] Trailing stops
-[ ] Deploy to Railway + Vercel
-[ ] Domain + SSL
+[ ] pandas-ta integration (Day 1-2)
+[ ] Trailing stops (Day 2)
+[ ] Short selling (Day 3-4)
+[ ] Supabase auth setup (Day 4-5)
+    [ ] Create project
+    [ ] Database schema + RLS
+    [ ] Google OAuth
+    [ ] Frontend auth components
+    [ ] Backend JWT validation
+[ ] Deploy to Railway + Vercel (Day 5-6)
+[ ] Domain + SSL (Day 6)
+[ ] Test full auth flow (Day 7)
 [ ] Basic analytics (PostHog)
 
 WEEK 2: LAUNCH
@@ -465,7 +737,7 @@ WEEK 3: ITERATE
 [ ] Build most-requested feature
 [ ] Second round of posting
 [ ] Start collecting testimonials
-[ ] Plan paid tier
+[ ] Plan paid tier (Stripe + Supabase)
 ```
 
 ---
