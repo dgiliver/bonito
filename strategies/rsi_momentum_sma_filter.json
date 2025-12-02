@@ -1,0 +1,80 @@
+{
+  "id": "849b4ea6-9de9-4842-9f55-cd355e1341b3",
+  "name": "rsi_momentum_sma_filter",
+  "description": "RSI momentum strategy with 200-day SMA trend filter. Buys RSI oversold conditions in uptrends, exits on overbought or trend break.",
+  "version": 1,
+  "config": {
+    "name": "rsi_momentum_sma_filter",
+    "description": "RSI momentum strategy with 200-day SMA trend filter. Buys RSI oversold conditions in uptrends, exits on overbought or trend break.",
+    "version": "1.0",
+    "symbols": [
+      "SPY"
+    ],
+    "timeframe": "1d",
+    "indicators": [
+      {
+        "type": "rsi",
+        "name": "rsi_14",
+        "params": {
+          "period": 14
+        }
+      },
+      {
+        "type": "sma",
+        "name": "sma_200",
+        "params": {
+          "period": 200
+        }
+      }
+    ],
+    "entry_rules": [
+      {
+        "conditions": [
+          {
+            "left": "rsi_14",
+            "comparison": "lt",
+            "right": 30.0
+          },
+          {
+            "left": "close",
+            "comparison": "gt",
+            "right": "sma_200"
+          }
+        ],
+        "logic": "AND"
+      }
+    ],
+    "exit_rules": [
+      {
+        "conditions": [
+          {
+            "left": "rsi_14",
+            "comparison": "gt",
+            "right": 70.0
+          }
+        ],
+        "logic": "AND"
+      }
+    ],
+    "position_size": {
+      "type": "percent_equity",
+      "value": 95.0
+    },
+    "max_positions": 1,
+    "stop_loss": {
+      "type": "percent",
+      "value": 0.03
+    },
+    "take_profit": null
+  },
+  "created_at": "2025-12-02T14:05:27.261266",
+  "updated_at": "2025-12-02T14:05:27.261298",
+  "tags": [
+    "momentum",
+    "rsi",
+    "trend-filter",
+    "sma",
+    "low-frequency"
+  ],
+  "last_backtest": null
+}

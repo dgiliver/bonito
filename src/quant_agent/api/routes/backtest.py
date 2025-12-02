@@ -139,6 +139,16 @@ async def run_backtest(request: BacktestRequest) -> dict[str, Any]:
             }
             for t in result.trades[:50]  # Limit to 50 trades
         ],
+        "equity_curve": [
+            {
+                "date": result.equity_dates[i].isoformat(),
+                "equity": round(result.equity_curve[i], 2),
+                "drawdown": round(result.drawdown_curve[i] * 100, 2),
+                # Buy & hold benchmark: what if we just held the stock?
+                "benchmark": round(request.initial_capital * (bars.closes[i] / bars.closes[0]), 2),
+            }
+            for i in range(0, len(result.equity_curve), max(1, len(result.equity_curve) // 200))
+        ],
     }
 
 

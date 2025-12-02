@@ -1,26 +1,27 @@
 @import "tailwindcss";
 
 :root {
-  /* Cyber-mint dark theme */
-  --bg-primary: #0a0f0d;
-  --bg-secondary: #111916;
-  --bg-tertiary: #1a2420;
-  --bg-card: #0d1411;
-  --border-color: #2a3d35;
-  --border-glow: #3ecf8e;
+  /* Mediterranean Pastel Theme */
+  --bg-primary: #faf7f2;        /* Warm cream */
+  --bg-secondary: #f5f0e8;      /* Sandy beige */
+  --bg-tertiary: #ebe4d8;       /* Soft linen */
+  --bg-card: #ffffff;           /* Clean white */
+  --border-color: #e0d5c7;      /* Warm sand */
+  --border-glow: #c9a87c;       /* Muted gold */
 
-  --text-primary: #e8f4ef;
-  --text-secondary: #8ba99c;
-  --text-muted: #5a7668;
+  --text-primary: #3d3a36;      /* Warm charcoal */
+  --text-secondary: #6b645a;    /* Olive brown */
+  --text-muted: #9a928a;        /* Dusty taupe */
 
-  --accent-primary: #3ecf8e;
-  --accent-secondary: #2ecc71;
-  --accent-warning: #f39c12;
-  --accent-danger: #e74c3c;
-  --accent-info: #3498db;
+  --accent-primary: #c9a87c;    /* Terracotta gold */
+  --accent-secondary: #b8956e;  /* Deeper terracotta */
+  --accent-success: #8fae8b;    /* Sage green */
+  --accent-warning: #d4a574;    /* Warm apricot */
+  --accent-danger: #c88b8b;     /* Dusty rose */
+  --accent-info: #8ba5b5;       /* Mediterranean blue */
 
-  --gradient-start: #3ecf8e;
-  --gradient-end: #2ecc71;
+  --gradient-start: #c9a87c;
+  --gradient-end: #8fae8b;
 }
 
 * {
@@ -36,9 +37,9 @@ html, body {
 body {
   background: var(--bg-primary);
   color: var(--text-primary);
-  font-family: 'SF Mono', 'Fira Code', 'JetBrains Mono', 'Cascadia Code', monospace;
+  font-family: 'DM Sans', -apple-system, BlinkMacSystemFont, sans-serif;
   font-size: 14px;
-  line-height: 1.6;
+  line-height: 1.65;
   -webkit-font-smoothing: antialiased;
 }
 
@@ -75,13 +76,13 @@ body {
 
 /* Custom utility classes */
 .glow-border {
-  box-shadow: 0 0 0 1px var(--border-color),
-              0 0 20px -5px rgba(62, 207, 142, 0.2);
+  box-shadow: 0 2px 8px -2px rgba(201, 168, 124, 0.2),
+              0 0 0 1px var(--border-color);
 }
 
 .glow-border-active {
-  box-shadow: 0 0 0 1px var(--border-glow),
-              0 0 30px -5px rgba(62, 207, 142, 0.4);
+  box-shadow: 0 4px 16px -4px rgba(201, 168, 124, 0.3),
+              0 0 0 1px var(--accent-primary);
 }
 
 .gradient-text {
@@ -126,9 +127,9 @@ body {
 
 /* Code blocks */
 pre, code {
-  font-family: inherit;
+  font-family: 'JetBrains Mono', 'Fira Code', monospace;
   background: var(--bg-tertiary);
-  border-radius: 4px;
+  border-radius: 6px;
 }
 
 code {
@@ -154,7 +155,7 @@ pre code {
   gap: 8px;
   padding: 10px 20px;
   font-weight: 500;
-  border-radius: 6px;
+  border-radius: 8px;
   transition: all 0.2s ease;
   cursor: pointer;
   border: none;
@@ -164,17 +165,17 @@ pre code {
 
 .btn-primary {
   background: var(--accent-primary);
-  color: var(--bg-primary);
+  color: white;
 }
 
 .btn-primary:hover {
   background: var(--accent-secondary);
   transform: translateY(-1px);
-  box-shadow: 0 4px 12px rgba(62, 207, 142, 0.3);
+  box-shadow: 0 4px 12px rgba(201, 168, 124, 0.3);
 }
 
 .btn-secondary {
-  background: var(--bg-tertiary);
+  background: var(--bg-card);
   color: var(--text-primary);
   border: 1px solid var(--border-color);
 }
@@ -198,9 +199,9 @@ pre code {
 .input {
   width: 100%;
   padding: 12px 16px;
-  background: var(--bg-tertiary);
+  background: var(--bg-card);
   border: 1px solid var(--border-color);
-  border-radius: 6px;
+  border-radius: 8px;
   color: var(--text-primary);
   font-family: inherit;
   font-size: 14px;
@@ -210,7 +211,7 @@ pre code {
 .input:focus {
   outline: none;
   border-color: var(--accent-primary);
-  box-shadow: 0 0 0 3px rgba(62, 207, 142, 0.1);
+  box-shadow: 0 0 0 3px rgba(201, 168, 124, 0.15);
 }
 
 .input::placeholder {
@@ -221,13 +222,13 @@ pre code {
 .card {
   background: var(--bg-card);
   border: 1px solid var(--border-color);
-  border-radius: 8px;
+  border-radius: 12px;
   padding: 20px;
 }
 
 .card-hover:hover {
   border-color: var(--accent-primary);
-  box-shadow: 0 0 30px -10px rgba(62, 207, 142, 0.2);
+  box-shadow: 0 8px 24px -8px rgba(201, 168, 124, 0.15);
 }
 
 /* Badges */
@@ -237,24 +238,24 @@ pre code {
   padding: 4px 10px;
   font-size: 12px;
   font-weight: 500;
-  border-radius: 4px;
+  border-radius: 6px;
   background: var(--bg-tertiary);
   color: var(--text-secondary);
 }
 
 .badge-success {
-  background: rgba(62, 207, 142, 0.15);
-  color: var(--accent-primary);
+  background: rgba(143, 174, 139, 0.2);
+  color: #5a7a56;
 }
 
 .badge-warning {
-  background: rgba(243, 156, 18, 0.15);
-  color: var(--accent-warning);
+  background: rgba(212, 165, 116, 0.2);
+  color: #9a7040;
 }
 
 .badge-danger {
-  background: rgba(231, 76, 60, 0.15);
-  color: var(--accent-danger);
+  background: rgba(200, 139, 139, 0.2);
+  color: #8a5a5a;
 }
 
 /* Markdown content styling */
@@ -283,5 +284,23 @@ pre code {
 }
 
 .prose strong {
-  color: var(--accent-primary);
+  color: var(--accent-secondary);
+  font-weight: 600;
+}
+
+/* Checkbox styling */
+input[type="checkbox"] {
+  accent-color: var(--accent-primary);
+}
+
+/* Select styling */
+select {
+  background-image: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 20 20'%3e%3cpath stroke='%239a928a' stroke-linecap='round' stroke-linejoin='round' stroke-width='1.5' d='M6 8l4 4 4-4'/%3e%3c/svg%3e");
+  background-position: right 0.5rem center;
+  background-repeat: no-repeat;
+  background-size: 1.5em 1.5em;
+  padding-right: 2.5rem;
+  -webkit-appearance: none;
+  -moz-appearance: none;
+  appearance: none;
 }

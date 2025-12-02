@@ -13,6 +13,7 @@ import {
   Award,
 } from "lucide-react";
 import { fetchStrategies, runBacktest } from "@/lib/api";
+import EquityChart from "./EquityChart";
 
 interface Strategy {
   id: string;
@@ -29,6 +30,24 @@ interface Strategy {
   };
 }
 
+interface EquityDataPoint {
+  date: string;
+  equity: number;
+  drawdown: number;
+  benchmark?: number;
+}
+
+interface Trade {
+  entry_time: string;
+  exit_time: string;
+  side: string;
+  quantity: number;
+  entry_price: number;
+  exit_price: number;
+  pnl: number;
+  return_pct: string;
+}
+
 interface BacktestResult {
   symbol: string;
   strategy: string;
@@ -42,6 +61,8 @@ interface BacktestResult {
   };
   trades: { total: number; winning: number; losing: number };
   capital: { initial: number; final: number; profit: number };
+  equity_curve?: EquityDataPoint[];
+  trade_log?: Trade[];
 }
 
 export default function Strategies() {
@@ -279,6 +300,22 @@ export default function Strategies() {
                     {backtestResult.period.bars} bars)
                   </div>
 
+                  {/* Equity Chart */}
+                  {backtestResult.equity_curve && backtestResult.equity_curve.length > 0 && (
+                    <div
+                      className="mb-6 pb-6 border-b"
+                      style={{ borderColor: "var(--border-color)" }}
+                    >
+                      <EquityChart
+                        data={backtestResult.equity_curve}
+                        initialCapital={backtestResult.capital.initial}
+                        trades={backtestResult.trade_log}
+                        symbol={backtestResult.symbol}
+                        showBenchmark={true}
+                      />
+                    </div>
+                  )}
+
                   {/* Key Metrics */}
                   <div className="grid grid-cols-2 gap-4 mb-6">
                     <div className="card p-4">
@@ -296,7 +333,7 @@ export default function Strategies() {
                         style={{
                           color:
                             backtestResult.performance.total_return >= 0
-                              ? "var(--accent-primary)"
+                              ? "var(--accent-success)"
                               : "var(--accent-danger)",
                         }}
                       >
@@ -388,7 +425,7 @@ export default function Strategies() {
                       <div>
                         <p
                           className="text-2xl font-bold"
-                          style={{ color: "var(--accent-primary)" }}
+                          style={{ color: "var(--accent-success)" }}
                         >
                           {backtestResult.trades.winning}
                         </p>
