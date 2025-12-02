@@ -6,6 +6,17 @@ alwaysApply: true
 
 # Bonito Project Rules
 
+## Licensing & IP Protection
+
+- **PROPRIETARY CODE** - This codebase is proprietary and confidential
+- **NO AGPL/GPL DEPENDENCIES** - Before adding ANY new dependency, check its license
+  - ✅ Allowed: MIT, BSD, Apache 2.0, ISC, Unlicense
+  - ❌ Forbidden: GPL, AGPL, LGPL (copyleft licenses)
+  - ⚠️ Check: Any license you haven't seen before
+- **Copyright belongs to David Giliver** - All rights reserved
+- When suggesting new packages, always mention the license
+- If unsure about a license, flag it for review
+
 ## Python Standards
 
 - **Python 3.12+** - Use modern syntax (type unions with `|`, match statements)
@@ -48,6 +59,7 @@ src/bonito/
 - Sprint docs go in `docs/sprints/WEEK_N_*.md`
 - Architecture decisions in `docs/ARCHITECTURE*.md`
 - Keep `docs/PITCH.md` updated for demos
+- Update `CHANGELOG.md` for every version bump
 
 ## Testing
 
@@ -76,6 +88,7 @@ When creating new tools:
 - Conventional commits: `feat:`, `fix:`, `docs:`, `refactor:`, `test:`
 - Reference backlog items: `feat: F001 custom formula indicators`
 - Keep commits focused and atomic
+- Update version in pyproject.toml for releases
 
 ## Error Handling
 
@@ -88,3 +101,11 @@ When creating new tools:
 - Use vectorized NumPy operations in backtest engine
 - Lazy-load heavy dependencies (anthropic, openai clients)
 - Cache indicator calculations where possible
+
+## Dependency Management
+
+When adding new dependencies:
+1. **CHECK THE LICENSE FIRST** - No GPL/AGPL/LGPL
+2. Pin major versions in pyproject.toml
+3. Add to appropriate section (core vs dev)
+4. Document why it's needed in commit message

@@ -4,6 +4,7 @@ version = "0.4.2"
 description = "AI-native algorithmic trading platform"
 readme = "README.md"
 requires-python = ">=3.12"
+license = {text = "Proprietary - All Rights Reserved"}
 dependencies = [
     # Core
     "pydantic>=2.5.0",
