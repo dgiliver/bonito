@@ -6,7 +6,7 @@ from pathlib import Path
 import pytest
 from pydantic import ValidationError
 
-from quant_agent.backtest.strategy import (
+from bonito.backtest.strategy import (
     Comparison,
     IndicatorConfig,
     IndicatorType,

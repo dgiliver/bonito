@@ -23,7 +23,7 @@ source .venv/bin/activate
 pip install -e ".[dev]"
 
 # 4. Verify installation
-python -c "from quant_agent.data import MarketDataStore; print('✓ Import works')"
+python -c "from bonito.data import MarketDataStore; print('✓ Import works')"
 
 # 5. Set up pre-commit hooks (optional but recommended)
 pre-commit install
@@ -52,7 +52,7 @@ python -c "import pandas as pd; import numpy as np; print(f'pandas {pd.__version
 ### Ticket 1: Fix and Test MarketDataStore
 **Priority**: P0 (Start Here)
 **Estimate**: 2-3 hours
-**File**: `src/quant_agent/data/store.py`
+**File**: `src/bonito/data/store.py`
 
 #### Description
 The `MarketDataStore` class has been scaffolded but needs testing and bug fixes. Make it production-ready.
@@ -78,7 +78,7 @@ from datetime import datetime
 from pathlib import Path
 import tempfile
 
-from quant_agent.data.store import MarketDataStore
+from bonito.data.store import MarketDataStore
 
 
 @pytest.fixture
@@ -164,7 +164,7 @@ pytest tests/test_data_store.py -v
 ### Ticket 2: Implement CLI Data Commands
 **Priority**: P0
 **Estimate**: 2-3 hours
-**File**: `src/quant_agent/cli.py`
+**File**: `src/bonito/cli.py`
 **Depends on**: Ticket 1
 
 #### Description
@@ -184,7 +184,7 @@ Implement the CLI commands for data management:
 #### Implementation
 
 ```python
-# src/quant_agent/cli.py - Updated version
+# src/bonito/cli.py - Updated version
 
 import typer
 from rich.console import Console
@@ -192,7 +192,7 @@ from rich.table import Table
 from rich.progress import Progress, SpinnerColumn, TextColumn
 from datetime import datetime
 
-from quant_agent.data.store import MarketDataStore
+from bonito.data.store import MarketDataStore
 
 app = typer.Typer(
     name="quant",
@@ -318,7 +318,7 @@ def data_info(
 ### Ticket 3: Add Data Validation and Quality Checks
 **Priority**: P1
 **Estimate**: 1-2 hours
-**File**: `src/quant_agent/data/store.py`
+**File**: `src/bonito/data/store.py`
 **Depends on**: Ticket 1
 
 #### Description
@@ -420,8 +420,8 @@ from datetime import datetime
 
 import pytest
 
-from quant_agent.data.store import MarketDataStore
-from quant_agent.data.models import BarData
+from bonito.data.store import MarketDataStore
+from bonito.data.models import BarData
 
 
 class TestDataPipelineIntegration:
@@ -519,7 +519,7 @@ class TestCLIIntegration:
     def test_ingest_command(self):
         """Test the ingest CLI command."""
         result = subprocess.run(
-            ["python", "-m", "quant_agent.cli", "ingest", "SPY",
+            ["python", "-m", "bonito.cli", "ingest", "SPY",
              "--start", "2023-12-01", "--end", "2023-12-15"],
             capture_output=True,
             text=True,
@@ -538,7 +538,7 @@ class TestCLIIntegration:
 ### Ticket 5: Add Logging Infrastructure
 **Priority**: P2
 **Estimate**: 1 hour
-**Files**: `src/quant_agent/logging.py`, various
+**Files**: `src/bonito/logging.py`, various
 
 #### Description
 Set up proper logging so you can debug issues and track what's happening.
@@ -546,14 +546,14 @@ Set up proper logging so you can debug issues and track what's happening.
 #### Implementation
 
 ```python
-# src/quant_agent/logging.py
-"""Logging configuration for quant-agent."""
+# src/bonito/logging.py
+"""Logging configuration for bonito."""
 
 import logging
 import sys
 from pathlib import Path
 
-from quant_agent.config import settings
+from bonito.config import settings
 
 
 def setup_logging(
@@ -603,13 +603,13 @@ def setup_logging(
 
 def get_logger(name: str) -> logging.Logger:
     """Get a logger for a module."""
-    return logging.getLogger(f"quant_agent.{name}")
+    return logging.getLogger(f"bonito.{name}")
 ```
 
 Then add to `store.py`:
 
 ```python
-from quant_agent.logging import get_logger
+from bonito.logging import get_logger
 
 logger = get_logger("data.store")
 
@@ -664,7 +664,7 @@ pytest tests/ -v
 pytest tests/test_data_store.py -v
 
 # Run with coverage
-pytest tests/ --cov=quant_agent --cov-report=html
+pytest tests/ --cov=bonito --cov-report=html
 
 # Run linting
 ruff check src/
@@ -673,13 +673,13 @@ ruff check src/
 mypy src/
 
 # Manual testing
-python -m quant_agent.cli ingest SPY --start 2020-01-01
-python -m quant_agent.cli data list
-python -m quant_agent.cli data info SPY
+python -m bonito.cli ingest SPY --start 2020-01-01
+python -m bonito.cli data list
+python -m bonito.cli data info SPY
 
 # Quick Python REPL test
 python -c "
-from quant_agent.data.store import MarketDataStore
+from bonito.data.store import MarketDataStore
 store = MarketDataStore()
 store.ingest_from_yahoo('SPY', '2020-01-01', '2024-01-01')
 print(store.list_symbols())

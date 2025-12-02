@@ -1,4 +1,4 @@
-# Makefile for quant-agent development
+# Makefile for Bonito development
 # Usage: make <target>
 
 .PHONY: help install install-dev test lint format typecheck pre-commit clean api web docker-build docker-up docker-down
@@ -41,7 +41,7 @@ test-fast:
 	pytest tests/ -v -m "not slow"
 
 test-cov:
-	pytest tests/ --cov=quant_agent --cov-report=html --cov-report=term-missing
+	pytest tests/ --cov=bonito --cov-report=html --cov-report=term-missing
 
 test-all:
 	pytest tests/ -v --run-slow
@@ -83,11 +83,11 @@ setup: install-dev
 
 # API Server
 api:
-	uvicorn quant_agent.api.main:app --reload --host 0.0.0.0 --port 8000
+	uvicorn bonito.api.main:app --reload --host 0.0.0.0 --port 8000
 
 # CLI Chat
 chat:
-	python -m quant_agent.cli chat -v
+	python -m bonito.cli chat -v
 
 # Frontend
 web:
@@ -98,7 +98,7 @@ web-build:
 
 # Docker
 docker-build:
-	docker build -t quant-agent .
+	docker build -t bonito .
 
 docker-up:
 	docker-compose up -d

@@ -1,4 +1,4 @@
-# Docker Compose for Quant Agent
+# Docker Compose for Bonito
 # Usage: docker-compose up -d
 
 version: "3.8"
@@ -8,7 +8,7 @@ services:
     build:
       context: .
       dockerfile: Dockerfile
-    container_name: quant-agent-api
+    container_name: bonito-api
     ports:
       - "8000:8000"
     environment:

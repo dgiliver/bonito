@@ -1,4 +1,4 @@
-# Quant Agent: AI-Native Algorithmic Trading Platform
+# Bonito: AI-Native Algorithmic Trading Platform
 
 ## The Problem
 
@@ -17,7 +17,7 @@
 
 ## The Solution
 
-**Quant Agent** — an AI-native platform where you describe strategies in plain English and iterate in real-time.
+**Bonito** — an AI-native platform where you describe strategies in plain English and iterate in real-time.
 
 ```
 You: "Create a momentum strategy using RSI with a trend filter"
@@ -140,7 +140,7 @@ Strategies are defined in a constrained JSON format:
 
 ## Competitive Advantage
 
-| Feature | Quant Agent | QuantConnect | Backtrader |
+| Feature | Bonito | QuantConnect | Backtrader |
 |---------|-------------|--------------|------------|
 | Natural language | ✅ | ❌ | ❌ |
 | No coding required | ✅ | ❌ | ❌ |

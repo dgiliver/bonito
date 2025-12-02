@@ -57,7 +57,7 @@
 
 Enhance existing tool base classes for agent compatibility.
 
-**File**: `src/quant_agent/tools/base.py`
+**File**: `src/bonito/tools/base.py`
 
 ```python
 from typing import Any
@@ -101,7 +101,7 @@ class ToolDefinition(BaseModel):
 Create agent-friendly tool wrappers with rich context.
 
 **Files**:
-- `src/quant_agent/agent/tools.py`
+- `src/bonito/agent/tools.py`
 
 **Tools to implement**:
 
@@ -157,7 +157,7 @@ modify_strategy(
 
 Create a unified interface for LLM providers.
 
-**File**: `src/quant_agent/agent/llm.py`
+**File**: `src/bonito/agent/llm.py`
 
 ```python
 from abc import ABC, abstractmethod
@@ -221,7 +221,7 @@ class OpenAIClient(LLMClient):
 
 The core agent that coordinates thinking, tool use, and responses.
 
-**File**: `src/quant_agent/agent/orchestrator.py`
+**File**: `src/bonito/agent/orchestrator.py`
 
 ```python
 class AgentOrchestrator:
@@ -287,7 +287,7 @@ Current context:
 
 Wire up the agent to the existing `quant chat` command.
 
-**File**: `src/quant_agent/cli.py` (update existing)
+**File**: `src/bonito/cli.py` (update existing)
 
 ```python
 @app.command()
@@ -304,7 +304,7 @@ async def _chat_loop(model: str, verbose: bool):
     llm = AnthropicClient() if model == "claude" else OpenAIClient()
     agent = AgentOrchestrator(llm=llm, tools=get_agent_tools())
 
-    console.print(Panel.fit("Quant Agent - AI Trading Assistant"))
+    console.print(Panel.fit("Bonito - AI Trading Assistant"))
 
     while True:
         user_input = Prompt.ask("[bold green]You")

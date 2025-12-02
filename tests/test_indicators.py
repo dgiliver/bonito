@@ -3,7 +3,7 @@
 import numpy as np
 import pytest
 
-from quant_agent.backtest.indicators import (
+from bonito.backtest.indicators import (
     atr,
     bollinger_bands,
     compute_indicators,
@@ -13,8 +13,8 @@ from quant_agent.backtest.indicators import (
     sma,
     stochastic,
 )
-from quant_agent.backtest.strategy import IndicatorConfig, IndicatorType
-from quant_agent.data.models import BarData
+from bonito.backtest.strategy import IndicatorConfig, IndicatorType
+from bonito.data.models import BarData
 
 
 class TestSMA:

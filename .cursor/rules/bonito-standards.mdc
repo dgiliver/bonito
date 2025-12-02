@@ -1,0 +1,90 @@
+---
+description: Standards and conventions for the Bonito project
+globs: ["**/*.py", "**/*.md", "**/*.json"]
+alwaysApply: true
+---
+
+# Bonito Project Rules
+
+## Python Standards
+
+- **Python 3.12+** - Use modern syntax (type unions with `|`, match statements)
+- **Type hints required** - All function signatures must have type annotations
+- **Pydantic for data models** - Use BaseModel for all data structures
+- **Async by default** - Agent tools and API endpoints should be async
+- **Imports from `collections.abc`** - Use `AsyncIterator`, `Iterator` from there, not `typing`
+
+## Code Style (enforced by ruff)
+
+- Line length: 100 characters
+- Use `from __future__ import annotations` only if needed
+- Prefer f-strings over .format()
+- Use pathlib.Path over os.path
+- Exception chaining: `raise X from err` or `raise X from None`
+
+## Project Structure
+
+```
+src/bonito/
+├── agent/          # AI agent, LLM clients, orchestrator
+├── backtest/       # Engine, indicators, strategy DSL
+├── data/           # Market data store, models
+├── storage/        # Strategy persistence
+├── tools/          # Tool base classes and registry
+├── api/            # FastAPI server
+└── cli.py          # Typer CLI
+```
+
+## Strategy DSL Conventions
+
+- Comparison operators: `gt`, `gte`, `lt`, `lte`, `eq`, `crosses_above`, `crosses_below`
+- Indicator types: `sma`, `ema`, `rsi`, `macd`, `atr`, `bbands`, `stoch`
+- Timeframes: `1m`, `5m`, `15m`, `1h`, `4h`, `1d`
+- Position size: Always leave room for commission (use 95% max, not 100%)
+
+## Documentation
+
+- Update `docs/FEATURE_BACKLOG.md` when adding/completing features
+- Sprint docs go in `docs/sprints/WEEK_N_*.md`
+- Architecture decisions in `docs/ARCHITECTURE*.md`
+- Keep `docs/PITCH.md` updated for demos
+
+## Testing
+
+- Tests in `tests/` mirroring source structure
+- Use pytest fixtures in `conftest.py`
+- Mark slow/network tests with `@pytest.mark.slow`
+- Run `make lint && make test` before committing
+
+## Agent Tools
+
+When creating new tools:
+1. Inherit from `Tool` base class
+2. Implement `name`, `description`, `parameters`, `execute`
+3. Return `ToolResult` with `success`, `data`, `error`
+4. Add to registry in `get_agent_tools()`
+
+## Backlog Management
+
+- Features tracked in `docs/FEATURE_BACKLOG.md`
+- Priority levels: 🔥 High, 🟡 Medium, 🟢 Nice-to-have
+- Include effort estimates (days)
+- Update "Completed Features" table when done
+
+## Git Commits
+
+- Conventional commits: `feat:`, `fix:`, `docs:`, `refactor:`, `test:`
+- Reference backlog items: `feat: F001 custom formula indicators`
+- Keep commits focused and atomic
+
+## Error Handling
+
+- Use descriptive error messages
+- Return structured errors from tools (don't raise in tool.execute)
+- Log errors with context: `logger.error(f"Failed to {action}: {e}")`
+
+## Performance
+
+- Use vectorized NumPy operations in backtest engine
+- Lazy-load heavy dependencies (anthropic, openai clients)
+- Cache indicator calculations where possible

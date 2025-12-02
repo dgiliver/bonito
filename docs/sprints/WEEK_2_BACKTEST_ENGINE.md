@@ -11,7 +11,7 @@
 ### Verify Week 1 is Complete
 ```bash
 # Should have data available
-python -m quant_agent.cli data list
+python -m bonito.cli data list
 
 # Should show SPY, AAPL, QQQ with ~1,487 bars each
 ```
@@ -85,7 +85,7 @@ The backtest engine has four main components:
 
 **Priority**: P0 (Start Here)
 **Estimate**: 3-4 hours
-**File**: `src/quant_agent/backtest/indicators.py`
+**File**: `src/bonito/backtest/indicators.py`
 
 ### Why This Matters
 
@@ -124,12 +124,12 @@ Create `tests/test_indicators.py` (we have a basic one, let's expand it):
 import numpy as np
 import pytest
 
-from quant_agent.backtest.indicators import (
+from bonito.backtest.indicators import (
     sma, ema, rsi, atr, macd, bollinger_bands, stochastic,
     compute_indicators,
 )
-from quant_agent.backtest.strategy import IndicatorConfig, IndicatorType
-from quant_agent.data.models import BarData
+from bonito.backtest.strategy import IndicatorConfig, IndicatorType
+from bonito.data.models import BarData
 
 
 class TestSMA:
@@ -530,7 +530,7 @@ class TestComputeIndicators:
 
 **Priority**: P0
 **Estimate**: 2-3 hours
-**File**: `src/quant_agent/backtest/strategy.py`
+**File**: `src/bonito/backtest/strategy.py`
 
 ### Why This Matters
 
@@ -557,7 +557,7 @@ from pathlib import Path
 import pytest
 from pydantic import ValidationError
 
-from quant_agent.backtest.strategy import (
+from bonito.backtest.strategy import (
     StrategyConfig,
     IndicatorConfig,
     IndicatorType,
@@ -865,7 +865,7 @@ class TestToPromptDescription:
 
 **Priority**: P0
 **Estimate**: 4-5 hours
-**File**: `src/quant_agent/backtest/engine.py`
+**File**: `src/bonito/backtest/engine.py`
 
 ### Why This Matters
 
@@ -899,9 +899,9 @@ from datetime import datetime, timedelta
 import numpy as np
 import pytest
 
-from quant_agent.backtest.engine import BacktestEngine
-from quant_agent.backtest.models import BacktestConfig, Trade
-from quant_agent.backtest.strategy import (
+from bonito.backtest.engine import BacktestEngine
+from bonito.backtest.models import BacktestConfig, Trade
+from bonito.backtest.strategy import (
     StrategyConfig,
     IndicatorConfig,
     IndicatorType,
@@ -915,7 +915,7 @@ from quant_agent.backtest.strategy import (
     TakeProfitConfig,
     TakeProfitType,
 )
-from quant_agent.data.models import BarData
+from bonito.data.models import BarData
 
 
 @pytest.fixture
@@ -1368,7 +1368,7 @@ class TestResultSummary:
 
 **Priority**: P1
 **Estimate**: 2-3 hours
-**File**: `src/quant_agent/cli.py`
+**File**: `src/bonito/cli.py`
 
 ### Tasks
 
@@ -1396,10 +1396,10 @@ def backtest(
     output: str = typer.Option(None, "--output", "-o", help="Save results to JSON file"),
 ) -> None:
     """Run a backtest for a strategy configuration."""
-    from quant_agent.backtest.engine import BacktestEngine
-    from quant_agent.backtest.models import BacktestConfig
-    from quant_agent.backtest.strategy import StrategyConfig
-    from quant_agent.data.store import MarketDataStore
+    from bonito.backtest.engine import BacktestEngine
+    from bonito.backtest.models import BacktestConfig
+    from bonito.backtest.strategy import StrategyConfig
+    from bonito.data.store import MarketDataStore
 
     # Load strategy
     strategy_path = Path(strategy_file)
@@ -1537,10 +1537,10 @@ from pathlib import Path
 
 import pytest
 
-from quant_agent.backtest.engine import BacktestEngine
-from quant_agent.backtest.models import BacktestConfig
-from quant_agent.backtest.strategy import StrategyConfig
-from quant_agent.data.store import MarketDataStore
+from bonito.backtest.engine import BacktestEngine
+from bonito.backtest.models import BacktestConfig
+from bonito.backtest.strategy import StrategyConfig
+from bonito.data.store import MarketDataStore
 
 
 @pytest.fixture
@@ -1642,7 +1642,7 @@ class TestCLIIntegration:
         """Test the backtest CLI command."""
         result = subprocess.run(
             [
-                "python", "-m", "quant_agent.cli", "backtest",
+                "python", "-m", "bonito.cli", "backtest",
                 "examples/ema_cross_strategy.json",
                 "--start", "2023-01-01",
                 "--end", "2023-12-31",
@@ -1665,7 +1665,7 @@ class TestBuyAndHoldBaseline:
 
     def test_buy_and_hold_matches_market(self, engine, real_spy_data):
         """Buy-and-hold should roughly match SPY's return."""
-        from quant_agent.backtest.strategy import (
+        from bonito.backtest.strategy import (
             Rule, RuleCondition, Comparison,
             PositionSizeConfig, PositionSizeType
         )
@@ -1725,10 +1725,10 @@ from datetime import datetime
 
 import pytest
 
-from quant_agent.backtest.engine import BacktestEngine
-from quant_agent.backtest.models import BacktestConfig
-from quant_agent.backtest.strategy import StrategyConfig
-from quant_agent.data.store import MarketDataStore
+from bonito.backtest.engine import BacktestEngine
+from bonito.backtest.models import BacktestConfig
+from bonito.backtest.strategy import StrategyConfig
+from bonito.data.store import MarketDataStore
 
 
 @pytest.mark.slow
@@ -1824,13 +1824,13 @@ pytest tests/test_backtest_engine.py::TestTradeExecution -v
 pytest tests/test_backtest_integration.py -v --run-slow
 
 # Run backtest via CLI
-python -m quant_agent.cli backtest examples/ema_cross_strategy.json
+python -m bonito.cli backtest examples/ema_cross_strategy.json
 
 # Run with custom dates
-python -m quant_agent.cli backtest examples/ema_cross_strategy.json --start 2022-01-01 --end 2023-12-31
+python -m bonito.cli backtest examples/ema_cross_strategy.json --start 2022-01-01 --end 2023-12-31
 
 # Save results
-python -m quant_agent.cli backtest examples/ema_cross_strategy.json --output results.json
+python -m bonito.cli backtest examples/ema_cross_strategy.json --output results.json
 ```
 
 ---

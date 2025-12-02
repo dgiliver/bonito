@@ -37,7 +37,7 @@ export default function Sidebar({ currentView, onViewChange }: SidebarProps) {
             <Zap size={20} style={{ color: "var(--bg-primary)" }} />
           </div>
           <div>
-            <h1 className="text-lg font-bold gradient-text">Quant Agent</h1>
+            <h1 className="text-lg font-bold gradient-text">Bonito</h1>
             <p
               className="text-xs"
               style={{ color: "var(--text-muted)" }}
@@ -117,7 +117,7 @@ export default function Sidebar({ currentView, onViewChange }: SidebarProps) {
         style={{ borderColor: "var(--border-color)" }}
       >
         <a
-          href="https://github.com/dgiliver/quant_agent"
+          href="https://github.com/dgiliver/bonito"
           target="_blank"
           rel="noopener noreferrer"
           className="flex items-center gap-2 text-sm transition-colors"

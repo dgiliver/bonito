@@ -5,9 +5,9 @@ from datetime import datetime, timedelta
 import numpy as np
 import pytest
 
-from quant_agent.backtest.engine import BacktestEngine
-from quant_agent.backtest.models import BacktestConfig
-from quant_agent.backtest.strategy import (
+from bonito.backtest.engine import BacktestEngine
+from bonito.backtest.models import BacktestConfig
+from bonito.backtest.strategy import (
     Comparison,
     IndicatorConfig,
     IndicatorType,
@@ -21,7 +21,7 @@ from quant_agent.backtest.strategy import (
     TakeProfitConfig,
     TakeProfitType,
 )
-from quant_agent.data.models import BarData
+from bonito.data.models import BarData
 
 
 @pytest.fixture

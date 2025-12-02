@@ -1,4 +1,4 @@
-# Quant Agent v2 Architecture
+# Bonito v2 Architecture
 
 ## Overview
 
@@ -228,7 +228,7 @@ GET    /api/data/{symbol}/bars      # Get bar data
 from fastapi import FastAPI, WebSocket
 from fastapi.middleware.cors import CORSMiddleware
 
-app = FastAPI(title="Quant Agent API")
+app = FastAPI(title="Bonito API")
 
 app.add_middleware(
     CORSMiddleware,
@@ -381,7 +381,7 @@ class ResilientLLMClient:
 # Use Redis + Celery for long-running backtests
 from celery import Celery
 
-celery_app = Celery("quant_agent", broker="redis://localhost:6379/0")
+celery_app = Celery("bonito", broker="redis://localhost:6379/0")
 
 @celery_app.task(bind=True, max_retries=3)
 def run_backtest_task(self, strategy_id: str, config: dict) -> str:
@@ -456,7 +456,7 @@ async def backtest(request: Request, body: BacktestRequest):
 Let's implement Phase 1 now:
 
 ```python
-# src/quant_agent/storage/strategies.py
+# src/bonito/storage/strategies.py
 
 class StrategyStore:
     """Persistent strategy storage."""

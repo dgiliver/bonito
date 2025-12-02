@@ -7,8 +7,8 @@ from pathlib import Path
 import numpy as np
 import pytest
 
-from quant_agent.data.models import BarData
-from quant_agent.data.store import MarketDataStore
+from bonito.data.models import BarData
+from bonito.data.store import MarketDataStore
 
 
 @pytest.fixture

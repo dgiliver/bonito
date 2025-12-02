@@ -7,9 +7,9 @@ from pathlib import Path
 
 import pytest
 
-from quant_agent.backtest.engine import BacktestEngine
-from quant_agent.backtest.models import BacktestConfig
-from quant_agent.backtest.strategy import (
+from bonito.backtest.engine import BacktestEngine
+from bonito.backtest.models import BacktestConfig
+from bonito.backtest.strategy import (
     Comparison,
     PositionSizeConfig,
     PositionSizeType,
@@ -17,7 +17,7 @@ from quant_agent.backtest.strategy import (
     RuleCondition,
     StrategyConfig,
 )
-from quant_agent.data.store import MarketDataStore
+from bonito.data.store import MarketDataStore
 
 
 @pytest.fixture
@@ -207,7 +207,7 @@ class TestCLIIntegration:
             [
                 "python",
                 "-m",
-                "quant_agent.cli",
+                "bonito.cli",
                 "backtest",
                 "examples/ema_cross_strategy.json",
                 "--start",
@@ -236,7 +236,7 @@ class TestCLIIntegration:
             [
                 "python",
                 "-m",
-                "quant_agent.cli",
+                "bonito.cli",
                 "backtest",
                 "examples/ema_cross_strategy.json",
                 "--symbol",
@@ -263,7 +263,7 @@ class TestPerformanceBenchmark:
         """Backtest should complete in reasonable time."""
         import time
 
-        from quant_agent.backtest.strategy import IndicatorConfig, IndicatorType
+        from bonito.backtest.strategy import IndicatorConfig, IndicatorType
 
         strategy = StrategyConfig(
             name="perf_test",

@@ -1,4 +1,4 @@
-# Quant Agent
+# 🐟 Bonito
 
 > AI-native algorithmic trading platform — backtesting and deployment built for agents, not scripts.
 
@@ -6,7 +6,7 @@
 
 Traditional quant platforms (QuantConnect, Tradestation, etc.) were built in a pre-AI paradigm. They assume you write deterministic strategies, run slow backtests, and manually iterate.
 
-**Quant Agent** inverts this:
+**Bonito** inverts this:
 
 - **Agent-first**: An AI agent generates, tests, and refines strategies
 - **Tool-based**: Modular MCP-style tools for backtesting, data, and analysis
@@ -17,7 +17,7 @@ Traditional quant platforms (QuantConnect, Tradestation, etc.) were built in a p
 
 ```bash
 # Clone the repo
-cd quant-agent
+cd bonito
 
 # Install dependencies (using uv recommended)
 uv venv
@@ -29,10 +29,10 @@ cp .env.example .env
 # Edit .env and add your ANTHROPIC_API_KEY
 
 # Ingest some data
-quant ingest SPY AAPL QQQ --start 2020-01-01 --end 2024-12-01
+bonito ingest SPY AAPL QQQ --start 2020-01-01 --end 2024-12-01
 
 # Start chatting with the agent
-quant chat
+bonito chat
 ```
 
 ## Example Session
@@ -83,12 +83,12 @@ Would you like me to explain the strategy logic or make further refinements?
 
 ```
 ┌─────────────────────────────────────────────────────────────────┐
-│                         USER (CLI/API)                          │
+│                         USER (CLI/API/Web)                      │
 └─────────────────────────────────────────────────────────────────┘
                                 │
                                 ▼
 ┌─────────────────────────────────────────────────────────────────┐
-│                      QUANT AGENT (LLM)                          │
+│                        BONITO AGENT (LLM)                       │
 │  • Generates strategy configurations                            │
 │  • Calls tools to test strategies                               │
 │  • Analyzes results and iterates                                │
@@ -137,7 +137,7 @@ Instead of arbitrary Python code, strategies are defined as structured configura
     {
       "conditions": [
         {"left": "fast_ema", "comparison": "crosses_above", "right": "slow_ema"},
-        {"left": "rsi", "comparison": "<", "right": 70}
+        {"left": "rsi", "comparison": "lt", "right": 70}
       ],
       "logic": "AND"
     }
@@ -165,8 +165,8 @@ This approach:
 ## Project Structure
 
 ```
-quant-agent/
-├── src/quant_agent/
+bonito/
+├── src/bonito/
 │   ├── agent/           # LLM agent and prompts
 │   │   ├── core.py      # Agent implementation
 │   │   └── prompts.py   # System and task prompts
@@ -183,8 +183,10 @@ quant-agent/
 │   │   ├── backtest_tools.py
 │   │   ├── data_tools.py
 │   │   └── strategy_tools.py
+│   ├── api/             # FastAPI server
 │   ├── cli.py           # Command-line interface
 │   └── config.py        # Configuration
+├── web/                 # Next.js frontend
 ├── tests/               # Test suite
 ├── examples/            # Example strategies
 ├── docs/                # Documentation
@@ -197,13 +199,19 @@ quant-agent/
 
 ```bash
 # Run tests
-pytest
+make test
 
 # Run linting
-ruff check src/
+make lint
 
-# Type checking
-mypy src/
+# Start API server
+make api
+
+# Start frontend
+make web
+
+# Run everything with Docker
+make docker-up
 ```
 
 ## Roadmap
@@ -212,15 +220,19 @@ See [docs/MVP_ROADMAP.md](docs/MVP_ROADMAP.md) for the detailed development plan
 
 **MVP (Weeks 1-6)**
 - [x] Project structure
-- [ ] Data layer (DuckDB + Yahoo Finance)
-- [ ] Backtest engine
-- [ ] Tool layer
-- [ ] Agent integration
-- [ ] CLI interface
+- [x] Data layer (DuckDB + Yahoo Finance)
+- [x] Backtest engine
+- [x] Tool layer
+- [x] Agent integration
+- [x] CLI interface
+- [x] FastAPI server
+- [x] Next.js frontend
 
 **Post-MVP**
 - [ ] Paper trading (Alpaca)
-- [ ] Web UI
+- [ ] Crypto support
+- [ ] Options trading
+- [ ] Multi-tenant architecture
 - [ ] Walk-forward optimization
 - [ ] Multi-asset portfolios
 
