@@ -1,0 +1,62 @@
+{
+  "name": "rsi_mean_reversion",
+  "description": "Mean reversion strategy - buy oversold, sell overbought using RSI",
+  "version": "1.0",
+  "symbols": ["SPY"],
+  "timeframe": "1d",
+  "indicators": [
+    {
+      "type": "rsi",
+      "name": "rsi",
+      "params": {"period": 14}
+    },
+    {
+      "type": "sma",
+      "name": "sma_200",
+      "params": {"period": 200}
+    }
+  ],
+  "entry_rules": [
+    {
+      "conditions": [
+        {
+          "left": "rsi",
+          "comparison": "<",
+          "right": 30
+        },
+        {
+          "left": "close",
+          "comparison": ">",
+          "right": "sma_200"
+        }
+      ],
+      "logic": "AND"
+    }
+  ],
+  "exit_rules": [
+    {
+      "conditions": [
+        {
+          "left": "rsi",
+          "comparison": ">",
+          "right": 70
+        }
+      ],
+      "logic": "AND"
+    }
+  ],
+  "position_size": {
+    "type": "percent_equity",
+    "value": 50
+  },
+  "max_positions": 1,
+  "stop_loss": {
+    "type": "percent",
+    "value": 0.03
+  },
+  "take_profit": {
+    "type": "percent",
+    "value": 0.08
+  }
+}
+

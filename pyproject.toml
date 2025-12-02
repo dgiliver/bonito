@@ -1,0 +1,107 @@
+[project]
+name = "quant-agent"
+version = "0.1.0"
+description = "AI-native algorithmic trading platform"
+readme = "README.md"
+requires-python = ">=3.12"
+dependencies = [
+    # Core
+    "pydantic>=2.5.0",
+    "pydantic-settings>=2.1.0",
+    
+    # Data
+    "duckdb>=0.9.0",
+    "pandas>=2.1.0",
+    "numpy>=1.26.0",
+    "yfinance>=0.2.33",
+    
+    # LLM
+    "anthropic>=0.39.0",
+    "openai>=1.6.0",
+    
+    # CLI
+    "typer>=0.9.0",
+    "rich>=13.7.0",
+    
+    # Utilities
+    "httpx>=0.26.0",
+    "python-dotenv>=1.0.0",
+]
+
+[project.optional-dependencies]
+dev = [
+    # Testing
+    "pytest>=7.4.0",
+    "pytest-asyncio>=0.21.0",
+    "pytest-cov>=4.1.0",
+    
+    # Linting & Formatting
+    "ruff>=0.8.0",
+    "mypy>=1.8.0",
+    
+    # Pre-commit
+    "pre-commit>=3.6.0",
+    
+    # Security
+    "bandit[toml]>=1.7.0",
+    
+    # Type stubs
+    "types-requests>=2.31.0",
+    "pandas-stubs>=2.1.0",
+]
+
+[project.scripts]
+quant = "quant_agent.cli:app"
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.ruff]
+target-version = "py312"
+line-length = 100
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "N", "W", "UP", "B", "C4", "SIM"]
+ignore = ["E501"]  # Line too long - handled by formatter
+
+[tool.mypy]
+python_version = "3.12"
+strict = true
+warn_return_any = true
+warn_unused_ignores = true
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+testpaths = ["tests"]
+addopts = "-v --tb=short"
+markers = [
+    "slow: marks tests as slow (deselect with '-m \"not slow\"')",
+]
+
+[tool.coverage.run]
+source = ["src/quant_agent"]
+branch = true
+omit = ["*/tests/*", "*/__pycache__/*"]
+
+[tool.coverage.report]
+exclude_lines = [
+    "pragma: no cover",
+    "def __repr__",
+    "raise NotImplementedError",
+    "if TYPE_CHECKING:",
+    "if __name__ == .__main__.:",
+]
+show_missing = true
+skip_covered = true
+
+[tool.bandit]
+exclude_dirs = ["tests", "venv", ".venv"]
+skips = ["B101"]  # Skip assert warnings (we use them in tests)
+
+[tool.ruff.lint.isort]
+known-first-party = ["quant_agent"]
+
+[tool.ruff.lint.per-file-ignores]
+"tests/*" = ["S101"]  # Allow asserts in tests
+
