@@ -76,7 +76,47 @@
 -- Users table (auto-created by Supabase Auth)
 -- auth.users
 
--- Strategies table
+-- ============================================================
+-- MARKET DATA (User-specific - each user ingests their own data)
+-- ============================================================
+CREATE TABLE market_data (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    user_id UUID REFERENCES auth.users(id) ON DELETE CASCADE,
+    symbol TEXT NOT NULL,
+    timeframe TEXT NOT NULL,  -- '1m', '5m', '15m', '1h', '4h', '1d'
+    timestamp TIMESTAMPTZ NOT NULL,
+    open DOUBLE PRECISION NOT NULL,
+    high DOUBLE PRECISION NOT NULL,
+    low DOUBLE PRECISION NOT NULL,
+    close DOUBLE PRECISION NOT NULL,
+    volume DOUBLE PRECISION NOT NULL,
+    created_at TIMESTAMPTZ DEFAULT NOW(),
+
+    -- Each user can only have one bar per symbol/timeframe/timestamp
+    UNIQUE(user_id, symbol, timeframe, timestamp)
+);
+
+-- Index for fast queries
+CREATE INDEX idx_market_data_user_symbol ON market_data(user_id, symbol, timeframe, timestamp);
+
+-- RLS: Users only see their own market data
+ALTER TABLE market_data ENABLE ROW LEVEL SECURITY;
+
+CREATE POLICY "Users can view own market data"
+    ON market_data FOR SELECT
+    USING (auth.uid() = user_id);
+
+CREATE POLICY "Users can insert own market data"
+    ON market_data FOR INSERT
+    WITH CHECK (auth.uid() = user_id);
+
+CREATE POLICY "Users can delete own market data"
+    ON market_data FOR DELETE
+    USING (auth.uid() = user_id);
+
+-- ============================================================
+-- STRATEGIES (User-specific)
+-- ============================================================
 CREATE TABLE strategies (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     user_id UUID REFERENCES auth.users(id) ON DELETE CASCADE,
@@ -92,7 +132,6 @@ CREATE TABLE strategies (
     UNIQUE(user_id, name)
 );
 
--- Row Level Security: Users only see their own strategies
 ALTER TABLE strategies ENABLE ROW LEVEL SECURITY;
 
 CREATE POLICY "Users can view own strategies"
@@ -111,7 +150,9 @@ CREATE POLICY "Users can delete own strategies"
     ON strategies FOR DELETE
     USING (auth.uid() = user_id);
 
--- Chat history table (optional, for conversation persistence)
+-- ============================================================
+-- CONVERSATIONS (User-specific chat history)
+-- ============================================================
 CREATE TABLE conversations (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     user_id UUID REFERENCES auth.users(id) ON DELETE CASCADE,
@@ -126,6 +167,20 @@ ALTER TABLE conversations ENABLE ROW LEVEL SECURITY;
 CREATE POLICY "Users can manage own conversations"
     ON conversations FOR ALL
     USING (auth.uid() = user_id);
+
+-- ============================================================
+-- HELPER VIEW: User's available symbols
+-- ============================================================
+CREATE VIEW user_symbols AS
+SELECT DISTINCT
+    user_id,
+    symbol,
+    timeframe,
+    MIN(timestamp) as first_date,
+    MAX(timestamp) as last_date,
+    COUNT(*) as bar_count
+FROM market_data
+GROUP BY user_id, symbol, timeframe;
 ```
 
 ### Frontend Implementation (Next.js)
@@ -303,15 +358,23 @@ async def list_strategies(user_id: str = Depends(get_current_user)):
 │   $0/mo free    │     │   $5-20/mo      │
 └─────────────────┘     └────────┬────────┘
                                  │
-                    ┌────────────┴────────────┐
-                    │                         │
-              ┌─────▼─────┐           ┌───────▼───────┐
-              │  Supabase │           │   DuckDB      │
-              │  (Auth +  │           │   (Market     │
-              │  Postgres)│           │    Data)      │
-              │  $0/mo    │           │   In Railway  │
-              └───────────┘           └───────────────┘
+                                 │
+                                 ▼
+                        ┌─────────────────┐
+                        │    Supabase     │
+                        │                 │
+                        │  • Auth         │
+                        │  • PostgreSQL   │
+                        │    - market_data│
+                        │    - strategies │
+                        │    - convos     │
+                        │  • RLS (isolate)│
+                        │                 │
+                        │  $0/mo free     │
+                        └─────────────────┘
 ```
+
+**Note:** All user data (market data, strategies, conversations) is stored in Supabase PostgreSQL with Row Level Security. Each user only sees their own data.
 
 ### Services & Costs
 

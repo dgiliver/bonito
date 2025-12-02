@@ -29,7 +29,7 @@ Detailed multi-user flow charts and architecture diagrams for Bonito.
 │  │  • Landing Page                   │ │       │  │  • /api/chat (SSE streaming)     │ │
 │  │  • Auth Pages (login/signup)      │ │       │  │  • /api/strategies (CRUD)        │ │
 │  │  • Dashboard                      │ │       │  │  • /api/backtest (run tests)     │ │
-│  │  • Chat Interface                 │ │       │  │  • /api/data (market data)       │ │
+│  │  • Chat Interface                 │ │       │  │  • /api/data (ingest + query)    │ │
 │  │  • Strategy Manager               │ │       │  │                                   │ │
 │  │  • Equity Charts                  │ │       │  │  ┌─────────────────────────────┐ │ │
 │  │                                   │ │       │  │  │    Backtest Engine          │ │ │
@@ -38,13 +38,10 @@ Detailed multi-user flow charts and architecture diagrams for Bonito.
 │  │  │  • Auth state               │ │ │       │  │  │    • Strategy DSL           │ │ │
 │  │  │  • Session management       │ │ │       │  │  └─────────────────────────────┘ │ │
 │  │  │  • JWT tokens               │ │ │       │  │                                   │ │
-│  │  └─────────────────────────────┘ │ │       │  │  ┌─────────────────────────────┐ │ │
-│  └──────────────────────────────────┘ │       │  │  │    DuckDB (Market Data)     │ │ │
-│                                        │       │  │  │    • OHLCV bars             │ │ │
-└───────────────────────────────────────┘       │  │  │    • Multi-timeframe        │ │ │
-                    │                            │  │  │    • Shared across users    │ │ │
-                    │                            │  │  └─────────────────────────────┘ │ │
-                    │                            │  └──────────────────────────────────┘ │
+│  │  └─────────────────────────────┘ │ │       │  │  All user data fetched from      │ │
+│  └──────────────────────────────────┘ │       │  │  Supabase (RLS enforced)         │ │
+│                                        │       │  │                                   │ │
+└───────────────────────────────────────┘       │  └──────────────────────────────────┘ │
                     │                            └───────────────────────────────────────┘
                     │                                               │
                     │                                               │
@@ -62,29 +59,21 @@ Detailed multi-user flow charts and architecture diagrams for Bonito.
 │  │  • JWT token generation                 │  │  │  • email                           │ │          │
 │  │  • Password reset                       │  │  │  • created_at                      │ │          │
 │  │                                         │  │  └────────────────────────────────────┘ │          │
-│  └─────────────────────────────────────────┘  │                    │                    │          │
-│                                                │                    │ FK                 │          │
-│                                                │                    ▼                    │          │
-│  ┌─────────────────────────────────────────┐  │  ┌────────────────────────────────────┐ │          │
-│  │          ROW LEVEL SECURITY             │  │  │         strategies                 │ │          │
-│  │                                         │  │  │  • id (UUID)                       │ │          │
-│  │  auth.uid() = user_id                   │  │  │  • user_id (FK → auth.users)      │ │          │
-│  │                                         │  │  │  • name                            │ │          │
-│  │  User A can only see User A's data      │  │  │  • config (JSONB)                  │ │          │
-│  │  User B can only see User B's data      │  │  │  • last_backtest (JSONB)          │ │          │
-│  │                                         │  │  │  • created_at                      │ │          │
-│  └─────────────────────────────────────────┘  │  └────────────────────────────────────┘ │          │
-│                                                │                    │                    │          │
-│                                                │                    │ FK                 │          │
-│                                                │                    ▼                    │          │
-│                                                │  ┌────────────────────────────────────┐ │          │
-│                                                │  │        conversations               │ │          │
-│                                                │  │  • id (UUID)                       │ │          │
-│                                                │  │  • user_id (FK → auth.users)      │ │          │
-│                                                │  │  • title                           │ │          │
-│                                                │  │  • messages (JSONB)                │ │          │
-│                                                │  └────────────────────────────────────┘ │          │
-│                                                └─────────────────────────────────────────┘          │
+│  └─────────────────────────────────────────┘  │           │          │          │       │          │
+│                                                │           │ FK       │ FK       │ FK    │          │
+│  ┌─────────────────────────────────────────┐  │           ▼          ▼          ▼       │          │
+│  │          ROW LEVEL SECURITY             │  │  ┌────────────┐ ┌────────────┐ ┌──────────────┐   │
+│  │                                         │  │  │ market_data│ │ strategies │ │conversations │   │
+│  │  auth.uid() = user_id                   │  │  │            │ │            │ │              │   │
+│  │                                         │  │  │ • user_id  │ │ • user_id  │ │ • user_id    │   │
+│  │  User A can only see User A's data      │  │  │ • symbol   │ │ • name     │ │ • title      │   │
+│  │  User B can only see User B's data      │  │  │ • timeframe│ │ • config   │ │ • messages   │   │
+│  │                                         │  │  │ • OHLCV    │ │ • backtest │ │              │   │
+│  │  Applies to ALL tables:                 │  │  │            │ │            │ │              │   │
+│  │  • market_data                          │  │  │ RLS ✓      │ │ RLS ✓      │ │ RLS ✓        │   │
+│  │  • strategies                           │  │  └────────────┘ └────────────┘ └──────────────┘   │
+│  │  • conversations                        │  │                                          │          │
+│  └─────────────────────────────────────────┘  └─────────────────────────────────────────┘          │
 └─────────────────────────────────────────────────────────────────────────────────────────────────────┘
                                         │
                                         ▼
@@ -416,28 +405,35 @@ Detailed multi-user flow charts and architecture diagrams for Bonito.
              │                     │                     │
              ▼                     ▼                     ▼
     ┌─────────────────┐   ┌─────────────────┐   ┌─────────────────┐
-    │   CHAT/LLM      │   │    BACKTEST     │   │   STRATEGIES    │
+    │   CHAT/LLM      │   │    BACKTEST     │   │  DATA INGEST    │
     │                 │   │                 │   │                 │
-    │ • Send to Claude│   │ • Load market   │   │ • Save to DB    │
-    │ • Tool calling  │   │   data (DuckDB) │   │   (user_id)     │
-    │ • Stream resp.  │   │ • Run engine    │   │ • List (RLS)    │
-    │                 │   │ • Return metrics│   │ • Delete        │
+    │ • Send to Claude│   │ • Load user's   │   │ • Fetch from    │
+    │ • Tool calling  │   │   market data   │   │   Yahoo Finance │
+    │ • Stream resp.  │   │   (Supabase)    │   │ • Store with    │
+    │                 │   │ • Run engine    │   │   user_id       │
+    │                 │   │ • Return metrics│   │                 │
     └────────┬────────┘   └────────┬────────┘   └────────┬────────┘
              │                     │                     │
-             ▼                     │                     ▼
-    ┌─────────────────┐            │            ┌─────────────────┐
-    │   ANTHROPIC     │            │            │    SUPABASE     │
-    │   CLAUDE API    │            │            │   POSTGRESQL    │
-    │                 │            │            │   (with RLS)    │
-    └─────────────────┘            │            └─────────────────┘
-                                   │
-                                   ▼
-                          ┌─────────────────┐
-                          │     DUCKDB      │
-                          │  (Market Data)  │
-                          │  • Shared data  │
-                          │  • Read-only    │
-                          └─────────────────┘
+             ▼                     │                     │
+    ┌─────────────────┐            │                     │
+    │   ANTHROPIC     │            │                     │
+    │   CLAUDE API    │            │                     │
+    └─────────────────┘            │                     │
+                                   │                     │
+                                   └──────────┬──────────┘
+                                              │
+                                              ▼
+                                   ┌─────────────────────┐
+                                   │      SUPABASE       │
+                                   │     POSTGRESQL      │
+                                   │                     │
+                                   │  • market_data      │
+                                   │  • strategies       │
+                                   │  • conversations    │
+                                   │                     │
+                                   │  ALL with RLS       │
+                                   │  (user isolation)   │
+                                   └─────────────────────┘
 ```
 
 ---
@@ -447,11 +443,12 @@ Detailed multi-user flow charts and architecture diagrams for Bonito.
 ```
 ┌──────────────────────────────────────────────────────────────────────────────────────────────────────┐
 │                                        DATA OWNERSHIP                                                 │
+│                              ALL USER DATA IS ISOLATED (No Shared Data)                              │
 └──────────────────────────────────────────────────────────────────────────────────────────────────────┘
 
 ┌─────────────────────────────────────────────────────────────────────────────────────────────────────┐
 │                                     USER-SPECIFIC DATA                                               │
-│                                   (Isolated per user_id)                                             │
+│                                   (ALL isolated per user_id)                                         │
 │                                                                                                      │
 │  ┌──────────────────────┐  ┌──────────────────────┐  ┌──────────────────────┐                       │
 │  │      strategies      │  │    conversations     │  │       usage          │                       │
@@ -463,28 +460,108 @@ Detailed multi-user flow charts and architecture diagrams for Bonito.
 │  │  RLS: user_id match  │  │  RLS: user_id match  │  │  RLS: user_id match  │                       │
 │  └──────────────────────┘  └──────────────────────┘  └──────────────────────┘                       │
 │                                                                                                      │
-│                                    Stored in: SUPABASE PostgreSQL                                    │
+│  ┌──────────────────────────────────────────────────────────────────────────────────────────────┐   │
+│  │                                    market_data (OHLCV)                                        │   │
+│  │                                                                                               │   │
+│  │  • Each user ingests their own symbols                                                        │   │
+│  │  • User A has AAPL, SPY → only User A sees it                                                │   │
+│  │  • User B has TSLA, QQQ → only User B sees it                                                │   │
+│  │  • If both want SPY, each has their own copy (storage is cheap)                              │   │
+│  │                                                                                               │   │
+│  │  RLS: user_id match                                                                           │   │
+│  └──────────────────────────────────────────────────────────────────────────────────────────────┘   │
+│                                                                                                      │
+│                                    ALL stored in: SUPABASE PostgreSQL                                │
 └─────────────────────────────────────────────────────────────────────────────────────────────────────┘
+```
 
-┌─────────────────────────────────────────────────────────────────────────────────────────────────────┐
-│                                       SHARED DATA                                                    │
-│                                   (Same for all users)                                               │
-│                                                                                                      │
-│  ┌─────────────────────────────────────────────────────────────────────────────────────────────┐   │
-│  │                                    Market Data (OHLCV)                                       │   │
-│  │                                                                                              │   │
-│  │  • SPY: 2020-01-01 to 2025-12-01 (daily, hourly, etc.)                                      │   │
-│  │  • AAPL: 2020-01-01 to 2025-12-01                                                           │   │
-│  │  • QQQ: ...                                                                                  │   │
-│  │  • etc.                                                                                      │   │
-│  │                                                                                              │   │
-│  │  Read-only for users (they can query, not modify)                                           │   │
-│  │  Admin/system ingests new data                                                               │   │
-│  │                                                                                              │   │
-│  │  Stored in: DUCKDB (embedded in Railway)                                                    │   │
-│  └─────────────────────────────────────────────────────────────────────────────────────────────┘   │
-│                                                                                                      │
-└─────────────────────────────────────────────────────────────────────────────────────────────────────┘
+---
+
+## Market Data Isolation
+
+```
+┌──────────────────────────────────────────────────────────────────────────────────────────────────────┐
+│                                    USER-SPECIFIC MARKET DATA                                          │
+└──────────────────────────────────────────────────────────────────────────────────────────────────────┘
+
+     USER A (user_id: abc123)                    USER B (user_id: xyz789)
+              │                                           │
+              │ "Ingest AAPL and SPY"                     │ "Ingest TSLA and SPY"
+              ▼                                           ▼
+    ┌─────────────────────┐                    ┌─────────────────────┐
+    │ POST /api/data/     │                    │ POST /api/data/     │
+    │      ingest         │                    │      ingest         │
+    │ JWT: user abc123    │                    │ JWT: user xyz789    │
+    │ symbol: AAPL        │                    │ symbol: TSLA        │
+    └──────────┬──────────┘                    └──────────┬──────────┘
+               │                                          │
+               ▼                                          ▼
+    ┌──────────────────────────────────────────────────────────────────┐
+    │                     FASTAPI: Data Ingestion                       │
+    │                                                                   │
+    │  1. Validate JWT → extract user_id                               │
+    │  2. Fetch data from Yahoo Finance                                │
+    │  3. Store in Supabase with user_id                               │
+    └──────────────────────────────────────────────────────────────────┘
+               │                                          │
+               ▼                                          ▼
+    ┌──────────────────────────────────────────────────────────────────┐
+    │                         SUPABASE PostgreSQL                       │
+    │                                                                   │
+    │  ┌─────────────────────────────────────────────────────────────┐ │
+    │  │                     market_data table                        │ │
+    │  │                                                              │ │
+    │  │  user_id   │ symbol │ timeframe │ timestamp  │ OHLCV...     │ │
+    │  │  ──────────┼────────┼───────────┼────────────┼──────────    │ │
+    │  │  abc123    │ AAPL   │ 1d        │ 2024-01-02 │ ...          │ │
+    │  │  abc123    │ AAPL   │ 1d        │ 2024-01-03 │ ...          │ │
+    │  │  abc123    │ SPY    │ 1d        │ 2024-01-02 │ ...          │ │
+    │  │  xyz789    │ TSLA   │ 1d        │ 2024-01-02 │ ...          │ │
+    │  │  xyz789    │ SPY    │ 1d        │ 2024-01-02 │ ...    ◀─────┼─── Same symbol,
+    │  │                                                              │    different user
+    │  └─────────────────────────────────────────────────────────────┘ │
+    │                                                                   │
+    │  ROW LEVEL SECURITY:                                             │
+    │  SELECT/INSERT/UPDATE/DELETE WHERE auth.uid() = user_id          │
+    │                                                                   │
+    └──────────────────────────────────────────────────────────────────┘
+               │                                          │
+               │                                          │
+               ▼                                          ▼
+    ┌─────────────────────┐                    ┌─────────────────────┐
+    │ User A sees:        │                    │ User B sees:        │
+    │ • AAPL              │                    │ • TSLA              │
+    │ • SPY               │                    │ • SPY               │
+    │                     │                    │                     │
+    │ (NOT TSLA)          │                    │ (NOT AAPL)          │
+    └─────────────────────┘                    └─────────────────────┘
+
+
+┌──────────────────────────────────────────────────────────────────────────────────────────────────────┐
+│                                      BACKTEST WITH USER DATA                                          │
+└──────────────────────────────────────────────────────────────────────────────────────────────────────┘
+
+     USER A wants to backtest on AAPL
+              │
+              ▼
+    ┌─────────────────────────────────────────────────────────────────┐
+    │                        FASTAPI: Run Backtest                     │
+    │                                                                  │
+    │  1. JWT validated → user_id = abc123                            │
+    │                                                                  │
+    │  2. Query market_data WHERE user_id = abc123 AND symbol = AAPL  │
+    │     (RLS automatically enforces this)                           │
+    │                                                                  │
+    │  3. Run backtest engine on that data                            │
+    │                                                                  │
+    │  4. Return results                                               │
+    └─────────────────────────────────────────────────────────────────┘
+
+     If User A tries to backtest TSLA (which they haven't ingested):
+     → "No data found for TSLA. Please ingest data first."
+
+     If User B tries to access User A's AAPL data:
+     → RLS blocks it, returns empty result
 ```
 
 ---
