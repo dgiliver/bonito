@@ -1,7 +1,7 @@
 # Makefile for quant-agent development
 # Usage: make <target>
 
-.PHONY: help install install-dev test lint format typecheck pre-commit clean api docker-build docker-up docker-down
+.PHONY: help install install-dev test lint format typecheck pre-commit clean api web docker-build docker-up docker-down
 
 # Default target
 help:
@@ -18,6 +18,7 @@ help:
 	@echo "  clean        - Remove build artifacts"
 	@echo "  setup        - Complete dev environment setup"
 	@echo "  api          - Run the API server (port 8000)"
+	@echo "  web          - Run the frontend (port 3000)"
 	@echo "  chat         - Start CLI chat with agent"
 	@echo "  docker-build - Build Docker image"
 	@echo "  docker-up    - Start containers"
@@ -87,6 +88,13 @@ api:
 # CLI Chat
 chat:
 	python -m quant_agent.cli chat -v
+
+# Frontend
+web:
+	cd web && npm run dev
+
+web-build:
+	cd web && npm run build
 
 # Docker
 docker-build:

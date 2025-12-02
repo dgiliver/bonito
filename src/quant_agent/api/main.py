@@ -3,10 +3,14 @@
 from contextlib import asynccontextmanager
 from typing import Any
 
+from dotenv import load_dotenv
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from quant_agent.api.routes import backtest, chat, data, strategies
+
+# Load environment variables from .env file
+load_dotenv()
 
 
 @asynccontextmanager

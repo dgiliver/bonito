@@ -142,6 +142,25 @@ Current Yahoo Finance limitations:
 
 ## 🟢 Nice to Have (Future)
 
+### F013: Conversation Persistence
+**Status**: Backlog
+**Effort**: 1 day
+**Value**: Medium - Resume previous agent sessions
+
+Save chat conversations to disk and allow users to:
+- Resume previous sessions
+- Browse conversation history
+- Search past interactions
+- Export conversations
+
+**Implementation**:
+- Store in `data/conversations/{session_id}.json`
+- Include timestamps, messages, tool calls
+- Add "History" panel in sidebar
+- Session selector dropdown
+
+---
+
 ### F008: Strategy Marketplace
 Share and discover community strategies.
 
@@ -171,7 +190,10 @@ Combine signals from daily + hourly data.
 | - | Multi-timeframe Support | Week 3 | 1m, 5m, 15m, 1h, 4h, 1d |
 | - | FastAPI Server | Week 4 | REST API + SSE streaming |
 | - | Docker Setup | Week 4 | Dockerfile + docker-compose |
+| - | Next.js Web UI | Week 4 | Chat, Strategies, Data views |
+| - | Markdown Rendering | Week 4 | react-markdown for agent responses |
+| - | Quick Action Buttons | Week 4 | Save, Backtest, New Chat |
 
 ---
 
-*Last updated: Week 4 - API Server*
+*Last updated: Week 4 - Web UI*

@@ -1,0 +1,89 @@
+{
+  "id": "40fb5bd4-1304-496d-85d7-d1a2772da665",
+  "name": "ema_cross_rsi_optimized",
+  "description": "Optimized EMA crossover with RSI filter - RSI<65, 2% stop loss, 10% take profit",
+  "version": 1,
+  "config": {
+    "name": "ema_cross_rsi_optimized",
+    "description": "Optimized EMA crossover with RSI filter - RSI<65, 2% stop loss, 10% take profit",
+    "version": "1.0",
+    "symbols": [
+      "SPY"
+    ],
+    "timeframe": "1d",
+    "indicators": [
+      {
+        "type": "ema",
+        "name": "ema_fast",
+        "params": {
+          "period": 12
+        }
+      },
+      {
+        "type": "ema",
+        "name": "ema_slow",
+        "params": {
+          "period": 26
+        }
+      },
+      {
+        "type": "rsi",
+        "name": "rsi_14",
+        "params": {
+          "period": 14
+        }
+      }
+    ],
+    "entry_rules": [
+      {
+        "conditions": [
+          {
+            "left": "ema_fast",
+            "comparison": "crosses_above",
+            "right": "ema_slow"
+          },
+          {
+            "left": "rsi_14",
+            "comparison": "lt",
+            "right": 65.0
+          }
+        ],
+        "logic": "AND"
+      }
+    ],
+    "exit_rules": [
+      {
+        "conditions": [
+          {
+            "left": "ema_fast",
+            "comparison": "crosses_below",
+            "right": "ema_slow"
+          }
+        ],
+        "logic": "AND"
+      }
+    ],
+    "position_size": {
+      "type": "percent_equity",
+      "value": 95.0
+    },
+    "max_positions": 1,
+    "stop_loss": {
+      "type": "percent",
+      "value": 0.02
+    },
+    "take_profit": {
+      "type": "percent",
+      "value": 0.1
+    }
+  },
+  "created_at": "2025-12-02T13:58:54.983529",
+  "updated_at": "2025-12-02T13:58:54.983561",
+  "tags": [
+    "momentum",
+    "ema-crossover",
+    "rsi-filter",
+    "optimized"
+  ],
+  "last_backtest": null
+}
