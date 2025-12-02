@@ -1,210 +1,288 @@
-# MVP Roadmap: AI-Native Quant Platform
+# Project Roadmap: AI-Native Quant Platform
 
-## MVP Definition
-
-**Goal**: A working demo where an AI agent can:
-1. Accept a natural language strategy request
-2. Generate a valid strategy configuration
-3. Run a backtest
-4. Interpret results
-5. Iterate to improve
-6. Present final strategy to user
-
-**Timeline**: 4-6 weeks (solo developer, part-time: 8-10 weeks)
+**Last Updated:** December 2025
+**Current Version:** 0.4.1
 
 ---
 
-## Phase 0: Foundation (Week 1)
+## ✅ MVP Complete
 
-### 0.1 Project Setup
-- [ ] Python project structure (see file structure below)
-- [ ] Dependency management (pyproject.toml / uv)
-- [ ] Pre-commit hooks (ruff, mypy)
-- [ ] Basic logging infrastructure
-- [ ] Configuration management (pydantic-settings)
+The MVP is **complete**. All core functionality is working:
 
-### 0.2 Data Layer
-- [ ] DuckDB setup for market data
-- [ ] Data ingestion script (Yahoo Finance for MVP - free, easy)
-- [ ] Bar data model (OHLCV)
-- [ ] Simple data API: `get_bars(symbol, start, end, timeframe)`
-
-**Deliverable**: Can load and query SPY daily bars from 2019-2024
+| Goal | Status | Notes |
+|------|--------|-------|
+| Accept natural language strategy request | ✅ | Claude agent with tool calling |
+| Generate valid strategy configuration | ✅ | JSON DSL with validation |
+| Run a backtest | ✅ | Vectorized engine, <1s execution |
+| Interpret results | ✅ | Agent analyzes metrics, suggests improvements |
+| Iterate to improve | ✅ | Multi-turn conversation with context |
+| Present final strategy | ✅ | Save to JSON, display in UI |
 
 ---
 
-## Phase 1: Backtest Engine (Week 2)
+## Completed Phases
 
-### 1.1 Core Engine
-- [ ] Strategy configuration schema (Pydantic models)
-- [ ] Indicator library (SMA, EMA, RSI, MACD, ATR, Bollinger)
-- [ ] Rule DSL parser (entry/exit conditions)
-- [ ] Position sizing models (fixed, percent equity)
+### ✅ Phase 0: Foundation (Week 1)
 
-### 1.2 Simulation
-- [ ] Vectorized backtest loop
-- [ ] Order generation from rules
-- [ ] Fill simulation (next-bar-open model)
-- [ ] Portfolio state tracking (cash, positions, equity)
+- [x] Python project structure (`src/bonito/`)
+- [x] Dependency management (pyproject.toml / uv)
+- [x] Pre-commit hooks (ruff, mypy)
+- [x] Basic logging infrastructure
+- [x] Configuration management (pydantic-settings)
+- [x] DuckDB setup for market data
+- [x] Data ingestion (Yahoo Finance)
+- [x] Bar data model (OHLCV)
+- [x] Data API: `get_bars(symbol, start, end, timeframe)`
 
-### 1.3 Metrics
-- [ ] Return calculation
-- [ ] Sharpe ratio
-- [ ] Max drawdown
-- [ ] Win rate / profit factor
-- [ ] Trade list generation
-
-**Deliverable**: Can backtest a hardcoded EMA crossover strategy, returns JSON metrics
+**Deliverable:** ✅ Can load and query SPY daily bars
 
 ---
 
-## Phase 2: Tool Layer (Week 3)
+### ✅ Phase 1: Backtest Engine (Week 2)
 
-### 2.1 Tool Protocol
-- [ ] Base `Tool` class with standard interface
-- [ ] `ToolResult` response model
-- [ ] Tool registry
+- [x] Strategy configuration schema (Pydantic models)
+- [x] Indicator library (SMA, EMA, RSI, MACD, ATR, Bollinger, Stochastic)
+- [x] Rule DSL parser (entry/exit conditions)
+- [x] Position sizing models (fixed, percent equity)
+- [x] Vectorized backtest loop
+- [x] Order generation from rules
+- [x] Fill simulation (next-bar-open model)
+- [x] Portfolio state tracking (cash, positions, equity)
+- [x] Return calculation, Sharpe ratio, max drawdown
+- [x] Win rate, profit factor, trade list generation
 
-### 2.2 Core Tools
-- [ ] `backtest.run` - Execute backtest, return metrics
-- [ ] `backtest.explain` - Explain why trades happened
-- [ ] `data.get_bars` - Fetch historical data
-- [ ] `data.list_symbols` - Available symbols
-- [ ] `strategy.validate` - Validate strategy config
-- [ ] `analysis.compare` - Compare two strategies
-
-### 2.3 Tool Schemas
-- [ ] JSON Schema for each tool's parameters
-- [ ] LLM-friendly descriptions
-
-**Deliverable**: Tools callable via Python API with typed inputs/outputs
+**Deliverable:** ✅ Can backtest EMA crossover strategy, returns JSON metrics
 
 ---
 
-## Phase 3: Agent Integration (Week 4)
+### ✅ Phase 2: Tool Layer (Week 3)
 
-### 3.1 LLM Integration
-- [ ] OpenAI/Anthropic client setup
-- [ ] System prompt for quant agent
-- [ ] Tool-calling format (function calling or structured output)
+- [x] Base `Tool` class with standard interface
+- [x] `ToolResult` response model
+- [x] Tool registry
+- [x] `backtest.run` - Execute backtest, return metrics
+- [x] `data.get_bars` - Fetch historical data
+- [x] `data.list_symbols` - Available symbols
+- [x] `strategy.create` - Generate strategy config
+- [x] `strategy.save/load` - Persist strategies
+- [x] JSON Schema for tool parameters
+- [x] LLM-friendly descriptions
 
-### 3.2 Agent Loop
-- [ ] ReAct-style reasoning loop
-- [ ] Tool selection and execution
-- [ ] Result interpretation
-- [ ] Iteration logic (when to refine vs. stop)
-
-### 3.3 Strategy Generation
-- [ ] Prompt templates for strategy generation
-- [ ] Output parsing to StrategyConfig
-- [ ] Validation and error recovery
-
-### 3.4 Conversation Management
-- [ ] Session state
-- [ ] History tracking
-- [ ] Strategy versioning within session
-
-**Deliverable**: Agent can generate, test, and refine a strategy from natural language
+**Deliverable:** ✅ Tools callable via Python API with typed inputs/outputs
 
 ---
 
-## Phase 4: Interface & Polish (Week 5-6)
+### ✅ Phase 3: Agent Integration (Week 4)
 
-### 4.1 CLI Interface
-- [ ] Interactive chat mode
-- [ ] Strategy display (pretty-printed config)
-- [ ] Results display (metrics table)
-- [ ] Equity curve ASCII chart (or save to file)
+- [x] Anthropic Claude client setup
+- [x] System prompt for quant agent
+- [x] Tool-calling format (Claude native)
+- [x] ReAct-style reasoning loop
+- [x] Tool selection and execution
+- [x] Result interpretation
+- [x] Iteration logic
+- [x] Prompt templates for strategy generation
+- [x] Output parsing to StrategyConfig
+- [x] Validation and error recovery
+- [x] Session state and history tracking
 
-### 4.2 Persistence
-- [ ] Save/load strategies
-- [ ] Session history
-- [ ] Backtest result archive
-
-### 4.3 Demo Script
-- [ ] Pre-written demo scenarios
-- [ ] Happy path validation
-- [ ] Error case handling
-
-### 4.4 Documentation
-- [ ] README with setup instructions
-- [ ] Example conversations
-- [ ] Architecture overview
-
-**Deliverable**: Polished demo you can show to investors/colleagues
+**Deliverable:** ✅ Agent generates, tests, and refines strategies from natural language
 
 ---
 
-## Post-MVP Phases
+### ✅ Phase 4: Interface & API (Week 5)
 
-### Phase 5: Paper Trading (Week 7-8)
-- [ ] Real-time data feed (Alpaca free tier)
-- [ ] Paper execution simulator
-- [ ] Live position tracking
-- [ ] Performance monitoring
+- [x] Interactive CLI chat mode
+- [x] Strategy display (pretty-printed)
+- [x] Results display (metrics table)
+- [x] Save/load strategies
+- [x] FastAPI REST API
+- [x] SSE streaming for chat
+- [x] Docker containerization
 
-### Phase 6: Web UI (Week 9-12)
-- [ ] Next.js frontend
-- [ ] Chat interface
-- [ ] Strategy editor
-- [ ] Interactive charts
-- [ ] Backtest visualizations
+**Deliverable:** ✅ Full API server with streaming chat
 
-### Phase 7: Advanced Features
-- [ ] Walk-forward optimization
-- [ ] Multi-asset portfolios
-- [ ] Custom indicators (user-defined)
-- [ ] Strategy templates library
-- [ ] Performance attribution
+---
+
+### ✅ Phase 5: Web UI (Week 6)
+
+- [x] Next.js app with App Router
+- [x] Chat interface with streaming
+- [x] Markdown rendering (react-markdown)
+- [x] Strategy list view
+- [x] Data management view
+- [x] Equity curve chart (Recharts)
+- [x] Quick action buttons
+- [x] Responsive sidebar
+
+**Deliverable:** ✅ Working web UI for demos
+
+---
+
+## Current Phase: Post-MVP Enhancement
+
+### 🔄 Phase 6: DSL & Indicators (Weeks 7-8)
+
+Focus: Expand what the DSL can express without custom code.
+
+| Task | Priority | Effort | Status |
+|------|----------|--------|--------|
+| pandas-ta integration (130+ indicators) | 🔥 Critical | 1-2 days | Planned |
+| Trailing stops (percent, ATR) | High | 1 day | Planned |
+| Short selling support | 🔥 Critical | 2-3 days | Planned |
+| Rolling lookback conditions | High | 2-3 days | Planned |
+| Custom formula indicators | Medium | 1-2 days | Planned |
+
+**Success criteria:**
+- User can use VWAP, ADX, Donchian channels in strategies
+- User can short overbought conditions
+- User can create "20-day high breakout" strategies
+
+---
+
+### 📋 Phase 7: Plugin System (Weeks 9-10)
+
+Focus: Escape hatch for advanced users who need full Python.
+
+| Task | Priority | Effort | Status |
+|------|----------|--------|--------|
+| StrategyBase abstract class | High | 1 day | Planned |
+| Auto-discovery from strategies/ folder | High | 1 day | Planned |
+| Parameter schema for agent tuning | Medium | 1 day | Planned |
+| Unit test template | Low | 0.5 days | Planned |
+| Example plugins (pairs, momentum) | Medium | 1 day | Planned |
+
+**Success criteria:**
+- Power user can write Python strategy, have agent backtest it
+- Agent can tune parameters on custom strategies
+
+---
+
+### 📋 Phase 8: Multi-Asset & Portfolio (Weeks 11-12)
+
+Focus: Real portfolio strategies with multiple symbols.
+
+| Task | Priority | Effort | Status |
+|------|----------|--------|--------|
+| Multi-symbol signal scanning | High | 2 days | Planned |
+| Shared capital pool allocation | High | 1 day | Planned |
+| Portfolio-level metrics | High | 1 day | Planned |
+| Position correlation analysis | Medium | 1 day | Planned |
+| Risk parity sizing | Medium | 1 day | Planned |
+
+**Success criteria:**
+- User can run same strategy across AAPL, MSFT, GOOGL, TSLA
+- See combined equity curve and per-symbol breakdown
+
+---
+
+### 📋 Phase 9: Production Hardening (Weeks 13-14)
+
+Focus: Multi-tenant, scalable, secure deployment.
+
+| Task | Priority | Effort | Status |
+|------|----------|--------|--------|
+| Authentication (Clerk/Supabase) | Critical | 2-3 days | Planned |
+| PostgreSQL + pgvector migration | High | 2 days | Planned |
+| Strategy semantic search | Medium | 1 day | Planned |
+| Rate limiting | High | 0.5 days | Planned |
+| User isolation (RLS) | Critical | 1 day | Planned |
+| Monitoring (Sentry, PostHog) | Medium | 1 day | Planned |
+
+**Success criteria:**
+- Multiple users can sign in, each sees only their strategies
+- Semantic search: "find my momentum strategies"
+
+---
+
+### 🔮 Phase 10: Paper Trading (Weeks 15-16)
+
+Focus: Bridge from backtest to live markets.
+
+| Task | Priority | Effort | Status |
+|------|----------|--------|--------|
+| Alpaca OAuth integration | High | 2 days | Planned |
+| Real-time bar streaming | High | 2 days | Planned |
+| Paper order execution | High | 2 days | Planned |
+| Live vs backtest comparison | Medium | 1 day | Planned |
+| Kill switch / risk controls | Critical | 1 day | Planned |
+
+**Success criteria:**
+- User connects Alpaca paper account
+- Strategy runs in real-time, places simulated orders
+- Dashboard shows live P&L
 
 ---
 
 ## Risk Mitigation
 
-| Risk | Mitigation |
-|------|------------|
-| LLM generates invalid strategies | Strict schema validation, retry with error feedback |
-| Backtest too slow | Start with vectorized approach, optimize hot paths |
-| Scope creep | Ruthlessly prioritize; no ML training in MVP |
-| Data quality issues | Use well-known data sources (Yahoo Finance, then Polygon) |
-| Agent loops forever | Max iteration limits, token budgets |
+| Risk | Mitigation | Status |
+|------|------------|--------|
+| LLM generates invalid strategies | Strict schema validation, retry with error feedback | ✅ Implemented |
+| Backtest too slow | Vectorized approach, optimize hot paths | ✅ Implemented |
+| Scope creep | Ruthlessly prioritize; no ML training in MVP | ✅ Active |
+| Data quality issues | Use well-known data sources | ✅ Yahoo Finance works |
+| Agent loops forever | Max iteration limits, token budgets | ✅ Implemented |
+| DSL too limiting | Plugin system as escape hatch | 📋 Planned |
+| Single-tenant only | Auth + RLS in Phase 9 | 📋 Planned |
 
 ---
 
-## Success Criteria (MVP)
+## Success Metrics
 
-✅ Agent can generate a working strategy from "Create a momentum strategy for SPY"
-✅ Backtest runs in <5 seconds
-✅ Agent autonomously refines strategy at least once
-✅ Final metrics are reasonable (not obviously broken)
-✅ Entire flow completes in <2 minutes
-✅ User can save the resulting strategy
+### MVP (Achieved ✅)
+
+- [x] Agent can generate a working strategy from natural language
+- [x] Backtest runs in <5 seconds
+- [x] Agent autonomously refines strategy at least once
+- [x] Final metrics are reasonable
+- [x] Entire flow completes in <2 minutes
+- [x] User can save the resulting strategy
+
+### v1.0 Targets
+
+- [ ] 130+ indicators available
+- [ ] Short selling works
+- [ ] Multi-symbol portfolios work
+- [ ] 100 concurrent users supported
+- [ ] <100ms semantic search
+- [ ] Paper trading connected
 
 ---
 
 ## Tech Stack
 
-| Component | Choice | Rationale |
-|-----------|--------|-----------|
-| Language | Python 3.12+ | Ecosystem, LLM libs, pandas/numpy |
-| Data Store | DuckDB | Fast analytics, embedded, SQL |
-| Strategy Store | SQLite | Simple, embedded |
-| LLM | Claude / GPT-4 | Best tool-calling support |
-| Data Validation | Pydantic v2 | Schema generation, validation |
-| CLI | Typer + Rich | Beautiful CLI with minimal effort |
-| Async | asyncio | LLM calls, future streaming |
-| Testing | pytest | Standard |
-| Linting | Ruff | Fast, comprehensive |
+| Component | Current | Planned (v1.0) |
+|-----------|---------|----------------|
+| Language | Python 3.12 | Python 3.12 |
+| AI | Claude Sonnet | Claude Sonnet |
+| Market Data DB | DuckDB | DuckDB |
+| Strategy Store | JSON files | PostgreSQL + pgvector |
+| Cache | - | Redis |
+| Data Source | Yahoo Finance | Yahoo + Alpaca |
+| Backtesting | NumPy (vectorized) | NumPy + pandas-ta |
+| Indicators | Hand-rolled (7) | pandas-ta (130+) |
+| CLI | Typer + Rich | Typer + Rich |
+| API | FastAPI | FastAPI |
+| Web UI | Next.js | Next.js |
+| Auth | - | Clerk/Supabase |
+| Hosting | Local/Docker | Vercel + Railway |
 
 ---
 
-## Milestones
+## Timeline Summary
 
-| Week | Milestone | Demo |
-|------|-----------|------|
-| 1 | Data layer works | Query SPY bars |
-| 2 | Backtest works | Run EMA cross strategy |
-| 3 | Tools work | Call backtest via tool interface |
-| 4 | Agent works | Agent generates + tests strategy |
-| 5 | CLI works | Interactive demo |
-| 6 | Polish | Investor-ready demo |
+| Phase | Weeks | Status |
+|-------|-------|--------|
+| Phase 0-5: MVP | 1-6 | ✅ Complete |
+| Phase 6: DSL & Indicators | 7-8 | 🔄 Next |
+| Phase 7: Plugin System | 9-10 | 📋 Planned |
+| Phase 8: Multi-Asset | 11-12 | 📋 Planned |
+| Phase 9: Production | 13-14 | 📋 Planned |
+| Phase 10: Paper Trading | 15-16 | 📋 Planned |
+
+**Estimated v1.0 completion:** ~10 more weeks (Q1 2026)
+
+---
+
+*Last updated: December 2025*

@@ -11,6 +11,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [0.4.2] - 2025-12-02 - Documentation & Planning
+
+### Added
+- HIGH_PRIORITY_PLAN.md with detailed implementation analysis
+  - pandas-ta integration design
+  - Short selling architecture
+  - Trailing stops implementation plan
+  - Rolling lookback conditions design
+  - Plugin interface specification
+
+### Changed
+- ARCHITECTURE_V2.md rewritten with current + planned v1.0 architecture
+- MVP_ROADMAP.md updated: MVP marked complete, phases 6-10 roadmap added
+- PITCH.md refreshed with latest capabilities and business model
+
+---
+
 ## [0.4.1] - 2025-12-02 - Strategy Analysis
 
 ### Added
@@ -111,6 +128,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 | Version | Date | Codename | Key Feature |
 |---------|------|----------|-------------|
+| 0.4.2 | 2025-12-02 | Planning | Architecture, roadmap, high-priority plan |
 | 0.4.1 | 2025-12-02 | Analysis | Strategy limitations & indicator gap analysis |
 | 0.4.0 | 2025-12-02 | Web UI | Next.js frontend, SSE streaming |
 | 0.3.0 | 2025-11-25 | Agent | Claude AI, tool calling, strategy persistence |

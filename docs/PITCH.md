@@ -1,23 +1,30 @@
 # Bonito: AI-Native Algorithmic Trading Platform
 
+> **From idea to backtested strategy in 60 seconds.**
+
+---
+
 ## The Problem
 
 **Existing quant platforms are stuck in 2010.**
 
 | Platform | Pain Point |
 |----------|------------|
-| QuantConnect | Steep learning curve, C#/Python required |
-| Backtrader | Complex API, no AI integration |
-| TradingView | Limited backtesting, manual strategy building |
-| Bloomberg Terminal | $24K/year, enterprise-only |
+| QuantConnect | Steep learning curve, C#/Python required, slow iteration |
+| Backtrader | Complex API, no AI integration, abandoned maintenance |
+| TradingView | Limited backtesting, manual strategy building, Pine Script lock-in |
+| Bloomberg Terminal | $24K/year, enterprise-only, overkill for most |
+| Zipline | Deprecated, Python 2 legacy, no active development |
 
-**The gap:** No platform lets you go from idea → tested strategy in natural language.
+**The gap:** No platform lets you go from idea → tested strategy in natural language with intelligent iteration.
+
+**The opportunity:** AI can now understand trading intent, generate valid strategy code, analyze results, and suggest improvements — all in conversation.
 
 ---
 
 ## The Solution
 
-**Bonito** — an AI-native platform where you describe strategies in plain English and iterate in real-time.
+**Bonito** — describe strategies in plain English, iterate in real-time, deploy with confidence.
 
 ```
 You: "Create a momentum strategy using RSI with a trend filter"
@@ -28,6 +35,8 @@ Agent: Created strategy with RSI(14) + 200-day SMA filter.
        The RSI < 35 threshold caught better pullback opportunities.
        Would you like me to test on different assets or adjust parameters?
 ```
+
+**No coding. No configuration files. Just conversation.**
 
 ---
 
@@ -51,57 +60,91 @@ You: "Relax to RSI < 35 and use 100-day SMA"
 ```
 **Result:** 20.3% return, 8.25% drawdown, 0.97 Sharpe ✅
 
-**Time elapsed: ~2 minutes**
-**Traditional approach: Hours of coding and manual iteration**
+**Time elapsed:** ~2 minutes
+**Traditional approach:** Hours of coding and manual iteration
 
 ---
 
-## Key Features
+## What Makes Bonito Different
 
-### 🧠 Natural Language Strategy Creation
-No coding required. Describe what you want:
-- "Buy when RSI is oversold and price is above the moving average"
-- "Create an EMA crossover strategy with 12/26 periods"
-- "Add a 3% stop loss to protect against drawdowns"
+### 🧠 AI That Actually Understands Trading
 
-### 📊 Instant Backtesting
-- Sub-second execution on years of data
-- Full metrics: Sharpe, Sortino, drawdown, win rate
-- Trade-by-trade analysis
+Not just GPT wrapper. The agent:
+- Knows indicator semantics (RSI 30 = oversold, not "buy signal")
+- Understands risk/reward tradeoffs
+- Suggests improvements based on backtest analysis
+- Explains *why* a strategy works or fails
 
-### 🔄 Iterative Refinement
-The AI doesn't just execute — it analyzes and suggests:
-- "Win rate is low, consider tighter entry conditions"
-- "High drawdown suggests adding a trend filter"
-- "Try RSI 30/70 levels for cleaner signals"
+### ⚡ Sub-Second Backtesting
 
-### 📈 7 Built-in Indicators
-SMA, EMA, RSI, MACD, ATR, Bollinger Bands, Stochastic
+Vectorized NumPy engine runs years of data in <1 second:
+- No waiting for results
+- Instant iteration cycles
+- Try 10 variations in the time it takes to try 1 elsewhere
 
-### 🛡️ Safe Strategy DSL
-Strategies are defined in a constrained JSON format:
+### 🔒 Safe by Design
+
+Strategies are defined in a constrained JSON DSL:
 - No arbitrary code execution
 - Full auditability
 - Version controlled
+- Schema validated
+
+### 🎯 Intelligent Iteration
+
+The agent doesn't just execute — it coaches:
+- "Win rate is low, consider tighter entry conditions"
+- "High drawdown suggests adding a trend filter"
+- "This strategy is similar to your RSI_momentum_v2 — want to compare?"
+
+---
+
+## Current Capabilities
+
+### ✅ Working Today
+
+| Feature | Status |
+|---------|--------|
+| Natural language strategy creation | ✅ |
+| 7 technical indicators (SMA, EMA, RSI, MACD, ATR, BBands, Stoch) | ✅ |
+| Instant backtesting (<1 second) | ✅ |
+| Full metrics (Sharpe, Sortino, drawdown, win rate) | ✅ |
+| Multi-timeframe data (1m to 1d) | ✅ |
+| Strategy save/load | ✅ |
+| Web UI with chat interface | ✅ |
+| Equity curve visualization | ✅ |
+| REST API with SSE streaming | ✅ |
+| Docker deployment | ✅ |
+
+### 🔜 Coming Soon
+
+| Feature | Timeline |
+|---------|----------|
+| 130+ indicators (pandas-ta) | 2 weeks |
+| Short selling | 2 weeks |
+| Trailing stops | 2 weeks |
+| Custom Python strategies | 4 weeks |
+| Multi-asset portfolios | 6 weeks |
+| Paper trading (Alpaca) | 8 weeks |
 
 ---
 
 ## Architecture
 
 ```
-┌─────────────────────────────────────────────────────────┐
-│                    Natural Language                      │
-│            "Create a momentum strategy..."               │
-└─────────────────────────────┬───────────────────────────┘
+┌─────────────────────────────────────────────────────────────┐
+│                    Natural Language                          │
+│            "Create a momentum strategy..."                   │
+└─────────────────────────────┬───────────────────────────────┘
                               │
                               ▼
-┌─────────────────────────────────────────────────────────┐
-│                    AI Agent (Claude)                     │
-│         • Understands intent                            │
-│         • Creates strategy JSON                         │
-│         • Analyzes results                              │
-│         • Suggests improvements                         │
-└─────────────────────────────┬───────────────────────────┘
+┌─────────────────────────────────────────────────────────────┐
+│                    AI Agent (Claude)                         │
+│         • Understands intent                                 │
+│         • Creates strategy JSON                              │
+│         • Analyzes results                                   │
+│         • Suggests improvements                              │
+└─────────────────────────────┬───────────────────────────────┘
                               │
               ┌───────────────┼───────────────┐
               ▼               ▼               ▼
@@ -111,106 +154,107 @@ Strategies are defined in a constrained JSON format:
         └──────────┘   └──────────┘   └──────────┘
                               │
                               ▼
-┌─────────────────────────────────────────────────────────┐
-│                   Market Data (DuckDB)                   │
-│              Yahoo Finance • 1-minute bars              │
-└─────────────────────────────────────────────────────────┘
+┌─────────────────────────────────────────────────────────────┐
+│                   Market Data (DuckDB)                       │
+│              Yahoo Finance • Multi-timeframe                 │
+└─────────────────────────────────────────────────────────────┘
 ```
 
 ---
 
 ## Target Users
 
-### 1. **Aspiring Quants**
+### 1. **Aspiring Quants** (Primary)
 - Want to learn algorithmic trading
 - Don't have programming background
 - Need guidance on strategy development
+- *"I have ideas but don't know how to test them"*
 
 ### 2. **Retail Traders**
 - Currently use TradingView/manual trading
 - Want to systematize their approach
-- Need proper backtesting
+- Need proper backtesting without learning Pine Script
+- *"I want to automate my strategy but coding is a barrier"*
 
-### 3. **Small Hedge Funds**
+### 3. **Small Funds / RIAs**
 - Need rapid strategy prototyping
 - Want to reduce developer dependency
 - Value iteration speed over infrastructure
+- *"We need to test ideas faster than our dev cycle allows"*
 
 ---
 
-## Competitive Advantage
+## Competitive Landscape
 
-| Feature | Bonito | QuantConnect | Backtrader |
-|---------|-------------|--------------|------------|
-| Natural language | ✅ | ❌ | ❌ |
-| No coding required | ✅ | ❌ | ❌ |
-| AI iteration | ✅ | ❌ | ❌ |
-| Instant feedback | ✅ | Minutes | Minutes |
-| Free tier | ✅ | Limited | ✅ |
-| Strategy explanation | ✅ | ❌ | ❌ |
+| Feature | Bonito | QuantConnect | TradingView | Backtrader |
+|---------|--------|--------------|-------------|------------|
+| Natural language | ✅ | ❌ | ❌ | ❌ |
+| No coding required | ✅ | ❌ | ⚠️ Pine | ❌ |
+| AI iteration | ✅ | ❌ | ❌ | ❌ |
+| Instant feedback | ✅ | Minutes | Minutes | Minutes |
+| Strategy explanation | ✅ | ❌ | ❌ | ❌ |
+| Free tier | ✅ | Limited | Limited | ✅ |
+| Modern stack | ✅ | ⚠️ | ✅ | ❌ Abandoned |
 
-**Unique value:** The AI doesn't just execute — it **teaches** and **iterates**.
-
----
-
-## Roadmap
-
-### ✅ MVP (Complete)
-- [x] Data ingestion (Yahoo Finance)
-- [x] Vectorized backtesting engine
-- [x] 7 technical indicators
-- [x] Strategy DSL (JSON-based)
-- [x] AI agent with tool calling
-- [x] CLI interface
-- [x] Strategy save/load
-- [x] Multi-timeframe support (1m-1d)
-- [x] FastAPI REST API
-- [x] SSE streaming chat endpoint
-- [x] Docker containerization
-
-### 🔄 Phase 2 (Next)
-- [ ] Web UI (Next.js)
-- [ ] Strategy comparison tool
-- [ ] Custom formula indicators
-- [ ] Authentication
-
-### 🔮 Phase 3 (Future)
-- [ ] Paper trading (Alpaca integration)
-- [ ] Multi-asset portfolios
-- [ ] Walk-forward optimization
-- [ ] Strategy marketplace
+**Unique moat:** The AI doesn't just execute — it **teaches**, **iterates**, and **explains**.
 
 ---
 
-## Technical Stack
+## Business Model (Future)
 
-| Component | Technology |
-|-----------|------------|
-| Language | Python 3.12 |
-| AI | Claude Sonnet (Anthropic) |
-| Data Storage | DuckDB |
-| Data Source | Yahoo Finance |
-| Backtesting | NumPy (vectorized) |
-| CLI | Typer + Rich |
-| Validation | Pydantic |
+### Freemium SaaS
+
+| Tier | Price | Features |
+|------|-------|----------|
+| **Free** | $0 | 50 backtests/mo, 5 saved strategies, basic indicators |
+| **Pro** | $29/mo | Unlimited backtests, all indicators, custom formulas |
+| **Team** | $99/mo | Multi-user, API access, priority support |
+| **Enterprise** | Custom | On-prem, custom integrations, SLA |
+
+### Revenue Streams
+1. **Subscriptions** — Primary revenue
+2. **Data fees** — Premium data sources (Polygon, options)
+3. **Paper trading** — Alpaca partnership revenue share
+4. **Strategy marketplace** — Commission on strategy sales (future)
 
 ---
 
-## Getting Started
+## Traction & Roadmap
 
-```bash
-# Install
-pip install -e ".[dev]"
+### Completed (MVP)
+- ✅ Full agent loop working
+- ✅ 7 indicators, vectorized backtesting
+- ✅ Web UI with streaming chat
+- ✅ Docker deployment ready
 
-# Download data
-quant ingest SPY --start 2020-01-01
+### Next 90 Days
+- 130+ indicators (pandas-ta integration)
+- Short selling support
+- Custom Python strategy plugins
+- Multi-asset portfolio backtesting
+- Authentication + multi-tenant
 
-# Start chatting
-quant chat
+### 6-Month Vision
+- Paper trading with Alpaca
+- Strategy marketplace
+- Mobile app
+- Options backtesting (data permitting)
 
-# Or run a strategy directly
-quant backtest examples/ema_cross_strategy.json
-```
+---
+
+## Technical Highlights
+
+| Component | Technology | Why |
+|-----------|------------|-----|
+| AI | Claude Sonnet | Best tool-calling, reasoning |
+| Backtesting | NumPy vectorized | <1s execution on years of data |
+| Data | DuckDB | Embedded analytics, zero ops |
+| API | FastAPI + SSE | Real-time streaming |
+| Frontend | Next.js 14 | Modern React, great DX |
+| Validation | Pydantic | Schema generation, type safety |
+
+**Lines of code:** ~3,000
+**Dependencies:** Minimal, production-ready stack
 
 ---
 
@@ -233,7 +277,7 @@ Agent: I'll create a MACD crossover strategy with RSI confirmation.
        • Total Trades: 23
 
        The strategy captures momentum shifts while avoiding
-       overbought entries. The win rate is moderate but winners
+       overbought entries. Win rate is moderate but winners
        are larger than losers (1.8:1 ratio).
 
        Would you like me to:
@@ -254,16 +298,58 @@ Agent: → modify_strategy
        The filter reduced trades from 23 to 14 but dramatically
        improved risk-adjusted returns. This is a better strategy
        for most investors.
+
+You: Save this as "macd_trend_filtered"
+
+Agent: → save_strategy
+
+       ✅ Saved! You can load it anytime with "load macd_trend_filtered"
 ```
+
+---
+
+## Getting Started
+
+```bash
+# Clone and install
+git clone https://github.com/dgiliver/bonito
+cd bonito
+pip install -e ".[dev]"
+
+# Download market data
+bonito ingest SPY --start 2020-01-01
+
+# Start the API server
+bonito-api
+
+# Or use CLI directly
+bonito chat
+```
+
+**Docker:**
+```bash
+docker-compose up
+# Web UI at http://localhost:3000
+# API at http://localhost:8000
+```
+
+---
+
+## The Vision
+
+**Today:** AI helps you create and test trading strategies in conversation.
+
+**Tomorrow:** AI manages your entire quant workflow — from idea generation to paper trading to live execution — with human oversight at key decision points.
+
+**We're building the quant platform that should have existed the moment LLMs got good at tool use.**
 
 ---
 
 ## Contact
 
-[Your Name]
-[Email]
-[GitHub]
+**David Giliver**
+[GitHub](https://github.com/dgiliver) • [Email]
 
 ---
 
-*Built with Claude Sonnet, NumPy, and a vision for democratizing quantitative trading.*
+*Built with Claude, NumPy, and a vision for democratizing quantitative trading.*
