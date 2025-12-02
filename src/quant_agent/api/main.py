@@ -6,7 +6,7 @@ from typing import Any
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from quant_agent.api.routes import chat, data, strategies
+from quant_agent.api.routes import backtest, chat, data, strategies
 
 
 @asynccontextmanager
@@ -39,6 +39,7 @@ app.add_middleware(
 app.include_router(chat.router, prefix="/api/chat", tags=["chat"])
 app.include_router(strategies.router, prefix="/api/strategies", tags=["strategies"])
 app.include_router(data.router, prefix="/api/data", tags=["data"])
+app.include_router(backtest.router, prefix="/api/backtest", tags=["backtest"])
 
 
 @app.get("/")

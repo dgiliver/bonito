@@ -62,6 +62,19 @@ class BarData(BaseModel):
         """Volume as numpy array."""
         return np.array(self.volumes)
 
+    def slice(self, start: int, end: int | None = None) -> "BarData":
+        """Return a sliced copy of the bar data."""
+        return BarData(
+            symbol=self.symbol,
+            timeframe=self.timeframe,
+            timestamps=self.timestamps[start:end],
+            opens=self.opens[start:end],
+            highs=self.highs[start:end],
+            lows=self.lows[start:end],
+            closes=self.closes[start:end],
+            volumes=self.volumes[start:end],
+        )
+
 
 class DataRequest(BaseModel):
     """Request for market data."""
