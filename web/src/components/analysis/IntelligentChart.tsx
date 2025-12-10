@@ -80,6 +80,7 @@ const API_BASE = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
 function createTradeMarkers(
   trades: Trade[],
   candleData: CandlestickData<Time>[],
+  selectedTradeId?: string | null,
 ): SeriesMarker<Time>[] {
   const markers: SeriesMarker<Time>[] = [];
 
@@ -118,32 +119,43 @@ function createTradeMarkers(
   };
 
   for (const trade of trades) {
+    const isSelected = trade.id === selectedTradeId;
     const entryTs = Math.floor(new Date(trade.entry_time).getTime() / 1000);
     const exitTs = Math.floor(new Date(trade.exit_time).getTime() / 1000);
 
     const entryTime = findNearestCandleTime(entryTs);
     const exitTime = findNearestCandleTime(exitTs);
 
-    // Entry marker
+    // Entry marker - highlighted if selected
     if (entryTime !== null) {
       markers.push({
         time: entryTime,
         position: "belowBar",
-        color: trade.side === "long" ? "#22c55e" : "#ef4444",
-        shape: "arrowUp",
-        text: `Entry $${trade.entry_price.toFixed(2)}`,
+        color: isSelected
+          ? "#fbbf24"
+          : trade.side === "long"
+            ? "#22c55e"
+            : "#ef4444",
+        shape: isSelected ? "circle" : "arrowUp",
+        size: isSelected ? 3 : 1,
+        text: isSelected
+          ? `★ ENTRY $${trade.entry_price.toFixed(2)}`
+          : `Entry $${trade.entry_price.toFixed(2)}`,
         id: `entry-${trade.id}`,
       });
     }
 
-    // Exit marker
+    // Exit marker - highlighted if selected
     if (exitTime !== null) {
       markers.push({
         time: exitTime,
         position: "aboveBar",
-        color: trade.pnl >= 0 ? "#22c55e" : "#ef4444",
-        shape: "arrowDown",
-        text: `Exit ${trade.pnl >= 0 ? "+" : ""}$${trade.pnl.toFixed(0)}`,
+        color: isSelected ? "#fbbf24" : trade.pnl >= 0 ? "#22c55e" : "#ef4444",
+        shape: isSelected ? "circle" : "arrowDown",
+        size: isSelected ? 3 : 1,
+        text: isSelected
+          ? `★ EXIT ${trade.pnl >= 0 ? "+" : ""}$${trade.pnl.toFixed(0)}`
+          : `Exit ${trade.pnl >= 0 ? "+" : ""}$${trade.pnl.toFixed(0)}`,
         id: `exit-${trade.id}`,
       });
     }
@@ -178,7 +190,14 @@ export default function IntelligentChart() {
     start: number;
     end: number;
   } | null>(null);
+  // Ref to track pendingZoom for use in fetchData (avoids stale closure)
+  const pendingZoomRef = useRef<{ start: number; end: number } | null>(null);
   const lastBacktestId = useRef<string | null>(null);
+
+  // Keep ref in sync with state
+  useEffect(() => {
+    pendingZoomRef.current = pendingZoom;
+  }, [pendingZoom]);
 
   // Chart refs
   const chartContainerRef = useRef<HTMLDivElement>(null);
@@ -232,6 +251,19 @@ export default function IntelligentChart() {
         );
         candleSeriesRef.current.setData(candles);
         setCandleData(candles);
+        console.log("[Chart] Loaded candles:", {
+          count: candles.length,
+          firstTime: candles[0]?.time,
+          firstDate: candles[0]?.time
+            ? new Date((candles[0].time as number) * 1000).toISOString()
+            : null,
+          lastTime: candles[candles.length - 1]?.time,
+          lastDate: candles[candles.length - 1]?.time
+            ? new Date(
+                (candles[candles.length - 1].time as number) * 1000,
+              ).toISOString()
+            : null,
+        });
         // Trade markers are updated in a separate effect when trades change
       }
 
@@ -249,14 +281,19 @@ export default function IntelligentChart() {
         volumeSeriesRef.current.setData(volumeData);
       }
 
-      chartRef.current?.timeScale().fitContent();
+      // Only fit content if no pending zoom (backtest will apply its own zoom)
+      // Use ref to get current value (avoids stale closure)
+      if (!pendingZoomRef.current) {
+        chartRef.current?.timeScale().fitContent();
+      } else {
+        console.log("[Chart] Skipping fitContent - pending zoom exists");
+      }
     } catch (err) {
       console.error("Failed to fetch chart data:", err);
       setError(err instanceof Error ? err.message : "Failed to fetch data");
     } finally {
       setLoading(false);
     }
-    // Note: trades removed from deps - markers are updated in separate effect
   }, [symbol, interval, range]);
 
   const fetchSymbols = useCallback(async () => {
@@ -419,20 +456,60 @@ export default function IntelligentChart() {
     fetchData();
   }, [fetchData]);
 
-  // Update trade markers when trades change
+  // Get selected trade from state
+  const selectedTrade = state.backtest.selectedTrade;
+
+  // Update trade markers when trades or selection changes
   useEffect(() => {
     if (markersPluginRef.current) {
       if (candleData.length > 0 && trades.length > 0) {
-        const markers = createTradeMarkers(trades, candleData);
+        const markers = createTradeMarkers(
+          trades,
+          candleData,
+          selectedTrade?.id,
+        );
         console.log(
-          `[Chart] Creating ${markers.length} markers for ${trades.length} trades`,
+          `[Chart] Creating ${markers.length} markers for ${trades.length} trades${selectedTrade ? ` (selected: ${selectedTrade.id})` : ""}`,
         );
         markersPluginRef.current.setMarkers(markers);
       } else {
         markersPluginRef.current.setMarkers([]);
       }
     }
-  }, [trades, candleData]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- Only re-run when ID changes, not full object
+  }, [trades, candleData, selectedTrade?.id]);
+
+  // Zoom to selected trade when viewing trade details
+  useEffect(() => {
+    if (!selectedTrade || !chartRef.current || candleData.length === 0) return;
+
+    const entryTs = Math.floor(
+      new Date(selectedTrade.entry_time).getTime() / 1000,
+    );
+    const exitTs = Math.floor(
+      new Date(selectedTrade.exit_time).getTime() / 1000,
+    );
+
+    // Add padding: show 20% extra time on each side for context
+    const tradeDuration = exitTs - entryTs;
+    const padding = Math.max(tradeDuration * 0.3, 86400 * 7); // At least 7 days padding
+
+    const zoomStart = entryTs - padding;
+    const zoomEnd = exitTs + padding;
+
+    console.log(
+      `[Chart] Zooming to selected trade: ${new Date(entryTs * 1000).toLocaleDateString()} - ${new Date(exitTs * 1000).toLocaleDateString()}`,
+    );
+
+    requestAnimationFrame(() => {
+      if (chartRef.current) {
+        chartRef.current.timeScale().setVisibleRange({
+          from: zoomStart as Time,
+          to: zoomEnd as Time,
+        });
+      }
+    });
+  }, [selectedTrade, candleData]);
 
   // Fetch symbols when search opens
   useEffect(() => {
@@ -470,61 +547,160 @@ export default function IntelligentChart() {
     const endDate = new Date(backtestResult.period.end);
     const now = new Date();
 
-    // Calculate how far back the backtest starts
+    console.log("[Chart] ========== BACKTEST ZOOM DEBUG ==========");
+    console.log("[Chart] Raw period:", backtestResult.period);
+    console.log("[Chart] Parsed startDate:", startDate.toISOString());
+    console.log("[Chart] Parsed endDate:", endDate.toISOString());
+
+    // Calculate backtest duration and how far back it starts
+    const backtestDays = Math.ceil(
+      (endDate.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24),
+    );
     const daysBack = Math.ceil(
       (now.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24),
     );
 
-    // Select appropriate range
-    let newRange = range;
-    if (daysBack > 365 * 5) {
+    // Select range that covers the backtest period
+    // Be aggressive about using ALL for anything more than 3 years back
+    let newRange: string;
+    if (daysBack > 365 * 3 || backtestDays > 365 * 3) {
       newRange = "ALL";
-    } else if (daysBack > 365) {
+    } else if (daysBack > 365 * 1.5 || backtestDays > 365 * 1.5) {
       newRange = "5Y";
-    } else if (daysBack > 180) {
+    } else if (daysBack > 365 || backtestDays > 365) {
       newRange = "1Y";
-    } else if (daysBack > 90) {
+    } else if (daysBack > 200 || backtestDays > 200) {
       newRange = "YTD";
-    } else if (daysBack > 30) {
+    } else if (daysBack > 60 || backtestDays > 60) {
       newRange = "3M";
-    } else {
+    } else if (daysBack > 14 || backtestDays > 14) {
       newRange = "1M";
+    } else {
+      newRange = "1W";
     }
 
-    // Set pending zoom for after data loads
+    console.log(
+      `[Chart] Backtest: ${backtestDays} days duration, ${daysBack} days back → range=${newRange}`,
+    );
+
+    // Calculate zoom range with padding
     const startTs = Math.floor(startDate.getTime() / 1000);
     const endTs = Math.floor(endDate.getTime() / 1000);
-    // Add 5% padding on each side for better visibility
     const padding = (endTs - startTs) * 0.05;
-    setPendingZoom({ start: startTs - padding, end: endTs + padding });
+    const zoomRange = { start: startTs - padding, end: endTs + padding };
 
-    // Update range if needed
+    console.log(
+      `[Chart] Zoom target: ${new Date(zoomRange.start * 1000).toLocaleDateString()} - ${new Date(zoomRange.end * 1000).toLocaleDateString()}`,
+    );
+
+    // Update range if needed - this will trigger a data fetch
     if (newRange !== range && !isIntraday) {
-      console.log(`[Chart] Switching to ${newRange} range for backtest period`);
+      console.log(`[Chart] Changing range from ${range} to ${newRange}`);
+      // Set pending zoom AFTER setting range to avoid race condition
+      // The fetch will use the ref, and the effect will run after new data loads
       setRange(newRange);
+      // Use setTimeout to ensure state update propagates before setting pendingZoom
+      setTimeout(() => {
+        setPendingZoom(zoomRange);
+      }, 0);
+      return; // Exit early - zoom will be applied after new data loads
     }
+
+    // Range already correct - set pending zoom and try to apply immediately
+    setPendingZoom(zoomRange);
+
+    if (candleData.length > 0 && chartRef.current) {
+      // Range is already correct and we have data - apply zoom now
+      const dataStart = candleData[0]?.time as number;
+      const dataEnd = candleData[candleData.length - 1]?.time as number;
+      const zStart = Math.max(dataStart, zoomRange.start);
+      const zEnd = Math.min(dataEnd, zoomRange.end);
+
+      console.log(
+        `[Chart] Data range: ${new Date(dataStart * 1000).toLocaleDateString()} - ${new Date(dataEnd * 1000).toLocaleDateString()}`,
+      );
+      console.log(
+        `[Chart] Calculated zoom: ${new Date(zStart * 1000).toLocaleDateString()} - ${new Date(zEnd * 1000).toLocaleDateString()}`,
+      );
+
+      if (zStart < zEnd) {
+        console.log("[Chart] Applying setVisibleRange with:", {
+          from: zStart,
+          to: zEnd,
+          fromDate: new Date(zStart * 1000).toISOString(),
+          toDate: new Date(zEnd * 1000).toISOString(),
+        });
+        requestAnimationFrame(() => {
+          if (chartRef.current) {
+            chartRef.current.timeScale().setVisibleRange({
+              from: zStart as Time,
+              to: zEnd as Time,
+            });
+            console.log("[Chart] Immediate zoom applied successfully");
+          }
+        });
+      }
+      // Clear pending zoom since we applied it
+      setPendingZoom(null);
+    }
+    // If no data yet, pendingZoom will be applied when data loads
+    console.log("[Chart] ========== END DEBUG ==========");
     // eslint-disable-next-line react-hooks/exhaustive-deps -- Only react to backtest result changes
   }, [state.backtest.result]);
 
   // Apply pending zoom after data loads
   useEffect(() => {
-    if (pendingZoom && candleData.length > 0 && chartRef.current && !loading) {
-      // Check if our data covers the zoom range
-      const dataStart = candleData[0]?.time as number;
-      const dataEnd = candleData[candleData.length - 1]?.time as number;
+    if (
+      !pendingZoom ||
+      candleData.length === 0 ||
+      !chartRef.current ||
+      loading
+    ) {
+      return;
+    }
 
-      if (dataStart <= pendingZoom.start && dataEnd >= pendingZoom.end) {
-        console.log(
-          `[Chart] Zooming to backtest period: ${new Date(pendingZoom.start * 1000).toLocaleDateString()} - ${new Date(pendingZoom.end * 1000).toLocaleDateString()}`,
-        );
-        chartRef.current.timeScale().setVisibleRange({
-          from: pendingZoom.start as Time,
-          to: pendingZoom.end as Time,
-        });
-        setPendingZoom(null);
-      } else {
-        console.log(`[Chart] Waiting for data covering backtest period...`);
-      }
+    const dataStart = candleData[0]?.time as number;
+    const dataEnd = candleData[candleData.length - 1]?.time as number;
+
+    console.log("[Chart] Raw timestamps:", {
+      dataStart,
+      dataEnd,
+      pendingStart: pendingZoom.start,
+      pendingEnd: pendingZoom.end,
+      candleCount: candleData.length,
+      firstCandle: candleData[0],
+      lastCandle: candleData[candleData.length - 1],
+    });
+    console.log(
+      `[Chart] Pending zoom check: data=${new Date(dataStart * 1000).toLocaleDateString()}-${new Date(dataEnd * 1000).toLocaleDateString()}, ` +
+        `target=${new Date(pendingZoom.start * 1000).toLocaleDateString()}-${new Date(pendingZoom.end * 1000).toLocaleDateString()}`,
+    );
+
+    // Calculate intersection
+    const zoomStart = Math.max(dataStart, pendingZoom.start);
+    const zoomEnd = Math.min(dataEnd, pendingZoom.end);
+
+    if (zoomStart < zoomEnd) {
+      // Use requestAnimationFrame for more reliable timing
+      requestAnimationFrame(() => {
+        if (chartRef.current) {
+          console.log(
+            `[Chart] Applying zoom: ${new Date(zoomStart * 1000).toLocaleDateString()} - ${new Date(zoomEnd * 1000).toLocaleDateString()}`,
+          );
+          chartRef.current.timeScale().setVisibleRange({
+            from: zoomStart as Time,
+            to: zoomEnd as Time,
+          });
+        }
+      });
+      // Only clear pendingZoom after successful zoom
+      setPendingZoom(null);
+    } else {
+      // Data doesn't cover backtest period - might be stale, wait for fresh data
+      console.log(
+        `[Chart] No overlap yet - data may be stale, waiting for fresh data...`,
+      );
+      // Don't clear pendingZoom - let it retry when new data arrives
     }
   }, [pendingZoom, candleData, loading]);
 

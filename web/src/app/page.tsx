@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import dynamic from "next/dynamic";
 import Sidebar from "@/components/Sidebar";
 import Chat, { Message } from "@/components/Chat";
@@ -47,22 +47,22 @@ const AnalysisView = dynamic(
 
 type View = "chat" | "analysis" | "strategies" | "chart" | "data";
 
-// Initialize sidebar state from localStorage (client-side only)
-const getInitialSidebarState = () => {
-  if (typeof window === "undefined") return false;
-  const saved = localStorage.getItem("sidebar-collapsed");
-  return saved ? JSON.parse(saved) : false;
-};
-
 export default function Home() {
   const [currentView, setCurrentView] = useState<View>("analysis");
-  const [sidebarCollapsed, setSidebarCollapsed] = useState(
-    getInitialSidebarState,
-  );
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
 
   // Lift chat state to preserve across view switches
   const [messages, setMessages] = useState<Message[]>([]);
   const [sessionId, setSessionId] = useState<string | null>(null);
+
+  // Sync sidebar state from localStorage after hydration (must be in useEffect to avoid hydration mismatch)
+  useEffect(() => {
+    const saved = localStorage.getItem("sidebar-collapsed");
+    if (saved) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- Required for hydration-safe localStorage sync
+      setSidebarCollapsed(JSON.parse(saved));
+    }
+  }, []);
 
   const toggleSidebar = () => {
     const newState = !sidebarCollapsed;
