@@ -3,6 +3,10 @@
 # Run manually: pre-commit run --all-files
 
 repos:
+  # ==========================================================================
+  # Python Hooks
+  # ==========================================================================
+
   # Ruff - Fast Python linter and formatter
   - repo: https://github.com/astral-sh/ruff-pre-commit
     rev: v0.8.2
@@ -12,6 +16,37 @@ repos:
         args: [--fix, --exit-non-zero-on-fix]
       # Formatter (replaces black)
       - id: ruff-format
+
+  # ==========================================================================
+  # Frontend (web/) Hooks
+  # ==========================================================================
+
+  # Prettier - Code formatting for JS/TS/CSS/JSON/MD
+  - repo: https://github.com/pre-commit/mirrors-prettier
+    rev: v4.0.0-alpha.8
+    hooks:
+      - id: prettier
+        types_or: [javascript, jsx, ts, tsx, css, json, markdown]
+        files: ^web/
+        additional_dependencies:
+          - prettier@3.4.2
+
+  # ESLint - TypeScript/JavaScript linting
+  - repo: local
+    hooks:
+      - id: eslint
+        name: eslint (web)
+        entry: bash -c 'cd web && npm run lint -- --max-warnings=0'
+        language: system
+        files: ^web/.*\.(ts|tsx|js|jsx)$
+        pass_filenames: false
+
+      - id: typescript
+        name: typescript (web)
+        entry: bash -c 'cd web && npx tsc --noEmit'
+        language: system
+        files: ^web/.*\.(ts|tsx)$
+        pass_filenames: false
 
   # Type checking with mypy (disabled for MVP - run manually with `make typecheck`)
   # - repo: https://github.com/pre-commit/mirrors-mypy

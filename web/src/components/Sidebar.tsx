@@ -1,6 +1,16 @@
 "use client";
 
-import { MessageSquare, TrendingUp, Database, Github, Zap, PanelLeftClose, PanelLeft, CandlestickChart, Sparkles } from "lucide-react";
+import {
+  MessageSquare,
+  TrendingUp,
+  Database,
+  Github,
+  Zap,
+  PanelLeftClose,
+  PanelLeft,
+  CandlestickChart,
+  Sparkles,
+} from "lucide-react";
 
 type View = "chat" | "analysis" | "strategies" | "chart" | "data";
 
@@ -12,14 +22,39 @@ interface SidebarProps {
 }
 
 const navItems = [
-  { id: "analysis" as const, label: "Analysis", icon: Sparkles, description: "Chart + AI" },
-  { id: "chat" as const, label: "Agent", icon: MessageSquare, description: "Chat only" },
-  { id: "strategies" as const, label: "Strategies", icon: TrendingUp, description: "Backtest" },
-  { id: "chart" as const, label: "Chart", icon: CandlestickChart, description: "View only" },
+  {
+    id: "analysis" as const,
+    label: "Analysis",
+    icon: Sparkles,
+    description: "Chart + AI",
+  },
+  {
+    id: "chat" as const,
+    label: "Agent",
+    icon: MessageSquare,
+    description: "Chat only",
+  },
+  {
+    id: "strategies" as const,
+    label: "Strategies",
+    icon: TrendingUp,
+    description: "Backtest",
+  },
+  {
+    id: "chart" as const,
+    label: "Chart",
+    icon: CandlestickChart,
+    description: "View only",
+  },
   { id: "data" as const, label: "Data", icon: Database, description: "Manage" },
 ];
 
-export default function Sidebar({ currentView, onViewChange, collapsed, onToggleCollapse }: SidebarProps) {
+export default function Sidebar({
+  currentView,
+  onViewChange,
+  collapsed,
+  onToggleCollapse,
+}: SidebarProps) {
   return (
     <aside
       className="flex flex-col border-r transition-all duration-300 ease-in-out"
@@ -44,7 +79,9 @@ export default function Sidebar({ currentView, onViewChange, collapsed, onToggle
           </div>
           {!collapsed && (
             <div className="overflow-hidden">
-              <h1 className="text-base font-bold gradient-text whitespace-nowrap">Bonito</h1>
+              <h1 className="text-base font-bold gradient-text whitespace-nowrap">
+                Bonito
+              </h1>
             </div>
           )}
         </div>
@@ -72,13 +109,17 @@ export default function Sidebar({ currentView, onViewChange, collapsed, onToggle
                   className="w-full flex items-center gap-2.5 px-3 py-2.5 rounded-lg transition-all"
                   style={{
                     background: isActive ? "var(--bg-tertiary)" : "transparent",
-                    color: isActive ? "var(--accent-primary)" : "var(--text-secondary)",
+                    color: isActive
+                      ? "var(--accent-primary)"
+                      : "var(--text-secondary)",
                     justifyContent: collapsed ? "center" : "flex-start",
                   }}
                   title={collapsed ? item.label : undefined}
                 >
                   <Icon size={18} className="flex-shrink-0" />
-                  {!collapsed && <span className="font-medium text-sm">{item.label}</span>}
+                  {!collapsed && (
+                    <span className="font-medium text-sm">{item.label}</span>
+                  )}
                 </button>
               </li>
             );
@@ -88,13 +129,29 @@ export default function Sidebar({ currentView, onViewChange, collapsed, onToggle
 
       {/* Status - only when expanded */}
       {!collapsed && (
-        <div className="p-2 border-t" style={{ borderColor: "var(--border-color)" }}>
-          <div className="px-3 py-2 rounded-lg" style={{ background: "var(--bg-tertiary)" }}>
+        <div
+          className="p-2 border-t"
+          style={{ borderColor: "var(--border-color)" }}
+        >
+          <div
+            className="px-3 py-2 rounded-lg"
+            style={{ background: "var(--bg-tertiary)" }}
+          >
             <div className="flex items-center justify-between">
-              <span className="text-xs" style={{ color: "var(--text-muted)" }}>API</span>
+              <span className="text-xs" style={{ color: "var(--text-muted)" }}>
+                API
+              </span>
               <span className="flex items-center gap-1">
-                <span className="w-1.5 h-1.5 rounded-full animate-pulse-glow" style={{ background: "var(--accent-primary)" }} />
-                <span className="text-xs" style={{ color: "var(--accent-primary)" }}>Connected</span>
+                <span
+                  className="w-1.5 h-1.5 rounded-full animate-pulse-glow"
+                  style={{ background: "var(--accent-primary)" }}
+                />
+                <span
+                  className="text-xs"
+                  style={{ color: "var(--accent-primary)" }}
+                >
+                  Connected
+                </span>
               </span>
             </div>
           </div>
@@ -102,13 +159,19 @@ export default function Sidebar({ currentView, onViewChange, collapsed, onToggle
       )}
 
       {/* Footer */}
-      <div className="p-2 border-t" style={{ borderColor: "var(--border-color)" }}>
+      <div
+        className="p-2 border-t"
+        style={{ borderColor: "var(--border-color)" }}
+      >
         <a
           href="https://github.com/dgiliver/bonito"
           target="_blank"
           rel="noopener noreferrer"
           className="flex items-center gap-2 px-3 py-2 rounded-lg text-sm transition-colors hover:bg-[var(--bg-tertiary)]"
-          style={{ color: "var(--text-muted)", justifyContent: collapsed ? "center" : "flex-start" }}
+          style={{
+            color: "var(--text-muted)",
+            justifyContent: collapsed ? "center" : "flex-start",
+          }}
           title={collapsed ? "View on GitHub" : undefined}
         >
           <Github size={16} className="flex-shrink-0" />

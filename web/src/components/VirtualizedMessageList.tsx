@@ -43,9 +43,10 @@ export default function VirtualizedMessageList({
 
       return baseHeight + contentHeight + toolCallsHeight;
     },
-    [messages]
+    [messages],
   );
 
+  // eslint-disable-next-line react-hooks/incompatible-library -- TanStack Virtual is safe to use here
   const virtualizer = useVirtualizer({
     count: messages.length,
     getScrollElement: () => parentRef.current,
@@ -55,7 +56,10 @@ export default function VirtualizedMessageList({
 
   // Auto-scroll to bottom when new messages arrive
   useEffect(() => {
-    if (messages.length > lastMessageCount.current && !isUserScrolling.current) {
+    if (
+      messages.length > lastMessageCount.current &&
+      !isUserScrolling.current
+    ) {
       // New message added - scroll to bottom
       virtualizer.scrollToIndex(messages.length - 1, { align: "end" });
     }
@@ -92,7 +96,8 @@ export default function VirtualizedMessageList({
           How can I help you today?
         </h3>
         <p className="text-center" style={{ color: "var(--text-muted)" }}>
-          I can create trading strategies, run backtests, and analyze market data.
+          I can create trading strategies, run backtests, and analyze market
+          data.
         </p>
       </div>
     );
@@ -166,14 +171,18 @@ export default function VirtualizedMessageList({
                               tc.success === undefined
                                 ? "var(--text-muted)"
                                 : tc.success
-                                ? "var(--accent-primary)"
-                                : "var(--accent-danger)",
+                                  ? "var(--accent-primary)"
+                                  : "var(--accent-danger)",
                           }}
                         >
                           <Wrench size={10} />
                           {tc.tool}
                           {tc.success !== undefined &&
-                            (tc.success ? <Check size={10} /> : <X size={10} />)}
+                            (tc.success ? (
+                              <Check size={10} />
+                            ) : (
+                              <X size={10} />
+                            ))}
                         </span>
                       ))}
                     </div>
@@ -224,7 +233,9 @@ export default function VirtualizedMessageList({
                                 </h3>
                               ),
                               p: ({ children }) => (
-                                <p className="mb-3 leading-relaxed">{children}</p>
+                                <p className="mb-3 leading-relaxed">
+                                  {children}
+                                </p>
                               ),
                               ul: ({ children }) => (
                                 <ul className="list-disc list-inside mb-3 space-y-1">
@@ -240,7 +251,9 @@ export default function VirtualizedMessageList({
                                 <li className="ml-2">{children}</li>
                               ),
                               strong: ({ children }) => (
-                                <strong style={{ color: "var(--accent-primary)" }}>
+                                <strong
+                                  style={{ color: "var(--accent-primary)" }}
+                                >
                                   {children}
                                 </strong>
                               ),
@@ -269,7 +282,9 @@ export default function VirtualizedMessageList({
                           </ReactMarkdown>
                         </div>
                       ) : (
-                        <div className="whitespace-pre-wrap">{message.content}</div>
+                        <div className="whitespace-pre-wrap">
+                          {message.content}
+                        </div>
                       )
                     ) : (
                       <span className="flex items-center gap-2">
@@ -278,7 +293,9 @@ export default function VirtualizedMessageList({
                           className="animate-spin"
                           style={{ color: "var(--text-muted)" }}
                         />
-                        <span style={{ color: "var(--text-muted)" }}>Thinking...</span>
+                        <span style={{ color: "var(--text-muted)" }}>
+                          Thinking...
+                        </span>
                       </span>
                     )}
                   </div>
@@ -289,7 +306,10 @@ export default function VirtualizedMessageList({
                     className="w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0"
                     style={{ background: "var(--bg-tertiary)" }}
                   >
-                    <User size={16} style={{ color: "var(--text-secondary)" }} />
+                    <User
+                      size={16}
+                      style={{ color: "var(--text-secondary)" }}
+                    />
                   </div>
                 )}
               </div>

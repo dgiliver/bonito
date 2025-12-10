@@ -1,7 +1,19 @@
 "use client";
 
 import { useRef, useEffect, useState } from "react";
-import { Send, Bot, User, Loader2, Sparkles, Wrench, Check, X, Save, Play, RotateCcw } from "lucide-react";
+import {
+  Send,
+  Bot,
+  User,
+  Loader2,
+  Sparkles,
+  Wrench,
+  Check,
+  X,
+  Save,
+  Play,
+  RotateCcw,
+} from "lucide-react";
 import ReactMarkdown from "react-markdown";
 import { streamChat, ChatEvent } from "@/lib/api";
 
@@ -27,7 +39,12 @@ const suggestions = [
   "Compare EMA cross and RSI strategies on QQQ",
 ];
 
-export default function Chat({ messages, setMessages, sessionId, setSessionId }: ChatProps) {
+export default function Chat({
+  messages,
+  setMessages,
+  sessionId,
+  setSessionId,
+}: ChatProps) {
   const [input, setInput] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
@@ -99,24 +116,26 @@ export default function Chat({ messages, setMessages, sessionId, setSessionId }:
               return {
                 ...m,
                 toolCalls: m.toolCalls?.map((tc) =>
-                  tc.tool === event.tool ? { ...tc, success: event.success } : tc
+                  tc.tool === event.tool
+                    ? { ...tc, success: event.success }
+                    : tc,
                 ),
               };
             } else if (event.type === "response") {
               return { ...m, content: event.content };
             }
             return m;
-          })
+          }),
         );
       },
       (error) => {
         setMessages((prev) =>
           prev.map((m) =>
-            m.id === assistantId ? { ...m, content: `Error: ${error}` } : m
-          )
+            m.id === assistantId ? { ...m, content: `Error: ${error}` } : m,
+          ),
         );
         setIsLoading(false);
-      }
+      },
     );
 
     if (newSessionId) {
@@ -150,7 +169,7 @@ export default function Chat({ messages, setMessages, sessionId, setSessionId }:
   const hasStrategyActivity = messages.some(
     (m) =>
       m.role === "assistant" &&
-      m.toolCalls?.some((tc) => tc.tool === "create_strategy" && tc.success)
+      m.toolCalls?.some((tc) => tc.tool === "create_strategy" && tc.success),
   );
 
   return (
@@ -164,7 +183,10 @@ export default function Chat({ messages, setMessages, sessionId, setSessionId }:
         style={{ borderColor: "var(--border-color)" }}
       >
         <div>
-          <h2 className="text-lg font-semibold" style={{ color: "var(--text-primary)" }}>
+          <h2
+            className="text-lg font-semibold"
+            style={{ color: "var(--text-primary)" }}
+          >
             AI Trading Agent
           </h2>
           <p className="text-sm" style={{ color: "var(--text-muted)" }}>
@@ -213,7 +235,8 @@ export default function Chat({ messages, setMessages, sessionId, setSessionId }:
               className="text-center max-w-md mb-8"
               style={{ color: "var(--text-muted)" }}
             >
-              I can create trading strategies, run backtests, and analyze market data. Try one of these:
+              I can create trading strategies, run backtests, and analyze market
+              data. Try one of these:
             </p>
             <div className="grid grid-cols-2 gap-3 max-w-2xl">
               {suggestions.map((suggestion, i) => (
@@ -259,8 +282,8 @@ export default function Chat({ messages, setMessages, sessionId, setSessionId }:
                               tc.success === undefined
                                 ? "var(--text-muted)"
                                 : tc.success
-                                ? "var(--accent-primary)"
-                                : "var(--accent-danger)",
+                                  ? "var(--accent-primary)"
+                                  : "var(--accent-danger)",
                           }}
                         >
                           <Wrench size={10} />
@@ -296,34 +319,53 @@ export default function Chat({ messages, setMessages, sessionId, setSessionId }:
                           <ReactMarkdown
                             components={{
                               h1: ({ children }) => (
-                                <h1 className="text-xl font-bold mt-4 mb-2" style={{ color: "var(--text-primary)" }}>
+                                <h1
+                                  className="text-xl font-bold mt-4 mb-2"
+                                  style={{ color: "var(--text-primary)" }}
+                                >
                                   {children}
                                 </h1>
                               ),
                               h2: ({ children }) => (
-                                <h2 className="text-lg font-semibold mt-4 mb-2" style={{ color: "var(--text-primary)" }}>
+                                <h2
+                                  className="text-lg font-semibold mt-4 mb-2"
+                                  style={{ color: "var(--text-primary)" }}
+                                >
                                   {children}
                                 </h2>
                               ),
                               h3: ({ children }) => (
-                                <h3 className="text-base font-semibold mt-3 mb-1" style={{ color: "var(--text-primary)" }}>
+                                <h3
+                                  className="text-base font-semibold mt-3 mb-1"
+                                  style={{ color: "var(--text-primary)" }}
+                                >
                                   {children}
                                 </h3>
                               ),
                               p: ({ children }) => (
-                                <p className="mb-3 leading-relaxed">{children}</p>
+                                <p className="mb-3 leading-relaxed">
+                                  {children}
+                                </p>
                               ),
                               ul: ({ children }) => (
-                                <ul className="list-disc list-inside mb-3 space-y-1">{children}</ul>
+                                <ul className="list-disc list-inside mb-3 space-y-1">
+                                  {children}
+                                </ul>
                               ),
                               ol: ({ children }) => (
-                                <ol className="list-decimal list-inside mb-3 space-y-1">{children}</ol>
+                                <ol className="list-decimal list-inside mb-3 space-y-1">
+                                  {children}
+                                </ol>
                               ),
                               li: ({ children }) => (
                                 <li className="ml-2">{children}</li>
                               ),
                               strong: ({ children }) => (
-                                <strong style={{ color: "var(--accent-primary)" }}>{children}</strong>
+                                <strong
+                                  style={{ color: "var(--accent-primary)" }}
+                                >
+                                  {children}
+                                </strong>
                               ),
                               code: ({ children }) => (
                                 <code
@@ -347,7 +389,9 @@ export default function Chat({ messages, setMessages, sessionId, setSessionId }:
                           </ReactMarkdown>
                         </div>
                       ) : (
-                        <div className="whitespace-pre-wrap">{message.content}</div>
+                        <div className="whitespace-pre-wrap">
+                          {message.content}
+                        </div>
                       )
                     ) : (
                       <span className="flex items-center gap-2">
@@ -368,7 +412,10 @@ export default function Chat({ messages, setMessages, sessionId, setSessionId }:
                     className="w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0"
                     style={{ background: "var(--bg-tertiary)" }}
                   >
-                    <User size={16} style={{ color: "var(--text-secondary)" }} />
+                    <User
+                      size={16}
+                      style={{ color: "var(--text-secondary)" }}
+                    />
                   </div>
                 )}
               </div>
@@ -445,7 +492,9 @@ export default function Chat({ messages, setMessages, sessionId, setSessionId }:
                     Save Strategy
                   </button>
                   <button
-                    onClick={() => sendQuickAction("Run a backtest on this strategy")}
+                    onClick={() =>
+                      sendQuickAction("Run a backtest on this strategy")
+                    }
                     disabled={isLoading}
                     className="btn btn-ghost px-3 py-1.5 text-xs flex items-center gap-1.5"
                     style={{

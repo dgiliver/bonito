@@ -1,7 +1,12 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
-import { AnalysisProvider, useAnalysis, ChartContextPayload, BacktestResult } from "@/contexts/AnalysisContext";
+import { useState } from "react";
+import {
+  AnalysisProvider,
+  useAnalysis,
+  ChartContextPayload,
+  BacktestResult,
+} from "@/contexts/AnalysisContext";
 import { streamChat, ChatEvent } from "@/lib/api";
 import {
   Send,
@@ -27,8 +32,14 @@ import dynamic from "next/dynamic";
 const IntelligentChart = dynamic(() => import("./IntelligentChart"), {
   ssr: false,
   loading: () => (
-    <div className="flex items-center justify-center h-full" style={{ background: "var(--bg-primary)" }}>
-      <Loader2 className="animate-spin" style={{ color: "var(--text-muted)" }} />
+    <div
+      className="flex items-center justify-center h-full"
+      style={{ background: "var(--bg-primary)" }}
+    >
+      <Loader2
+        className="animate-spin"
+        style={{ color: "var(--text-muted)" }}
+      />
     </div>
   ),
 });
@@ -51,7 +62,7 @@ interface Message {
 // ============================================================================
 
 function ChatPanel() {
-  const { state, getChartContext, addAgentIntent, dispatch } = useAnalysis();
+  const { state, getChartContext, dispatch } = useAnalysis();
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState("");
   const [isLoading, setIsLoading] = useState(false);
@@ -130,7 +141,11 @@ function ChatPanel() {
               };
             } else if (event.type === "tool_result") {
               // Handle backtest results - defer dispatch to avoid React warning
-              if (event.tool === "run_backtest" && event.success && event.data) {
+              if (
+                event.tool === "run_backtest" &&
+                event.success &&
+                event.data
+              ) {
                 const result = event.data as BacktestResult;
                 if (result.strategy_name && result.trades) {
                   // Defer to avoid "cannot update during render" error
@@ -144,24 +159,26 @@ function ChatPanel() {
               return {
                 ...m,
                 toolCalls: m.toolCalls?.map((tc) =>
-                  tc.tool === event.tool ? { ...tc, success: event.success } : tc
+                  tc.tool === event.tool
+                    ? { ...tc, success: event.success }
+                    : tc,
                 ),
               };
             } else if (event.type === "response") {
               return { ...m, content: event.content };
             }
             return m;
-          })
+          }),
         );
       },
       (error) => {
         setMessages((prev) =>
           prev.map((m) =>
-            m.id === assistantId ? { ...m, content: `Error: ${error}` } : m
-          )
+            m.id === assistantId ? { ...m, content: `Error: ${error}` } : m,
+          ),
         );
         setIsLoading(false);
-      }
+      },
     );
 
     if (newSessionId) {
@@ -181,7 +198,10 @@ function ChatPanel() {
       <button
         onClick={() => setCollapsed(false)}
         className="absolute right-0 top-1/2 -translate-y-1/2 p-2 rounded-l-lg shadow-lg z-10"
-        style={{ background: "var(--bg-secondary)", border: "1px solid var(--border-color)" }}
+        style={{
+          background: "var(--bg-secondary)",
+          border: "1px solid var(--border-color)",
+        }}
       >
         <ChevronLeft size={16} style={{ color: "var(--text-muted)" }} />
       </button>
@@ -191,7 +211,10 @@ function ChatPanel() {
   return (
     <div
       className="w-96 border-l flex flex-col h-full"
-      style={{ borderColor: "var(--border-color)", background: "var(--bg-primary)" }}
+      style={{
+        borderColor: "var(--border-color)",
+        background: "var(--bg-primary)",
+      }}
     >
       {/* Header */}
       <div
@@ -200,14 +223,20 @@ function ChatPanel() {
       >
         <div className="flex items-center gap-2">
           <Bot size={18} style={{ color: "var(--accent-primary)" }} />
-          <span className="font-medium" style={{ color: "var(--text-primary)" }}>
+          <span
+            className="font-medium"
+            style={{ color: "var(--text-primary)" }}
+          >
             Analysis Assistant
           </span>
         </div>
         <div className="flex items-center gap-2">
           <span
             className="text-xs px-2 py-0.5 rounded"
-            style={{ background: "var(--bg-tertiary)", color: "var(--text-muted)" }}
+            style={{
+              background: "var(--bg-tertiary)",
+              color: "var(--text-muted)",
+            }}
           >
             {state.chart.symbol}
           </span>
@@ -224,11 +253,16 @@ function ChatPanel() {
       {state.strategy && (
         <div
           className="px-3 py-2 border-b flex items-center gap-2 text-xs"
-          style={{ borderColor: "var(--border-color)", background: "var(--bg-secondary)" }}
+          style={{
+            borderColor: "var(--border-color)",
+            background: "var(--bg-secondary)",
+          }}
         >
           <Sparkles size={12} style={{ color: "var(--accent-primary)" }} />
           <span style={{ color: "var(--text-muted)" }}>Strategy:</span>
-          <span style={{ color: "var(--text-primary)" }}>{state.strategy.name}</span>
+          <span style={{ color: "var(--text-primary)" }}>
+            {state.strategy.name}
+          </span>
         </div>
       )}
 
@@ -236,25 +270,53 @@ function ChatPanel() {
       {state.backtest.result && (
         <div
           className="px-3 py-2 border-b flex items-center justify-between text-xs"
-          style={{ borderColor: "var(--border-color)", background: "var(--bg-tertiary)" }}
+          style={{
+            borderColor: "var(--border-color)",
+            background: "var(--bg-tertiary)",
+          }}
         >
           <div className="flex items-center gap-3">
             <div className="flex items-center gap-1">
-              <TrendingUp size={12} style={{ color: "var(--accent-primary)" }} />
+              <TrendingUp
+                size={12}
+                style={{ color: "var(--accent-primary)" }}
+              />
               <span style={{ color: "var(--text-muted)" }}>Strategy:</span>
-              <span style={{ color: state.backtest.result.performance.total_return >= 0 ? "var(--accent-success)" : "var(--accent-danger)" }}>
+              <span
+                style={{
+                  color:
+                    state.backtest.result.performance.total_return >= 0
+                      ? "var(--accent-success)"
+                      : "var(--accent-danger)",
+                }}
+              >
                 {state.backtest.result.performance.total_return >= 0 ? "+" : ""}
                 {state.backtest.result.performance.total_return.toFixed(1)}%
               </span>
             </div>
-            {state.backtest.result.performance.buy_hold_return !== undefined && (
+            {state.backtest.result.performance.buy_hold_return !==
+              undefined && (
               <>
                 <span style={{ color: "var(--text-muted)" }}>|</span>
                 <div className="flex items-center gap-1">
-                  <span style={{ color: "var(--text-muted)" }}>Buy & Hold:</span>
-                  <span style={{ color: state.backtest.result.performance.buy_hold_return >= 0 ? "var(--accent-success)" : "var(--accent-danger)" }}>
-                    {state.backtest.result.performance.buy_hold_return >= 0 ? "+" : ""}
-                    {state.backtest.result.performance.buy_hold_return.toFixed(1)}%
+                  <span style={{ color: "var(--text-muted)" }}>
+                    Buy & Hold:
+                  </span>
+                  <span
+                    style={{
+                      color:
+                        state.backtest.result.performance.buy_hold_return >= 0
+                          ? "var(--accent-success)"
+                          : "var(--accent-danger)",
+                    }}
+                  >
+                    {state.backtest.result.performance.buy_hold_return >= 0
+                      ? "+"
+                      : ""}
+                    {state.backtest.result.performance.buy_hold_return.toFixed(
+                      1,
+                    )}
+                    %
                   </span>
                 </div>
               </>
@@ -264,11 +326,18 @@ function ChatPanel() {
             <div
               className="px-2 py-0.5 rounded text-xs font-medium"
               style={{
-                background: state.backtest.result.performance.alpha >= 0 ? "rgba(34, 197, 94, 0.1)" : "rgba(239, 68, 68, 0.1)",
-                color: state.backtest.result.performance.alpha >= 0 ? "var(--accent-success)" : "var(--accent-danger)",
+                background:
+                  state.backtest.result.performance.alpha >= 0
+                    ? "rgba(34, 197, 94, 0.1)"
+                    : "rgba(239, 68, 68, 0.1)",
+                color:
+                  state.backtest.result.performance.alpha >= 0
+                    ? "var(--accent-success)"
+                    : "var(--accent-danger)",
               }}
             >
-              α {state.backtest.result.performance.alpha >= 0 ? "+" : ""}{state.backtest.result.performance.alpha.toFixed(1)}%
+              α {state.backtest.result.performance.alpha >= 0 ? "+" : ""}
+              {state.backtest.result.performance.alpha.toFixed(1)}%
             </div>
           )}
         </div>
@@ -282,13 +351,20 @@ function ChatPanel() {
               className="w-12 h-12 rounded-xl flex items-center justify-center mb-4"
               style={{ background: "var(--bg-tertiary)" }}
             >
-              <MessageSquare size={24} style={{ color: "var(--accent-primary)" }} />
+              <MessageSquare
+                size={24}
+                style={{ color: "var(--accent-primary)" }}
+              />
             </div>
-            <p className="font-medium mb-2" style={{ color: "var(--text-primary)" }}>
+            <p
+              className="font-medium mb-2"
+              style={{ color: "var(--text-primary)" }}
+            >
               Context-Aware Analysis
             </p>
             <p className="text-sm mb-4" style={{ color: "var(--text-muted)" }}>
-              I can see what you're viewing. Ask about the chart, create strategies, or click trades to learn more.
+              I can see what you&apos;re viewing. Ask about the chart, create
+              strategies, or click trades to learn more.
             </p>
             <div className="space-y-2 w-full">
               {[
@@ -326,18 +402,21 @@ function ChatPanel() {
               <div className="max-w-[85%]">
                 {/* Tool calls */}
                 {message.toolCalls && message.toolCalls.length > 0 && (
-                  <div className={`flex flex-wrap gap-1 mb-1 ${message.role === "user" ? "justify-end" : ""}`}>
+                  <div
+                    className={`flex flex-wrap gap-1 mb-1 ${message.role === "user" ? "justify-end" : ""}`}
+                  >
                     {message.toolCalls.map((tc, i) => (
                       <span
                         key={i}
                         className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-xs"
                         style={{
                           background: "var(--bg-tertiary)",
-                          color: tc.success === undefined
-                            ? "var(--text-muted)"
-                            : tc.success
-                            ? "var(--accent-success)"
-                            : "var(--accent-danger)",
+                          color:
+                            tc.success === undefined
+                              ? "var(--text-muted)"
+                              : tc.success
+                                ? "var(--accent-success)"
+                                : "var(--accent-danger)",
                         }}
                       >
                         {tc.tool}
@@ -348,8 +427,14 @@ function ChatPanel() {
                 <div
                   className="rounded-lg px-3 py-2 text-sm"
                   style={{
-                    background: message.role === "user" ? "var(--accent-primary)" : "var(--bg-secondary)",
-                    color: message.role === "user" ? "var(--bg-primary)" : "var(--text-primary)",
+                    background:
+                      message.role === "user"
+                        ? "var(--accent-primary)"
+                        : "var(--bg-secondary)",
+                    color:
+                      message.role === "user"
+                        ? "var(--bg-primary)"
+                        : "var(--text-primary)",
                   }}
                 >
                   {message.content ? (
@@ -357,13 +442,31 @@ function ChatPanel() {
                       <div className="text-left">
                         <ReactMarkdown
                           components={{
-                            p: ({ children }) => <p className="mb-2 last:mb-0 leading-relaxed">{children}</p>,
-                            strong: ({ children }) => (
-                              <strong style={{ color: "var(--accent-primary)" }}>{children}</strong>
+                            p: ({ children }) => (
+                              <p className="mb-2 last:mb-0 leading-relaxed">
+                                {children}
+                              </p>
                             ),
-                            ul: ({ children }) => <ul className="list-disc list-inside mb-2 space-y-1">{children}</ul>,
-                            ol: ({ children }) => <ol className="list-decimal list-inside mb-2 space-y-1">{children}</ol>,
-                            li: ({ children }) => <li className="leading-relaxed">{children}</li>,
+                            strong: ({ children }) => (
+                              <strong
+                                style={{ color: "var(--accent-primary)" }}
+                              >
+                                {children}
+                              </strong>
+                            ),
+                            ul: ({ children }) => (
+                              <ul className="list-disc list-inside mb-2 space-y-1">
+                                {children}
+                              </ul>
+                            ),
+                            ol: ({ children }) => (
+                              <ol className="list-decimal list-inside mb-2 space-y-1">
+                                {children}
+                              </ol>
+                            ),
+                            li: ({ children }) => (
+                              <li className="leading-relaxed">{children}</li>
+                            ),
                             code: ({ children }) => (
                               <code
                                 className="px-1 py-0.5 rounded text-xs"
@@ -381,7 +484,11 @@ function ChatPanel() {
                       <span className="text-left">{message.content}</span>
                     )
                   ) : (
-                    <Loader2 size={14} className="animate-spin" style={{ color: "var(--text-muted)" }} />
+                    <Loader2
+                      size={14}
+                      className="animate-spin"
+                      style={{ color: "var(--text-muted)" }}
+                    />
                   )}
                 </div>
               </div>
@@ -391,7 +498,10 @@ function ChatPanel() {
       </div>
 
       {/* Input */}
-      <div className="p-3 border-t" style={{ borderColor: "var(--border-color)" }}>
+      <div
+        className="p-3 border-t"
+        style={{ borderColor: "var(--border-color)" }}
+      >
         <form onSubmit={handleSubmit}>
           <div
             className="flex items-end gap-2 p-2 rounded-lg"
@@ -416,8 +526,14 @@ function ChatPanel() {
               disabled={!input.trim() || isLoading}
               className="p-2 rounded-lg"
               style={{
-                background: input.trim() && !isLoading ? "var(--accent-primary)" : "transparent",
-                color: input.trim() && !isLoading ? "var(--bg-primary)" : "var(--text-muted)",
+                background:
+                  input.trim() && !isLoading
+                    ? "var(--accent-primary)"
+                    : "transparent",
+                color:
+                  input.trim() && !isLoading
+                    ? "var(--bg-primary)"
+                    : "var(--text-muted)",
                 opacity: !input.trim() || isLoading ? 0.5 : 1,
               }}
             >
@@ -438,7 +554,10 @@ function ChatPanel() {
               <button
                 onClick={() => {
                   setInput(`Save the strategy "${state.strategy?.name}"`);
-                  setTimeout(() => document.querySelector("form")?.requestSubmit(), 100);
+                  setTimeout(
+                    () => document.querySelector("form")?.requestSubmit(),
+                    100,
+                  );
                 }}
                 disabled={isLoading}
                 className="flex items-center gap-1.5 px-2 py-1 rounded text-xs transition-colors hover:bg-[var(--bg-tertiary)]"
@@ -454,27 +573,34 @@ function ChatPanel() {
             )}
 
             {/* View Trades - show if there's a backtest */}
-            {state.backtest.result && state.backtest.result.trades.length > 0 && (
-              <button
-                onClick={() => {
-                  dispatch({ type: "SET_SIDE_PANEL", panel: "trade-details" });
-                  // Select first trade to show details
-                  if (state.backtest.result?.trades[0]) {
-                    dispatch({ type: "SELECT_TRADE", trade: state.backtest.result.trades[0] });
-                  }
-                }}
-                disabled={isLoading}
-                className="flex items-center gap-1.5 px-2 py-1 rounded text-xs transition-colors hover:bg-[var(--bg-tertiary)]"
-                style={{
-                  color: "var(--text-muted)",
-                  border: "1px solid var(--border-color)",
-                  opacity: isLoading ? 0.5 : 1,
-                }}
-              >
-                <List size={12} />
-                View Trades ({state.backtest.result.trades.length})
-              </button>
-            )}
+            {state.backtest.result &&
+              state.backtest.result.trades.length > 0 && (
+                <button
+                  onClick={() => {
+                    dispatch({
+                      type: "SET_SIDE_PANEL",
+                      panel: "trade-details",
+                    });
+                    // Select first trade to show details
+                    if (state.backtest.result?.trades[0]) {
+                      dispatch({
+                        type: "SELECT_TRADE",
+                        trade: state.backtest.result.trades[0],
+                      });
+                    }
+                  }}
+                  disabled={isLoading}
+                  className="flex items-center gap-1.5 px-2 py-1 rounded text-xs transition-colors hover:bg-[var(--bg-tertiary)]"
+                  style={{
+                    color: "var(--text-muted)",
+                    border: "1px solid var(--border-color)",
+                    opacity: isLoading ? 0.5 : 1,
+                  }}
+                >
+                  <List size={12} />
+                  View Trades ({state.backtest.result.trades.length})
+                </button>
+              )}
 
             {/* Clear Chart - show if there's backtest markers */}
             {state.backtest.result && (
@@ -530,7 +656,7 @@ function TradeDetailsPanel() {
   const { state, dispatch } = useAnalysis();
   const trade = state.backtest.selectedTrade;
   const trades = state.backtest.result?.trades || [];
-  const currentIndex = trade ? trades.findIndex(t => t.id === trade.id) : -1;
+  const currentIndex = trade ? trades.findIndex((t) => t.id === trade.id) : -1;
   const hasPrev = currentIndex > 0;
   const hasNext = currentIndex < trades.length - 1;
 
@@ -550,10 +676,20 @@ function TradeDetailsPanel() {
     return (
       <div
         className="w-80 border-l flex flex-col items-center justify-center p-6"
-        style={{ borderColor: "var(--border-color)", background: "var(--bg-secondary)" }}
+        style={{
+          borderColor: "var(--border-color)",
+          background: "var(--bg-secondary)",
+        }}
       >
-        <Info size={32} style={{ color: "var(--text-muted)" }} className="mb-3 opacity-50" />
-        <p className="text-sm text-center" style={{ color: "var(--text-muted)" }}>
+        <Info
+          size={32}
+          style={{ color: "var(--text-muted)" }}
+          className="mb-3 opacity-50"
+        />
+        <p
+          className="text-sm text-center"
+          style={{ color: "var(--text-muted)" }}
+        >
           Click a trade marker on the chart to see details
         </p>
       </div>
@@ -571,7 +707,10 @@ function TradeDetailsPanel() {
   return (
     <div
       className="w-80 border-l flex flex-col"
-      style={{ borderColor: "var(--border-color)", background: "var(--bg-secondary)" }}
+      style={{
+        borderColor: "var(--border-color)",
+        background: "var(--bg-secondary)",
+      }}
     >
       {/* Header */}
       <div
@@ -618,12 +757,22 @@ function TradeDetailsPanel() {
         <div className="text-center py-3">
           <p
             className="text-3xl font-bold"
-            style={{ color: trade.pnl >= 0 ? "var(--accent-success)" : "var(--accent-danger)" }}
+            style={{
+              color:
+                trade.pnl >= 0
+                  ? "var(--accent-success)"
+                  : "var(--accent-danger)",
+            }}
           >
-            {trade.pnl >= 0 ? "+" : ""}${trade.pnl.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+            {trade.pnl >= 0 ? "+" : ""}$
+            {trade.pnl.toLocaleString(undefined, {
+              minimumFractionDigits: 2,
+              maximumFractionDigits: 2,
+            })}
           </p>
           <p className="text-sm" style={{ color: "var(--text-muted)" }}>
-            {trade.pnl_percent >= 0 ? "+" : ""}{trade.pnl_percent.toFixed(2)}%
+            {trade.pnl_percent >= 0 ? "+" : ""}
+            {trade.pnl_percent.toFixed(2)}%
           </p>
         </div>
 
@@ -633,7 +782,12 @@ function TradeDetailsPanel() {
             <span style={{ color: "var(--text-muted)" }}>Side</span>
             <span
               className="font-medium"
-              style={{ color: trade.side === "long" ? "var(--accent-success)" : "var(--accent-danger)" }}
+              style={{
+                color:
+                  trade.side === "long"
+                    ? "var(--accent-success)"
+                    : "var(--accent-danger)",
+              }}
             >
               {trade.side.toUpperCase()}
             </span>
@@ -642,23 +796,33 @@ function TradeDetailsPanel() {
           <div className="flex justify-between text-sm">
             <span style={{ color: "var(--text-muted)" }}>Entry</span>
             <div className="text-right">
-              <p style={{ color: "var(--text-primary)" }}>${trade.entry_price.toFixed(2)}</p>
-              <p className="text-xs" style={{ color: "var(--text-muted)" }}>{formatDate(trade.entry_time)}</p>
+              <p style={{ color: "var(--text-primary)" }}>
+                ${trade.entry_price.toFixed(2)}
+              </p>
+              <p className="text-xs" style={{ color: "var(--text-muted)" }}>
+                {formatDate(trade.entry_time)}
+              </p>
             </div>
           </div>
 
           <div className="flex justify-between text-sm">
             <span style={{ color: "var(--text-muted)" }}>Exit</span>
             <div className="text-right">
-              <p style={{ color: "var(--text-primary)" }}>${trade.exit_price.toFixed(2)}</p>
-              <p className="text-xs" style={{ color: "var(--text-muted)" }}>{formatDate(trade.exit_time)}</p>
+              <p style={{ color: "var(--text-primary)" }}>
+                ${trade.exit_price.toFixed(2)}
+              </p>
+              <p className="text-xs" style={{ color: "var(--text-muted)" }}>
+                {formatDate(trade.exit_time)}
+              </p>
             </div>
           </div>
 
           <div className="flex justify-between text-sm">
             <span style={{ color: "var(--text-muted)" }}>Quantity</span>
             <span style={{ color: "var(--text-primary)" }}>
-              {trade.quantity >= 1 ? trade.quantity.toFixed(2) : trade.quantity.toFixed(4)}
+              {trade.quantity >= 1
+                ? trade.quantity.toFixed(2)
+                : trade.quantity.toFixed(4)}
             </span>
           </div>
 
@@ -668,7 +832,9 @@ function TradeDetailsPanel() {
               className="px-2 py-0.5 rounded text-xs"
               style={{
                 background: "var(--bg-tertiary)",
-                color: trade.exit_reason.includes("stop") ? "var(--accent-danger)" : "var(--accent-primary)",
+                color: trade.exit_reason.includes("stop")
+                  ? "var(--accent-danger)"
+                  : "var(--accent-primary)",
               }}
             >
               {trade.exit_reason}
@@ -681,9 +847,16 @@ function TradeDetailsPanel() {
           className="p-3 rounded-lg"
           style={{ background: "var(--bg-tertiary)" }}
         >
-          <p className="text-xs mb-1" style={{ color: "var(--text-muted)" }}>Duration</p>
+          <p className="text-xs mb-1" style={{ color: "var(--text-muted)" }}>
+            Duration
+          </p>
           <p className="font-medium" style={{ color: "var(--text-primary)" }}>
-            {Math.ceil((new Date(trade.exit_time).getTime() - new Date(trade.entry_time).getTime()) / (1000 * 60 * 60 * 24))} days
+            {Math.ceil(
+              (new Date(trade.exit_time).getTime() -
+                new Date(trade.entry_time).getTime()) /
+                (1000 * 60 * 60 * 24),
+            )}{" "}
+            days
           </p>
         </div>
       </div>
@@ -699,7 +872,8 @@ function AnalysisContent() {
   const { state } = useAnalysis();
 
   // Show trade details if a trade is selected, otherwise show chat
-  const showTradeDetails = state.ui.sidePanel === "trade-details" && state.backtest.selectedTrade;
+  const showTradeDetails =
+    state.ui.sidePanel === "trade-details" && state.backtest.selectedTrade;
 
   return (
     <div className="flex h-full" style={{ background: "var(--bg-primary)" }}>

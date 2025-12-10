@@ -2,23 +2,23 @@
 
 :root {
   /* Mediterranean Pastel Theme */
-  --bg-primary: #faf7f2;        /* Warm cream */
-  --bg-secondary: #f5f0e8;      /* Sandy beige */
-  --bg-tertiary: #ebe4d8;       /* Soft linen */
-  --bg-card: #ffffff;           /* Clean white */
-  --border-color: #e0d5c7;      /* Warm sand */
-  --border-glow: #c9a87c;       /* Muted gold */
+  --bg-primary: #faf7f2; /* Warm cream */
+  --bg-secondary: #f5f0e8; /* Sandy beige */
+  --bg-tertiary: #ebe4d8; /* Soft linen */
+  --bg-card: #ffffff; /* Clean white */
+  --border-color: #e0d5c7; /* Warm sand */
+  --border-glow: #c9a87c; /* Muted gold */
 
-  --text-primary: #3d3a36;      /* Warm charcoal */
-  --text-secondary: #6b645a;    /* Olive brown */
-  --text-muted: #9a928a;        /* Dusty taupe */
+  --text-primary: #3d3a36; /* Warm charcoal */
+  --text-secondary: #6b645a; /* Olive brown */
+  --text-muted: #9a928a; /* Dusty taupe */
 
-  --accent-primary: #c9a87c;    /* Terracotta gold */
-  --accent-secondary: #b8956e;  /* Deeper terracotta */
-  --accent-success: #8fae8b;    /* Sage green */
-  --accent-warning: #d4a574;    /* Warm apricot */
-  --accent-danger: #c88b8b;     /* Dusty rose */
-  --accent-info: #8ba5b5;       /* Mediterranean blue */
+  --accent-primary: #c9a87c; /* Terracotta gold */
+  --accent-secondary: #b8956e; /* Deeper terracotta */
+  --accent-success: #8fae8b; /* Sage green */
+  --accent-warning: #d4a574; /* Warm apricot */
+  --accent-danger: #c88b8b; /* Dusty rose */
+  --accent-info: #8ba5b5; /* Mediterranean blue */
 
   --gradient-start: #c9a87c;
   --gradient-end: #8fae8b;
@@ -28,7 +28,8 @@
   box-sizing: border-box;
 }
 
-html, body {
+html,
+body {
   height: 100%;
   margin: 0;
   padding: 0;
@@ -37,7 +38,11 @@ html, body {
 body {
   background: var(--bg-primary);
   color: var(--text-primary);
-  font-family: 'DM Sans', -apple-system, BlinkMacSystemFont, sans-serif;
+  font-family:
+    "DM Sans",
+    -apple-system,
+    BlinkMacSystemFont,
+    sans-serif;
   font-size: 14px;
   line-height: 1.65;
   -webkit-font-smoothing: antialiased;
@@ -76,25 +81,30 @@ body {
 
 /* Custom utility classes */
 .glow-border {
-  box-shadow: 0 2px 8px -2px rgba(201, 168, 124, 0.2),
-              0 0 0 1px var(--border-color);
+  box-shadow:
+    0 2px 8px -2px rgba(201, 168, 124, 0.2),
+    0 0 0 1px var(--border-color);
 }
 
 .glow-border-active {
-  box-shadow: 0 4px 16px -4px rgba(201, 168, 124, 0.3),
-              0 0 0 1px var(--accent-primary);
+  box-shadow:
+    0 4px 16px -4px rgba(201, 168, 124, 0.3),
+    0 0 0 1px var(--accent-primary);
 }
 
 .gradient-text {
-  background: linear-gradient(135deg, var(--gradient-start), var(--gradient-end));
+  background: linear-gradient(
+    135deg,
+    var(--gradient-start),
+    var(--gradient-end)
+  );
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
   background-clip: text;
 }
 
 .pattern-grid {
-  background-image:
-    linear-gradient(var(--border-color) 1px, transparent 1px),
+  background-image: linear-gradient(var(--border-color) 1px, transparent 1px),
     linear-gradient(90deg, var(--border-color) 1px, transparent 1px);
   background-size: 40px 40px;
   background-position: -1px -1px;
@@ -102,8 +112,13 @@ body {
 
 /* Animations */
 @keyframes pulse-glow {
-  0%, 100% { opacity: 1; }
-  50% { opacity: 0.5; }
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.5;
+  }
 }
 
 @keyframes slide-up {
@@ -126,8 +141,9 @@ body {
 }
 
 /* Code blocks */
-pre, code {
-  font-family: 'JetBrains Mono', 'Fira Code', monospace;
+pre,
+code {
+  font-family: "JetBrains Mono", "Fira Code", monospace;
   background: var(--bg-tertiary);
   border-radius: 6px;
 }
@@ -263,7 +279,9 @@ pre code {
   color: var(--text-primary);
 }
 
-.prose h1, .prose h2, .prose h3 {
+.prose h1,
+.prose h2,
+.prose h3 {
   color: var(--text-primary);
   font-weight: 600;
   margin-top: 1.5em;
@@ -274,7 +292,8 @@ pre code {
   margin-bottom: 1em;
 }
 
-.prose ul, .prose ol {
+.prose ul,
+.prose ol {
   margin-left: 1.5em;
   margin-bottom: 1em;
 }

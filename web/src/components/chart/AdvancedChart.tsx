@@ -1,9 +1,27 @@
 "use client";
 
 import { useEffect, useRef, useState, useCallback } from "react";
-import { createChart, ColorType, CandlestickSeries, HistogramSeries } from "lightweight-charts";
-import type { IChartApi, ISeriesApi, CandlestickData, HistogramData, Time } from "lightweight-charts";
-import { Search, ChevronDown, Loader2, Wifi, Database, AlertCircle } from "lucide-react";
+import {
+  createChart,
+  ColorType,
+  CandlestickSeries,
+  HistogramSeries,
+} from "lightweight-charts";
+import type {
+  IChartApi,
+  ISeriesApi,
+  CandlestickData,
+  HistogramData,
+  Time,
+} from "lightweight-charts";
+import {
+  Search,
+  ChevronDown,
+  Loader2,
+  Wifi,
+  Database,
+  AlertCircle,
+} from "lucide-react";
 
 // Types
 interface OHLCVBar {
@@ -23,18 +41,10 @@ interface OHLCVResponse {
   message?: string;
 }
 
-interface Trade {
-  entry_time: string;
-  exit_time: string;
-  side: string;
-  pnl: number;
-}
-
 interface AdvancedChartProps {
   initialSymbol?: string;
   initialInterval?: string;
   initialRange?: string;
-  trades?: Trade[];
   onSymbolChange?: (symbol: string) => void;
 }
 
@@ -58,7 +68,6 @@ export default function AdvancedChart({
   initialSymbol = "SPY",
   initialInterval = "1d",
   initialRange = "1Y",
-  trades = [],
   onSymbolChange,
 }: AdvancedChartProps) {
   // State
@@ -71,7 +80,9 @@ export default function AdvancedChart({
   const [dataMessage, setDataMessage] = useState<string | null>(null);
   const [symbolSearchOpen, setSymbolSearchOpen] = useState(false);
   const [intervalOpen, setIntervalOpen] = useState(false);
-  const [symbols, setSymbols] = useState<{ symbol: string; name?: string }[]>([]);
+  const [symbols, setSymbols] = useState<{ symbol: string; name?: string }[]>(
+    [],
+  );
   const [searchQuery, setSearchQuery] = useState("");
 
   // Chart refs
@@ -81,17 +92,22 @@ export default function AdvancedChart({
   const volumeSeriesRef = useRef<ISeriesApi<"Histogram"> | null>(null);
 
   // Check if current interval is intraday
-  const isIntraday = INTERVALS.find((i) => i.value === interval)?.intraday ?? false;
+  const isIntraday =
+    INTERVALS.find((i) => i.value === interval)?.intraday ?? false;
 
   // Fetch OHLCV data
   const fetchData = useCallback(async () => {
     setLoading(true);
     setError(null);
     try {
-      const res = await fetch(`${API_BASE}/api/chart/ohlcv?symbol=${symbol}&interval=${interval}&range=${range}`);
+      const res = await fetch(
+        `${API_BASE}/api/chart/ohlcv?symbol=${symbol}&interval=${interval}&range=${range}`,
+      );
 
       if (!res.ok) {
-        const errorData = await res.json().catch(() => ({ detail: "Failed to fetch data" }));
+        const errorData = await res
+          .json()
+          .catch(() => ({ detail: "Failed to fetch data" }));
         throw new Error(errorData.detail || "Failed to fetch data");
       }
 
@@ -102,22 +118,29 @@ export default function AdvancedChart({
       setDataMessage(data.message || null);
 
       if (candleSeriesRef.current && data.bars) {
-        const candleData: CandlestickData<Time>[] = data.bars.map((bar: OHLCVBar) => ({
-          time: bar.time as Time,
-          open: bar.open,
-          high: bar.high,
-          low: bar.low,
-          close: bar.close,
-        }));
+        const candleData: CandlestickData<Time>[] = data.bars.map(
+          (bar: OHLCVBar) => ({
+            time: bar.time as Time,
+            open: bar.open,
+            high: bar.high,
+            low: bar.low,
+            close: bar.close,
+          }),
+        );
         candleSeriesRef.current.setData(candleData);
       }
 
       if (volumeSeriesRef.current && data.bars) {
-        const volumeData: HistogramData<Time>[] = data.bars.map((bar: OHLCVBar) => ({
-          time: bar.time as Time,
-          value: bar.volume,
-          color: bar.close >= bar.open ? "rgba(34, 197, 94, 0.5)" : "rgba(239, 68, 68, 0.5)",
-        }));
+        const volumeData: HistogramData<Time>[] = data.bars.map(
+          (bar: OHLCVBar) => ({
+            time: bar.time as Time,
+            value: bar.volume,
+            color:
+              bar.close >= bar.open
+                ? "rgba(34, 197, 94, 0.5)"
+                : "rgba(239, 68, 68, 0.5)",
+          }),
+        );
         volumeSeriesRef.current.setData(volumeData);
       }
 
@@ -251,16 +274,21 @@ export default function AdvancedChart({
     setIntervalOpen(false);
 
     // Auto-adjust range for intraday
-    const isNewIntraday = INTERVALS.find((i) => i.value === newInterval)?.intraday ?? false;
+    const isNewIntraday =
+      INTERVALS.find((i) => i.value === newInterval)?.intraday ?? false;
     if (isNewIntraday && !INTRADAY_RANGES.includes(range)) {
       setRange("1M");
     }
   };
 
-  const currentIntervalLabel = INTERVALS.find((i) => i.value === interval)?.label || interval;
+  const currentIntervalLabel =
+    INTERVALS.find((i) => i.value === interval)?.label || interval;
 
   return (
-    <div className="advanced-chart w-full h-full flex flex-col" data-testid="advanced-chart">
+    <div
+      className="advanced-chart w-full h-full flex flex-col"
+      data-testid="advanced-chart"
+    >
       {/* Header */}
       <div
         className="flex items-center gap-2 px-3 py-2 border-b"
@@ -272,7 +300,10 @@ export default function AdvancedChart({
           <button
             onClick={() => setSymbolSearchOpen(!symbolSearchOpen)}
             className="flex items-center gap-2 px-3 py-1.5 rounded-lg font-semibold"
-            style={{ background: "var(--bg-secondary)", color: "var(--text-primary)" }}
+            style={{
+              background: "var(--bg-secondary)",
+              color: "var(--text-primary)",
+            }}
             data-testid="symbol-selector"
           >
             <span>{symbol}</span>
@@ -281,14 +312,26 @@ export default function AdvancedChart({
 
           {symbolSearchOpen && (
             <>
-              <div className="fixed inset-0 z-40" onClick={() => setSymbolSearchOpen(false)} />
+              <div
+                className="fixed inset-0 z-40"
+                onClick={() => setSymbolSearchOpen(false)}
+              />
               <div
                 className="absolute top-full left-0 mt-1 w-64 rounded-lg border shadow-lg z-50"
-                style={{ background: "var(--bg-secondary)", borderColor: "var(--border-color)" }}
+                style={{
+                  background: "var(--bg-secondary)",
+                  borderColor: "var(--border-color)",
+                }}
                 data-testid="symbol-search"
               >
-                <div className="p-2 border-b" style={{ borderColor: "var(--border-color)" }}>
-                  <div className="flex items-center gap-2 px-2 py-1 rounded" style={{ background: "var(--bg-tertiary)" }}>
+                <div
+                  className="p-2 border-b"
+                  style={{ borderColor: "var(--border-color)" }}
+                >
+                  <div
+                    className="flex items-center gap-2 px-2 py-1 rounded"
+                    style={{ background: "var(--bg-tertiary)" }}
+                  >
                     <Search size={14} style={{ color: "var(--text-muted)" }} />
                     <input
                       type="text"
@@ -308,9 +351,14 @@ export default function AdvancedChart({
                       onClick={() => handleSymbolChange(s.symbol)}
                       className="w-full px-3 py-2 text-left text-sm hover:bg-[var(--bg-tertiary)] flex justify-between"
                     >
-                      <span style={{ color: "var(--text-primary)" }}>{s.symbol}</span>
+                      <span style={{ color: "var(--text-primary)" }}>
+                        {s.symbol}
+                      </span>
                       {s.name && (
-                        <span className="text-xs truncate ml-2" style={{ color: "var(--text-muted)" }}>
+                        <span
+                          className="text-xs truncate ml-2"
+                          style={{ color: "var(--text-muted)" }}
+                        >
                           {s.name}
                         </span>
                       )}
@@ -327,7 +375,10 @@ export default function AdvancedChart({
           <button
             onClick={() => setIntervalOpen(!intervalOpen)}
             className="flex items-center gap-1 px-2 py-1.5 rounded text-sm"
-            style={{ background: "var(--bg-secondary)", color: "var(--text-secondary)" }}
+            style={{
+              background: "var(--bg-secondary)",
+              color: "var(--text-secondary)",
+            }}
             data-testid="interval-selector"
           >
             <span>{currentIntervalLabel}</span>
@@ -336,21 +387,38 @@ export default function AdvancedChart({
 
           {intervalOpen && (
             <>
-              <div className="fixed inset-0 z-40" onClick={() => setIntervalOpen(false)} />
+              <div
+                className="fixed inset-0 z-40"
+                onClick={() => setIntervalOpen(false)}
+              />
               <div
                 className="absolute top-full left-0 mt-1 rounded-lg border shadow-lg z-50 py-1"
-                style={{ background: "var(--bg-secondary)", borderColor: "var(--border-color)" }}
+                style={{
+                  background: "var(--bg-secondary)",
+                  borderColor: "var(--border-color)",
+                }}
               >
                 {INTERVALS.map((i) => (
                   <button
                     key={i.value}
                     onClick={() => handleIntervalChange(i.value)}
                     className="w-full px-4 py-1.5 text-left text-sm hover:bg-[var(--bg-tertiary)] flex items-center justify-between"
-                    style={{ color: interval === i.value ? "var(--accent-primary)" : "var(--text-secondary)" }}
+                    style={{
+                      color:
+                        interval === i.value
+                          ? "var(--accent-primary)"
+                          : "var(--text-secondary)",
+                    }}
                   >
                     <span>{i.label}</span>
                     {i.intraday && i.maxDays && (
-                      <span className="text-xs px-1 rounded" style={{ background: "var(--bg-tertiary)", color: "var(--text-muted)" }}>
+                      <span
+                        className="text-xs px-1 rounded"
+                        style={{
+                          background: "var(--bg-tertiary)",
+                          color: "var(--text-muted)",
+                        }}
+                      >
                         {i.maxDays}d
                       </span>
                     )}
@@ -366,12 +434,24 @@ export default function AdvancedChart({
           <div
             className="flex items-center gap-1 px-2 py-1 rounded text-xs"
             style={{
-              background: dataSource === "live" ? "rgba(59, 130, 246, 0.2)" : "var(--bg-tertiary)",
+              background:
+                dataSource === "live"
+                  ? "rgba(59, 130, 246, 0.2)"
+                  : "var(--bg-tertiary)",
               color: dataSource === "live" ? "#3b82f6" : "var(--text-muted)",
             }}
-            title={dataMessage || (dataSource === "live" ? "Live from Yahoo Finance" : "From database")}
+            title={
+              dataMessage ||
+              (dataSource === "live"
+                ? "Live from Yahoo Finance"
+                : "From database")
+            }
           >
-            {dataSource === "live" ? <Wifi size={12} /> : <Database size={12} />}
+            {dataSource === "live" ? (
+              <Wifi size={12} />
+            ) : (
+              <Database size={12} />
+            )}
             <span>{dataSource === "live" ? "LIVE" : "DB"}</span>
           </div>
         )}
@@ -389,13 +469,21 @@ export default function AdvancedChart({
                 onClick={() => !disabled && setRange(r)}
                 className={`px-2 py-1 text-xs rounded transition-colors ${range === r ? "active" : ""}`}
                 style={{
-                  background: range === r ? "var(--accent-primary)" : "transparent",
-                  color: range === r ? "var(--bg-primary)" : disabled ? "var(--text-muted)" : "var(--text-muted)",
+                  background:
+                    range === r ? "var(--accent-primary)" : "transparent",
+                  color:
+                    range === r
+                      ? "var(--bg-primary)"
+                      : disabled
+                        ? "var(--text-muted)"
+                        : "var(--text-muted)",
                   opacity: disabled ? 0.4 : 1,
                   cursor: disabled ? "not-allowed" : "pointer",
                 }}
                 disabled={disabled}
-                title={disabled ? "Intraday data limited to 60 days" : undefined}
+                title={
+                  disabled ? "Intraday data limited to 60 days" : undefined
+                }
                 data-testid={`range-${r}`}
               >
                 {r}
@@ -413,7 +501,11 @@ export default function AdvancedChart({
             style={{ background: "var(--bg-primary)" }}
             data-testid="chart-loading"
           >
-            <Loader2 className="animate-spin" size={32} style={{ color: "var(--text-muted)" }} />
+            <Loader2
+              className="animate-spin"
+              size={32}
+              style={{ color: "var(--text-muted)" }}
+            />
           </div>
         )}
 
@@ -423,7 +515,9 @@ export default function AdvancedChart({
             style={{ background: "var(--bg-primary)" }}
           >
             <AlertCircle size={32} style={{ color: "var(--accent-danger)" }} />
-            <p className="text-sm" style={{ color: "var(--text-muted)" }}>{error}</p>
+            <p className="text-sm" style={{ color: "var(--text-muted)" }}>
+              {error}
+            </p>
           </div>
         )}
 
@@ -434,7 +528,10 @@ export default function AdvancedChart({
       {dataMessage && !loading && !error && (
         <div
           className="px-3 py-1 text-xs border-t"
-          style={{ borderColor: "var(--border-color)", color: "var(--text-muted)" }}
+          style={{
+            borderColor: "var(--border-color)",
+            color: "var(--text-muted)",
+          }}
         >
           {dataMessage}
         </div>

@@ -1,10 +1,38 @@
 "use client";
 
-import { useEffect, useRef, useState, useCallback } from "react";
-import { createChart, ColorType, CandlestickSeries, HistogramSeries, createSeriesMarkers } from "lightweight-charts";
-import type { IChartApi, ISeriesApi, CandlestickData, HistogramData, Time, SeriesMarker, ISeriesMarkersPluginApi } from "lightweight-charts";
-import { Search, ChevronDown, Loader2, Wifi, Database, AlertCircle, TrendingUp, TrendingDown } from "lucide-react";
-import { useAnalysis, useChartIntents, Trade, ChartEvent as AnalysisChartEvent } from "@/contexts/AnalysisContext";
+import { useEffect, useRef, useState, useCallback, useMemo } from "react";
+import {
+  createChart,
+  ColorType,
+  CandlestickSeries,
+  HistogramSeries,
+  createSeriesMarkers,
+} from "lightweight-charts";
+import type {
+  IChartApi,
+  ISeriesApi,
+  CandlestickData,
+  HistogramData,
+  Time,
+  SeriesMarker,
+  ISeriesMarkersPluginApi,
+} from "lightweight-charts";
+import {
+  Search,
+  ChevronDown,
+  Loader2,
+  Wifi,
+  Database,
+  AlertCircle,
+  TrendingUp,
+  TrendingDown,
+} from "lucide-react";
+import {
+  useAnalysis,
+  useChartIntents,
+  Trade,
+  ChartEvent as AnalysisChartEvent,
+} from "@/contexts/AnalysisContext";
 
 // ============================================================================
 // Types
@@ -49,13 +77,16 @@ const API_BASE = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
 // Trade Markers
 // ============================================================================
 
-function createTradeMarkers(trades: Trade[], candleData: CandlestickData<Time>[]): SeriesMarker<Time>[] {
+function createTradeMarkers(
+  trades: Trade[],
+  candleData: CandlestickData<Time>[],
+): SeriesMarker<Time>[] {
   const markers: SeriesMarker<Time>[] = [];
 
   if (!candleData.length || !trades.length) return markers;
 
   // Get candle timestamps - normalize to start of day for daily charts
-  const candleTimes = candleData.map(c => c.time as number);
+  const candleTimes = candleData.map((c) => c.time as number);
   const minTime = Math.min(...candleTimes);
   const maxTime = Math.max(...candleTimes);
 
@@ -137,11 +168,16 @@ export default function IntelligentChart() {
   const [dataMessage, setDataMessage] = useState<string | null>(null);
   const [symbolSearchOpen, setSymbolSearchOpen] = useState(false);
   const [intervalOpen, setIntervalOpen] = useState(false);
-  const [symbols, setSymbols] = useState<{ symbol: string; name?: string }[]>([]);
+  const [symbols, setSymbols] = useState<{ symbol: string; name?: string }[]>(
+    [],
+  );
   const [searchQuery, setSearchQuery] = useState("");
   const [range, setRange] = useState("1Y");
   const [candleData, setCandleData] = useState<CandlestickData<Time>[]>([]);
-  const [pendingZoom, setPendingZoom] = useState<{ start: number; end: number } | null>(null);
+  const [pendingZoom, setPendingZoom] = useState<{
+    start: number;
+    end: number;
+  } | null>(null);
   const lastBacktestId = useRef<string | null>(null);
 
   // Chart refs
@@ -153,8 +189,12 @@ export default function IntelligentChart() {
 
   // Derived values
   const { symbol, interval } = state.chart;
-  const isIntraday = INTERVALS.find((i) => i.value === interval)?.intraday ?? false;
-  const trades = state.backtest.result?.trades || [];
+  const isIntraday =
+    INTERVALS.find((i) => i.value === interval)?.intraday ?? false;
+  const trades = useMemo(
+    () => state.backtest.result?.trades || [],
+    [state.backtest.result?.trades],
+  );
 
   // ============================================================================
   // Data Fetching
@@ -164,10 +204,14 @@ export default function IntelligentChart() {
     setLoading(true);
     setError(null);
     try {
-      const res = await fetch(`${API_BASE}/api/chart/ohlcv?symbol=${symbol}&interval=${interval}&range=${range}`);
+      const res = await fetch(
+        `${API_BASE}/api/chart/ohlcv?symbol=${symbol}&interval=${interval}&range=${range}`,
+      );
 
       if (!res.ok) {
-        const errorData = await res.json().catch(() => ({ detail: "Failed to fetch data" }));
+        const errorData = await res
+          .json()
+          .catch(() => ({ detail: "Failed to fetch data" }));
         throw new Error(errorData.detail || "Failed to fetch data");
       }
 
@@ -177,24 +221,31 @@ export default function IntelligentChart() {
       setDataMessage(data.message || null);
 
       if (candleSeriesRef.current && data.bars) {
-        const candles: CandlestickData<Time>[] = data.bars.map((bar: OHLCVBar) => ({
-          time: bar.time as Time,
-          open: bar.open,
-          high: bar.high,
-          low: bar.low,
-          close: bar.close,
-        }));
+        const candles: CandlestickData<Time>[] = data.bars.map(
+          (bar: OHLCVBar) => ({
+            time: bar.time as Time,
+            open: bar.open,
+            high: bar.high,
+            low: bar.low,
+            close: bar.close,
+          }),
+        );
         candleSeriesRef.current.setData(candles);
         setCandleData(candles);
         // Trade markers are updated in a separate effect when trades change
       }
 
       if (volumeSeriesRef.current && data.bars) {
-        const volumeData: HistogramData<Time>[] = data.bars.map((bar: OHLCVBar) => ({
-          time: bar.time as Time,
-          value: bar.volume,
-          color: bar.close >= bar.open ? "rgba(34, 197, 94, 0.5)" : "rgba(239, 68, 68, 0.5)",
-        }));
+        const volumeData: HistogramData<Time>[] = data.bars.map(
+          (bar: OHLCVBar) => ({
+            time: bar.time as Time,
+            value: bar.volume,
+            color:
+              bar.close >= bar.open
+                ? "rgba(34, 197, 94, 0.5)"
+                : "rgba(239, 68, 68, 0.5)",
+          }),
+        );
         volumeSeriesRef.current.setData(volumeData);
       }
 
@@ -289,17 +340,22 @@ export default function IntelligentChart() {
       const event: AnalysisChartEvent = {
         type: "click",
         timestamp: param.time as number,
-        price: param.point ? candleSeries.coordinateToPrice(param.point.y) || undefined : undefined,
+        price: param.point
+          ? candleSeries.coordinateToPrice(param.point.y) || undefined
+          : undefined,
       };
 
       // Check if clicked on a marker (trade)
       // Note: Lightweight Charts doesn't expose marker clicks directly,
       // so we approximate by checking if click is near a trade
       const clickTime = param.time as number;
-      const nearbyTrade = trades.find(t => {
+      const nearbyTrade = trades.find((t) => {
         const entryTime = Math.floor(new Date(t.entry_time).getTime() / 1000);
         const exitTime = Math.floor(new Date(t.exit_time).getTime() / 1000);
-        return Math.abs(clickTime - entryTime) < 86400 || Math.abs(clickTime - exitTime) < 86400;
+        return (
+          Math.abs(clickTime - entryTime) < 86400 ||
+          Math.abs(clickTime - exitTime) < 86400
+        );
       });
 
       if (nearbyTrade) {
@@ -351,6 +407,7 @@ export default function IntelligentChart() {
       }
       chart.remove();
     };
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- Chart init runs once; click handlers use current trades via closure
   }, []);
 
   // ============================================================================
@@ -367,7 +424,9 @@ export default function IntelligentChart() {
     if (markersPluginRef.current) {
       if (candleData.length > 0 && trades.length > 0) {
         const markers = createTradeMarkers(trades, candleData);
-        console.log(`[Chart] Creating ${markers.length} markers for ${trades.length} trades`);
+        console.log(
+          `[Chart] Creating ${markers.length} markers for ${trades.length} trades`,
+        );
         markersPluginRef.current.setMarkers(markers);
       } else {
         markersPluginRef.current.setMarkers([]);
@@ -401,7 +460,9 @@ export default function IntelligentChart() {
 
     // Sync chart symbol to backtest symbol
     if (backtestResult.symbol && backtestResult.symbol !== symbol) {
-      console.log(`[Chart] Switching symbol from ${symbol} to ${backtestResult.symbol} for backtest`);
+      console.log(
+        `[Chart] Switching symbol from ${symbol} to ${backtestResult.symbol} for backtest`,
+      );
       dispatch({ type: "SET_SYMBOL", symbol: backtestResult.symbol });
     }
 
@@ -410,7 +471,9 @@ export default function IntelligentChart() {
     const now = new Date();
 
     // Calculate how far back the backtest starts
-    const daysBack = Math.ceil((now.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24));
+    const daysBack = Math.ceil(
+      (now.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24),
+    );
 
     // Select appropriate range
     let newRange = range;
@@ -440,7 +503,8 @@ export default function IntelligentChart() {
       console.log(`[Chart] Switching to ${newRange} range for backtest period`);
       setRange(newRange);
     }
-  }, [state.backtest.result, range, isIntraday]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- Only react to backtest result changes
+  }, [state.backtest.result]);
 
   // Apply pending zoom after data loads
   useEffect(() => {
@@ -450,7 +514,9 @@ export default function IntelligentChart() {
       const dataEnd = candleData[candleData.length - 1]?.time as number;
 
       if (dataStart <= pendingZoom.start && dataEnd >= pendingZoom.end) {
-        console.log(`[Chart] Zooming to backtest period: ${new Date(pendingZoom.start * 1000).toLocaleDateString()} - ${new Date(pendingZoom.end * 1000).toLocaleDateString()}`);
+        console.log(
+          `[Chart] Zooming to backtest period: ${new Date(pendingZoom.start * 1000).toLocaleDateString()} - ${new Date(pendingZoom.end * 1000).toLocaleDateString()}`,
+        );
         chartRef.current.timeScale().setVisibleRange({
           from: pendingZoom.start as Time,
           to: pendingZoom.end as Time,
@@ -473,7 +539,9 @@ export default function IntelligentChart() {
       switch (intent.type) {
         case "navigate":
           if (intent.timestamp && chartRef.current) {
-            chartRef.current.timeScale().scrollToPosition(intent.timestamp, false);
+            chartRef.current
+              .timeScale()
+              .scrollToPosition(intent.timestamp, false);
           }
           if (intent.range && chartRef.current) {
             chartRef.current.timeScale().setVisibleRange({
@@ -490,7 +558,10 @@ export default function IntelligentChart() {
           break;
 
         case "clear":
-          if (intent.clearType === "annotations" || intent.clearType === "all") {
+          if (
+            intent.clearType === "annotations" ||
+            intent.clearType === "all"
+          ) {
             dispatch({ type: "CLEAR_ANNOTATIONS" });
           }
           break;
@@ -514,13 +585,15 @@ export default function IntelligentChart() {
     dispatch({ type: "SET_INTERVAL", interval: newInterval });
     setIntervalOpen(false);
 
-    const isNewIntraday = INTERVALS.find((i) => i.value === newInterval)?.intraday ?? false;
+    const isNewIntraday =
+      INTERVALS.find((i) => i.value === newInterval)?.intraday ?? false;
     if (isNewIntraday && !INTRADAY_RANGES.includes(range)) {
       setRange("1M");
     }
   };
 
-  const currentIntervalLabel = INTERVALS.find((i) => i.value === interval)?.label || interval;
+  const currentIntervalLabel =
+    INTERVALS.find((i) => i.value === interval)?.label || interval;
 
   // ============================================================================
   // Render
@@ -538,7 +611,10 @@ export default function IntelligentChart() {
           <button
             onClick={() => setSymbolSearchOpen(!symbolSearchOpen)}
             className="flex items-center gap-2 px-3 py-1.5 rounded-lg font-semibold"
-            style={{ background: "var(--bg-secondary)", color: "var(--text-primary)" }}
+            style={{
+              background: "var(--bg-secondary)",
+              color: "var(--text-primary)",
+            }}
           >
             <span>{symbol}</span>
             <ChevronDown size={14} />
@@ -546,13 +622,25 @@ export default function IntelligentChart() {
 
           {symbolSearchOpen && (
             <>
-              <div className="fixed inset-0 z-40" onClick={() => setSymbolSearchOpen(false)} />
+              <div
+                className="fixed inset-0 z-40"
+                onClick={() => setSymbolSearchOpen(false)}
+              />
               <div
                 className="absolute top-full left-0 mt-1 w-64 rounded-lg border shadow-lg z-50"
-                style={{ background: "var(--bg-secondary)", borderColor: "var(--border-color)" }}
+                style={{
+                  background: "var(--bg-secondary)",
+                  borderColor: "var(--border-color)",
+                }}
               >
-                <div className="p-2 border-b" style={{ borderColor: "var(--border-color)" }}>
-                  <div className="flex items-center gap-2 px-2 py-1 rounded" style={{ background: "var(--bg-tertiary)" }}>
+                <div
+                  className="p-2 border-b"
+                  style={{ borderColor: "var(--border-color)" }}
+                >
+                  <div
+                    className="flex items-center gap-2 px-2 py-1 rounded"
+                    style={{ background: "var(--bg-tertiary)" }}
+                  >
                     <Search size={14} style={{ color: "var(--text-muted)" }} />
                     <input
                       type="text"
@@ -572,9 +660,14 @@ export default function IntelligentChart() {
                       onClick={() => handleSymbolChange(s.symbol)}
                       className="w-full px-3 py-2 text-left text-sm hover:bg-[var(--bg-tertiary)] flex justify-between"
                     >
-                      <span style={{ color: "var(--text-primary)" }}>{s.symbol}</span>
+                      <span style={{ color: "var(--text-primary)" }}>
+                        {s.symbol}
+                      </span>
                       {s.name && (
-                        <span className="text-xs truncate ml-2" style={{ color: "var(--text-muted)" }}>
+                        <span
+                          className="text-xs truncate ml-2"
+                          style={{ color: "var(--text-muted)" }}
+                        >
                           {s.name}
                         </span>
                       )}
@@ -591,7 +684,10 @@ export default function IntelligentChart() {
           <button
             onClick={() => setIntervalOpen(!intervalOpen)}
             className="flex items-center gap-1 px-2 py-1.5 rounded text-sm"
-            style={{ background: "var(--bg-secondary)", color: "var(--text-secondary)" }}
+            style={{
+              background: "var(--bg-secondary)",
+              color: "var(--text-secondary)",
+            }}
           >
             <span>{currentIntervalLabel}</span>
             <ChevronDown size={12} />
@@ -599,21 +695,38 @@ export default function IntelligentChart() {
 
           {intervalOpen && (
             <>
-              <div className="fixed inset-0 z-40" onClick={() => setIntervalOpen(false)} />
+              <div
+                className="fixed inset-0 z-40"
+                onClick={() => setIntervalOpen(false)}
+              />
               <div
                 className="absolute top-full left-0 mt-1 rounded-lg border shadow-lg z-50 py-1"
-                style={{ background: "var(--bg-secondary)", borderColor: "var(--border-color)" }}
+                style={{
+                  background: "var(--bg-secondary)",
+                  borderColor: "var(--border-color)",
+                }}
               >
                 {INTERVALS.map((i) => (
                   <button
                     key={i.value}
                     onClick={() => handleIntervalChange(i.value)}
                     className="w-full px-4 py-1.5 text-left text-sm hover:bg-[var(--bg-tertiary)] flex items-center justify-between"
-                    style={{ color: interval === i.value ? "var(--accent-primary)" : "var(--text-secondary)" }}
+                    style={{
+                      color:
+                        interval === i.value
+                          ? "var(--accent-primary)"
+                          : "var(--text-secondary)",
+                    }}
                   >
                     <span>{i.label}</span>
                     {i.intraday && i.maxDays && (
-                      <span className="text-xs px-1 rounded" style={{ background: "var(--bg-tertiary)", color: "var(--text-muted)" }}>
+                      <span
+                        className="text-xs px-1 rounded"
+                        style={{
+                          background: "var(--bg-tertiary)",
+                          color: "var(--text-muted)",
+                        }}
+                      >
                         {i.maxDays}d
                       </span>
                     )}
@@ -630,15 +743,17 @@ export default function IntelligentChart() {
             className="flex items-center gap-1.5 px-2 py-1 rounded text-xs"
             style={{ background: "var(--bg-tertiary)" }}
           >
-            <span style={{ color: "var(--text-muted)" }}>{trades.length} trades</span>
+            <span style={{ color: "var(--text-muted)" }}>
+              {trades.length} trades
+            </span>
             <span style={{ color: "var(--text-muted)" }}>|</span>
             <span style={{ color: "var(--accent-success)" }}>
               <TrendingUp size={10} className="inline mr-0.5" />
-              {trades.filter(t => t.pnl > 0).length}
+              {trades.filter((t) => t.pnl > 0).length}
             </span>
             <span style={{ color: "var(--accent-danger)" }}>
               <TrendingDown size={10} className="inline mr-0.5" />
-              {trades.filter(t => t.pnl <= 0).length}
+              {trades.filter((t) => t.pnl <= 0).length}
             </span>
           </div>
         )}
@@ -648,12 +763,24 @@ export default function IntelligentChart() {
           <div
             className="flex items-center gap-1 px-2 py-1 rounded text-xs"
             style={{
-              background: dataSource === "live" ? "rgba(59, 130, 246, 0.2)" : "var(--bg-tertiary)",
+              background:
+                dataSource === "live"
+                  ? "rgba(59, 130, 246, 0.2)"
+                  : "var(--bg-tertiary)",
               color: dataSource === "live" ? "#3b82f6" : "var(--text-muted)",
             }}
-            title={dataMessage || (dataSource === "live" ? "Live from Yahoo Finance" : "From database")}
+            title={
+              dataMessage ||
+              (dataSource === "live"
+                ? "Live from Yahoo Finance"
+                : "From database")
+            }
           >
-            {dataSource === "live" ? <Wifi size={12} /> : <Database size={12} />}
+            {dataSource === "live" ? (
+              <Wifi size={12} />
+            ) : (
+              <Database size={12} />
+            )}
             <span>{dataSource === "live" ? "LIVE" : "DB"}</span>
           </div>
         )}
@@ -671,13 +798,21 @@ export default function IntelligentChart() {
                 onClick={() => !disabled && setRange(r)}
                 className={`px-2 py-1 text-xs rounded transition-colors ${range === r ? "active" : ""}`}
                 style={{
-                  background: range === r ? "var(--accent-primary)" : "transparent",
-                  color: range === r ? "var(--bg-primary)" : disabled ? "var(--text-muted)" : "var(--text-muted)",
+                  background:
+                    range === r ? "var(--accent-primary)" : "transparent",
+                  color:
+                    range === r
+                      ? "var(--bg-primary)"
+                      : disabled
+                        ? "var(--text-muted)"
+                        : "var(--text-muted)",
                   opacity: disabled ? 0.4 : 1,
                   cursor: disabled ? "not-allowed" : "pointer",
                 }}
                 disabled={disabled}
-                title={disabled ? "Intraday data limited to 60 days" : undefined}
+                title={
+                  disabled ? "Intraday data limited to 60 days" : undefined
+                }
               >
                 {r}
               </button>
@@ -693,7 +828,11 @@ export default function IntelligentChart() {
             className="absolute inset-0 flex items-center justify-center z-10"
             style={{ background: "var(--bg-primary)" }}
           >
-            <Loader2 className="animate-spin" size={32} style={{ color: "var(--text-muted)" }} />
+            <Loader2
+              className="animate-spin"
+              size={32}
+              style={{ color: "var(--text-muted)" }}
+            />
           </div>
         )}
 
@@ -703,7 +842,9 @@ export default function IntelligentChart() {
             style={{ background: "var(--bg-primary)" }}
           >
             <AlertCircle size={32} style={{ color: "var(--accent-danger)" }} />
-            <p className="text-sm" style={{ color: "var(--text-muted)" }}>{error}</p>
+            <p className="text-sm" style={{ color: "var(--text-muted)" }}>
+              {error}
+            </p>
           </div>
         )}
 
@@ -714,20 +855,34 @@ export default function IntelligentChart() {
       {state.backtest.selectedTrade && (
         <div
           className="px-3 py-2 border-t flex items-center gap-4 text-sm"
-          style={{ borderColor: "var(--border-color)", background: "var(--bg-secondary)" }}
+          style={{
+            borderColor: "var(--border-color)",
+            background: "var(--bg-secondary)",
+          }}
         >
           <span style={{ color: "var(--text-muted)" }}>Selected Trade:</span>
           <span style={{ color: "var(--text-primary)" }}>
-            ${state.backtest.selectedTrade.entry_price.toFixed(2)} → ${state.backtest.selectedTrade.exit_price.toFixed(2)}
+            ${state.backtest.selectedTrade.entry_price.toFixed(2)} → $
+            {state.backtest.selectedTrade.exit_price.toFixed(2)}
           </span>
           <span
             style={{
-              color: state.backtest.selectedTrade.pnl >= 0 ? "var(--accent-success)" : "var(--accent-danger)",
+              color:
+                state.backtest.selectedTrade.pnl >= 0
+                  ? "var(--accent-success)"
+                  : "var(--accent-danger)",
             }}
           >
-            {state.backtest.selectedTrade.pnl >= 0 ? "+" : ""}${state.backtest.selectedTrade.pnl.toFixed(2)}
+            {state.backtest.selectedTrade.pnl >= 0 ? "+" : ""}$
+            {state.backtest.selectedTrade.pnl.toFixed(2)}
           </span>
-          <span className="text-xs px-2 py-0.5 rounded" style={{ background: "var(--bg-tertiary)", color: "var(--text-muted)" }}>
+          <span
+            className="text-xs px-2 py-0.5 rounded"
+            style={{
+              background: "var(--bg-tertiary)",
+              color: "var(--text-muted)",
+            }}
+          >
             {state.backtest.selectedTrade.exit_reason}
           </span>
         </div>
@@ -737,7 +892,10 @@ export default function IntelligentChart() {
       {dataMessage && !loading && !error && !state.backtest.selectedTrade && (
         <div
           className="px-3 py-1 text-xs border-t"
-          style={{ borderColor: "var(--border-color)", color: "var(--text-muted)" }}
+          style={{
+            borderColor: "var(--border-color)",
+            color: "var(--text-muted)",
+          }}
         >
           {dataMessage}
         </div>

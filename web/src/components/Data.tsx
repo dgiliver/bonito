@@ -85,7 +85,10 @@ export default function Data() {
         style={{ borderColor: "var(--border-color)" }}
       >
         <div>
-          <h2 className="text-lg font-semibold" style={{ color: "var(--text-primary)" }}>
+          <h2
+            className="text-lg font-semibold"
+            style={{ color: "var(--text-primary)" }}
+          >
             Market Data
           </h2>
           <p className="text-sm" style={{ color: "var(--text-muted)" }}>
@@ -124,7 +127,10 @@ export default function Data() {
                 style={{ color: "var(--text-muted)" }}
               />
               <p style={{ color: "var(--text-muted)" }}>No data ingested yet</p>
-              <p className="text-sm mt-1" style={{ color: "var(--text-muted)" }}>
+              <p
+                className="text-sm mt-1"
+                style={{ color: "var(--text-muted)" }}
+              >
                 Use the form to download market data
               </p>
             </div>
@@ -161,7 +167,10 @@ export default function Data() {
                     </div>
                     <div className="text-right">
                       <div className="flex items-center gap-1">
-                        <BarChart3 size={14} style={{ color: "var(--text-muted)" }} />
+                        <BarChart3
+                          size={14}
+                          style={{ color: "var(--text-muted)" }}
+                        />
                         <span
                           className="font-semibold"
                           style={{ color: "var(--text-primary)" }}
@@ -271,25 +280,32 @@ export default function Data() {
               Popular Symbols
             </h4>
             <div className="flex flex-wrap gap-2">
-              {["AAPL", "MSFT", "GOOGL", "AMZN", "NVDA", "TSLA", "META", "BTC-USD"].map(
-                (sym) => (
-                  <button
-                    key={sym}
-                    onClick={() => setNewSymbol(sym)}
-                    className="btn btn-ghost px-3 py-1.5 text-xs"
-                    style={{
-                      background: symbols.some((s) => s.symbol === sym)
-                        ? "var(--bg-tertiary)"
-                        : "transparent",
-                      color: symbols.some((s) => s.symbol === sym)
-                        ? "var(--accent-primary)"
-                        : "var(--text-secondary)",
-                    }}
-                  >
-                    {sym}
-                  </button>
-                )
-              )}
+              {[
+                "AAPL",
+                "MSFT",
+                "GOOGL",
+                "AMZN",
+                "NVDA",
+                "TSLA",
+                "META",
+                "BTC-USD",
+              ].map((sym) => (
+                <button
+                  key={sym}
+                  onClick={() => setNewSymbol(sym)}
+                  className="btn btn-ghost px-3 py-1.5 text-xs"
+                  style={{
+                    background: symbols.some((s) => s.symbol === sym)
+                      ? "var(--bg-tertiary)"
+                      : "transparent",
+                    color: symbols.some((s) => s.symbol === sym)
+                      ? "var(--accent-primary)"
+                      : "var(--text-secondary)",
+                  }}
+                >
+                  {sym}
+                </button>
+              ))}
             </div>
           </div>
 
@@ -312,7 +328,9 @@ export default function Data() {
               </div>
               <div className="flex justify-between">
                 <span style={{ color: "var(--text-muted)" }}>Data Source</span>
-                <span style={{ color: "var(--text-primary)" }}>Yahoo Finance</span>
+                <span style={{ color: "var(--text-primary)" }}>
+                  Yahoo Finance
+                </span>
               </div>
             </div>
           </div>

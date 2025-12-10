@@ -21,7 +21,13 @@
  * NEVER create parallel state in components for shared concerns.
  */
 
-import React, { createContext, useContext, useReducer, useCallback, ReactNode } from "react";
+import React, {
+  createContext,
+  useContext,
+  useReducer,
+  useCallback,
+  ReactNode,
+} from "react";
 
 // ============================================================================
 // Types
@@ -160,7 +166,10 @@ type AnalysisAction =
   | { type: "SET_SYMBOL"; symbol: string }
   | { type: "SET_INTERVAL"; interval: string }
   | { type: "SET_VISIBLE_RANGE"; range: { start: number; end: number } }
-  | { type: "SET_CURSOR"; position: { timestamp: number; price: number } | null }
+  | {
+      type: "SET_CURSOR";
+      position: { timestamp: number; price: number } | null;
+    }
   | { type: "ADD_INDICATOR"; indicator: IndicatorConfig }
   | { type: "REMOVE_INDICATOR"; name: string }
   | { type: "TOGGLE_INDICATOR"; name: string }
@@ -220,14 +229,18 @@ const initialState: AnalysisState = {
 // Reducer
 // ============================================================================
 
-function analysisReducer(state: AnalysisState, action: AnalysisAction): AnalysisState {
+function analysisReducer(
+  state: AnalysisState,
+  action: AnalysisAction,
+): AnalysisState {
   switch (action.type) {
     // Chart actions
     case "SET_SYMBOL": {
       // Only clear backtest if switching to a DIFFERENT symbol than the backtest
       // (Don't clear when syncing to backtest symbol)
       const backtestSymbol = state.backtest.result?.symbol;
-      const shouldClearBacktest = backtestSymbol && backtestSymbol !== action.symbol;
+      const shouldClearBacktest =
+        backtestSymbol && backtestSymbol !== action.symbol;
 
       return {
         ...state,
@@ -258,7 +271,9 @@ function analysisReducer(state: AnalysisState, action: AnalysisAction): Analysis
       };
 
     case "ADD_INDICATOR": {
-      const exists = state.chart.indicators.some(i => i.name === action.indicator.name);
+      const exists = state.chart.indicators.some(
+        (i) => i.name === action.indicator.name,
+      );
       if (exists) return state;
       return {
         ...state,
@@ -274,7 +289,9 @@ function analysisReducer(state: AnalysisState, action: AnalysisAction): Analysis
         ...state,
         chart: {
           ...state.chart,
-          indicators: state.chart.indicators.filter(i => i.name !== action.name),
+          indicators: state.chart.indicators.filter(
+            (i) => i.name !== action.name,
+          ),
         },
       };
 
@@ -283,8 +300,8 @@ function analysisReducer(state: AnalysisState, action: AnalysisAction): Analysis
         ...state,
         chart: {
           ...state.chart,
-          indicators: state.chart.indicators.map(i =>
-            i.name === action.name ? { ...i, visible: !i.visible } : i
+          indicators: state.chart.indicators.map((i) =>
+            i.name === action.name ? { ...i, visible: !i.visible } : i,
           ),
         },
       };
@@ -295,10 +312,15 @@ function analysisReducer(state: AnalysisState, action: AnalysisAction): Analysis
         ...state,
         strategy: action.strategy,
         // Auto-add strategy indicators to chart
-        chart: action.strategy ? {
-          ...state.chart,
-          indicators: action.strategy.indicators.map(i => ({ ...i, visible: true })),
-        } : state.chart,
+        chart: action.strategy
+          ? {
+              ...state.chart,
+              indicators: action.strategy.indicators.map((i) => ({
+                ...i,
+                visible: true,
+              })),
+            }
+          : state.chart,
       };
 
     // Backtest actions
@@ -336,7 +358,7 @@ function analysisReducer(state: AnalysisState, action: AnalysisAction): Analysis
     case "REMOVE_ANNOTATION":
       return {
         ...state,
-        annotations: state.annotations.filter(a => a.id !== action.id),
+        annotations: state.annotations.filter((a) => a.id !== action.id),
       };
 
     case "CLEAR_ANNOTATIONS":
@@ -361,9 +383,11 @@ function analysisReducer(state: AnalysisState, action: AnalysisAction): Analysis
     case "PROCESS_INTENT":
       return {
         ...state,
-        pendingIntents: state.pendingIntents.map(i =>
-          i.id === action.intentId ? { ...i, processed: true } : i
-        ).filter(i => !i.processed),
+        pendingIntents: state.pendingIntents
+          .map((i) =>
+            i.id === action.intentId ? { ...i, processed: true } : i,
+          )
+          .filter((i) => !i.processed),
       };
 
     case "CLEAR_INTENTS":
@@ -396,9 +420,13 @@ function analysisReducer(state: AnalysisState, action: AnalysisAction): Analysis
       const event = action.event;
 
       // Handle trade selection from chart click
-      if (event.type === "click" && event.target?.type === "trade" && event.target.tradeId) {
+      if (
+        event.type === "click" &&
+        event.target?.type === "trade" &&
+        event.target.tradeId
+      ) {
         const trade = state.backtest.result?.trades.find(
-          t => t.id === event.target?.tradeId
+          (t) => t.id === event.target?.tradeId,
         );
         if (trade) {
           return {
@@ -470,15 +498,19 @@ export function AnalysisProvider({ children }: { children: ReactNode }) {
       symbol: state.chart.symbol,
       interval: state.chart.interval,
       visibleRange: state.chart.visibleRange,
-      indicators: state.chart.indicators.filter(i => i.visible).map(i => i.name),
+      indicators: state.chart.indicators
+        .filter((i) => i.visible)
+        .map((i) => i.name),
       activeStrategy: state.strategy?.name || null,
       hasBacktestResult: !!state.backtest.result,
       tradeCount: state.backtest.result?.trades.length || 0,
-      selectedTrade: state.backtest.selectedTrade ? {
-        entry_time: state.backtest.selectedTrade.entry_time,
-        exit_time: state.backtest.selectedTrade.exit_time,
-        pnl: state.backtest.selectedTrade.pnl,
-      } : null,
+      selectedTrade: state.backtest.selectedTrade
+        ? {
+            entry_time: state.backtest.selectedTrade.entry_time,
+            exit_time: state.backtest.selectedTrade.exit_time,
+            pnl: state.backtest.selectedTrade.pnl,
+          }
+        : null,
     };
   }, [state]);
 
@@ -488,12 +520,23 @@ export function AnalysisProvider({ children }: { children: ReactNode }) {
   }, []);
 
   // Add intent from agent
-  const addAgentIntent = useCallback((intent: Omit<ChartIntent, "id" | "processed">) => {
-    dispatch({ type: "ADD_INTENT", intent });
-  }, []);
+  const addAgentIntent = useCallback(
+    (intent: Omit<ChartIntent, "id" | "processed">) => {
+      dispatch({ type: "ADD_INTENT", intent });
+    },
+    [],
+  );
 
   return (
-    <AnalysisContext.Provider value={{ state, dispatch, getChartContext, emitChartEvent, addAgentIntent }}>
+    <AnalysisContext.Provider
+      value={{
+        state,
+        dispatch,
+        getChartContext,
+        emitChartEvent,
+        addAgentIntent,
+      }}
+    >
       {children}
     </AnalysisContext.Provider>
   );
@@ -521,12 +564,15 @@ export function useAnalysis() {
 export function useChartIntents() {
   const { state, dispatch } = useAnalysis();
 
-  const processIntent = useCallback((intentId: string) => {
-    dispatch({ type: "PROCESS_INTENT", intentId });
-  }, [dispatch]);
+  const processIntent = useCallback(
+    (intentId: string) => {
+      dispatch({ type: "PROCESS_INTENT", intentId });
+    },
+    [dispatch],
+  );
 
   return {
-    intents: state.pendingIntents.filter(i => !i.processed),
+    intents: state.pendingIntents.filter((i) => !i.processed),
     processIntent,
   };
 }
@@ -543,7 +589,7 @@ export function useVisibleTrades() {
 
   const { start, end } = state.chart.visibleRange;
 
-  return state.backtest.result.trades.filter(trade => {
+  return state.backtest.result.trades.filter((trade) => {
     const entryTime = new Date(trade.entry_time).getTime() / 1000;
     const exitTime = new Date(trade.exit_time).getTime() / 1000;
     return entryTime >= start && exitTime <= end;
