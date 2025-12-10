@@ -41,6 +41,15 @@ export default function Chat({ messages, setMessages, sessionId, setSessionId }:
     scrollToBottom();
   }, [messages]);
 
+  // Auto-resize textarea based on content
+  useEffect(() => {
+    const textarea = inputRef.current;
+    if (textarea) {
+      textarea.style.height = "auto";
+      textarea.style.height = `${Math.min(textarea.scrollHeight, 120)}px`;
+    }
+  }, [input]);
+
   const handleSubmit = async (e?: React.FormEvent) => {
     e?.preventDefault();
     if (!input.trim() || isLoading) return;
@@ -386,11 +395,12 @@ export default function Chat({ messages, setMessages, sessionId, setSessionId }:
               onKeyDown={handleKeyDown}
               placeholder="Create a strategy, run a backtest, or ask about your data..."
               rows={1}
-              className="flex-1 resize-none bg-transparent border-none outline-none"
+              className="flex-1 resize-none bg-transparent border-none outline-none overflow-y-auto"
               style={{
                 color: "var(--text-primary)",
                 minHeight: "24px",
                 maxHeight: "120px",
+                lineHeight: "1.5",
               }}
               disabled={isLoading}
             />

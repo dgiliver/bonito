@@ -9,6 +9,134 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- **Quick Action Buttons** in chat panel: Save Strategy, View Trades, Clear Chart, New Chat
+- **Trade Navigation** in Trade Details panel: prev/next buttons to browse all trades
+- **Buy & Hold Comparison**: Performance bar shows strategy return vs buy & hold with alpha calculation
+- **Integration Guide**: `docs/AGENT_CHART_SYNTHESIS.md` - Rules and workflows for adding new chart features
+
+### Fixed
+- Chat messages now persist when switching between Chat and Trade Details panels
+- Quantity formatting in Trade Details (shows 2-4 decimal places based on value)
+
+---
+
+## [0.8.0] - 2025-12-10 - Visual Language: Agent-Chart Synthesis
+
+### Added
+- **F025: Agent-Chart Synthesis** - Revolutionary integration of AI agent and financial charts
+  - `AnalysisContext` - Shared state between chart and AI agent
+  - `AnalysisView` - Unified view combining Intelligent Chart + Context-Aware Chat
+  - `IntelligentChart` - Chart that displays trade markers and responds to clicks
+  - `ChartIntent` system - Foundation for agent-controlled chart manipulation
+  - Trade markers automatically appear from backtest results
+  - Click trade to select and see details in side panel
+  - Agent sees chart context (symbol, interval, strategy, selected trade)
+
+### Technical Design
+```
+┌────────────────────────────────────────────────────────────────┐
+│                   UNIFIED ANALYSIS VIEW                        │
+├───────────────────────────────────┬────────────────────────────┤
+│                                   │                            │
+│     INTELLIGENT CHART             │    CONTEXT-AWARE CHAT      │
+│  • Candlesticks + Volume          │  • Agent sees chart state  │
+│  • Trade markers (▲ entry ▼ exit) │  • Backtest results update │
+│  • Click trade → see details      │  • Strategy-aware responses│
+│                                   │                            │
+└───────────────────────────────────┴────────────────────────────┘
+```
+
+### Vision: "The Chart IS the Conversation"
+This is Phase 1-2 of a 5-phase roadmap to create a conversational visual analysis experience:
+1. ✅ Context Bridge - Agent knows what user is viewing
+2. ✅ Trade Visualization - Trades appear on chart
+3. 🔜 Agent Chart Control - "Add RSI" → chart updates
+4. 🔜 Interactive Analysis - Click anywhere → agent explains
+5. 🔜 Visual Strategy Building - Draw → agent interprets
+
+See `docs/VISUAL_LANGUAGE.md` for full technical design.
+
+### Changed
+- Default view is now "Analysis" (unified chart + chat)
+- Sidebar includes new "Analysis" option with Sparkles icon
+- Strategies page remains for legacy backtest workflow
+
+---
+
+## [0.7.0] - 2025-12-10 - UI Virtualization
+
+### Added
+- **F024: UI Virtualization & Large Data Handling**
+  - `TradeLog` component with virtualized rows (handles 5000+ trades)
+  - `VirtualizedMessageList` for chat (handles 200+ messages)
+  - `@tanstack/react-virtual` for efficient rendering
+  - 41 frontend tests with Vitest + React Testing Library
+  - Removed 50-trade limit from API (frontend handles performance)
+
+### Changed
+- Strategies page now shows full trade log with virtualization
+- Backend returns all trades (no more truncation)
+- Added test infrastructure: Vitest, @testing-library/react, jsdom
+
+### Technical
+- TDD approach: 41 tests written before implementation
+- Virtual rendering: Only visible items rendered to DOM
+- Performance: 1000 trades render in <500ms
+- All 216 backend tests + 41 frontend tests passing
+
+---
+
+## [0.6.0] - 2025-12-10 - Trailing Stops
+
+### Added
+- **F021: Trailing Stops** - Protect profits in trending markets
+  - `trailing_stop_pct`: Trail X% below highest price since entry
+  - `trailing_atr_multiple`: Trail N × ATR below highest price (volatility-adaptive)
+  - `breakeven`: Move stop to entry after profit threshold
+- High water mark tracking in position state
+- Dynamic stop price calculation per bar
+- ATR computation for trailing ATR stops
+- Comprehensive test suite for trailing stops (28 tests)
+
+### Changed
+- `StopLossType` enum now includes `TRAILING_PERCENT`, `TRAILING_ATR`, `BREAKEVEN`
+- `StopLossConfig` has new fields: `atr_period`, `trigger_percent`
+- `CreateStrategyTool` accepts `trailing_stop_pct` and `trailing_atr_multiple`
+- Agent prompts updated with trailing stop documentation
+
+### Technical
+- Engine tracks `highest_price` per position for trailing stops
+- Ratchet effect: trailing stop only moves up, never down
+- Backward compatible: existing fixed stops work unchanged
+- 216 total tests passing
+
+---
+
+## [0.5.0] - 2025-12-10 - pandas-ta Integration
+
+### Added
+- **F019: pandas-ta Integration** - 130+ technical indicators now available
+  - Volume indicators: VWAP, OBV, CMF, MFI, A/D
+  - Trend indicators: ADX (with DI+/DI-), SuperTrend, Aroon, PSAR
+  - Volatility/Channels: Donchian Channels, Keltner Channels
+  - Momentum: CCI, ROC, Williams %R, Momentum
+  - Statistics: Z-Score, Standard Deviation
+- Flexible indicator type system (accepts both enum and string types)
+- BarData to DataFrame adapter for pandas-ta compatibility
+- Multi-column indicator output handling (ADX, Donchian, etc.)
+- Comprehensive test suite for pandas-ta indicators (28 tests)
+
+### Changed
+- `IndicatorConfig.type` now accepts string indicator names for pandas-ta
+- Agent prompts updated with extended indicator documentation
+- Parameter mapping: `period` → `length` for pandas-ta compatibility
+
+### Technical
+- Lazy loading of pandas-ta to avoid startup overhead
+- Backward compatible: all existing strategies work unchanged
+- 129 total tests passing
+
 ---
 
 ## [0.4.2] - 2025-12-02 - Documentation & Planning
@@ -128,6 +256,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 | Version | Date | Codename | Key Feature |
 |---------|------|----------|-------------|
+| 0.5.0 | 2025-12-10 | Indicators | pandas-ta integration, 130+ indicators |
 | 0.4.2 | 2025-12-02 | Planning | Architecture, roadmap, high-priority plan |
 | 0.4.1 | 2025-12-02 | Analysis | Strategy limitations & indicator gap analysis |
 | 0.4.0 | 2025-12-02 | Web UI | Next.js frontend, SSE streaming |

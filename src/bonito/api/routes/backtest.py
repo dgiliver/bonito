@@ -137,7 +137,7 @@ async def run_backtest(request: BacktestRequest) -> dict[str, Any]:
                 "pnl": round(t.pnl, 2),
                 "return_pct": f"{t.pnl_percent * 100:.2f}%",
             }
-            for t in result.trades[:50]  # Limit to 50 trades
+            for t in result.trades  # All trades (frontend handles virtualization)
         ],
         "equity_curve": [
             {

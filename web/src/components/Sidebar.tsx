@@ -1,56 +1,66 @@
 "use client";
 
-import { MessageSquare, TrendingUp, Database, Github, Zap } from "lucide-react";
+import { MessageSquare, TrendingUp, Database, Github, Zap, PanelLeftClose, PanelLeft, CandlestickChart, Sparkles } from "lucide-react";
 
-type View = "chat" | "strategies" | "data";
+type View = "chat" | "analysis" | "strategies" | "chart" | "data";
 
 interface SidebarProps {
   currentView: View;
   onViewChange: (view: View) => void;
+  collapsed: boolean;
+  onToggleCollapse: () => void;
 }
 
 const navItems = [
-  { id: "chat" as const, label: "Agent", icon: MessageSquare },
-  { id: "strategies" as const, label: "Strategies", icon: TrendingUp },
-  { id: "data" as const, label: "Data", icon: Database },
+  { id: "analysis" as const, label: "Analysis", icon: Sparkles, description: "Chart + AI" },
+  { id: "chat" as const, label: "Agent", icon: MessageSquare, description: "Chat only" },
+  { id: "strategies" as const, label: "Strategies", icon: TrendingUp, description: "Backtest" },
+  { id: "chart" as const, label: "Chart", icon: CandlestickChart, description: "View only" },
+  { id: "data" as const, label: "Data", icon: Database, description: "Manage" },
 ];
 
-export default function Sidebar({ currentView, onViewChange }: SidebarProps) {
+export default function Sidebar({ currentView, onViewChange, collapsed, onToggleCollapse }: SidebarProps) {
   return (
     <aside
-      className="w-64 flex flex-col border-r"
+      className="flex flex-col border-r transition-all duration-300 ease-in-out"
       style={{
         background: "var(--bg-secondary)",
         borderColor: "var(--border-color)",
+        width: collapsed ? "64px" : "220px",
+        minWidth: collapsed ? "64px" : "220px",
       }}
     >
       {/* Logo */}
       <div
-        className="p-6 border-b"
+        className="p-3 border-b flex items-center justify-between"
         style={{ borderColor: "var(--border-color)" }}
       >
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-2 overflow-hidden">
           <div
-            className="w-10 h-10 rounded-lg flex items-center justify-center"
+            className="w-9 h-9 rounded-lg flex items-center justify-center flex-shrink-0"
             style={{ background: "var(--accent-primary)" }}
           >
-            <Zap size={20} style={{ color: "var(--bg-primary)" }} />
+            <Zap size={18} style={{ color: "var(--bg-primary)" }} />
           </div>
-          <div>
-            <h1 className="text-lg font-bold gradient-text">Bonito</h1>
-            <p
-              className="text-xs"
-              style={{ color: "var(--text-muted)" }}
-            >
-              AI Trading Platform
-            </p>
-          </div>
+          {!collapsed && (
+            <div className="overflow-hidden">
+              <h1 className="text-base font-bold gradient-text whitespace-nowrap">Bonito</h1>
+            </div>
+          )}
         </div>
+        <button
+          onClick={onToggleCollapse}
+          className="p-1.5 rounded-md transition-colors hover:bg-[var(--bg-tertiary)]"
+          style={{ color: "var(--text-muted)" }}
+          title={collapsed ? "Expand sidebar" : "Collapse sidebar"}
+        >
+          {collapsed ? <PanelLeft size={18} /> : <PanelLeftClose size={18} />}
+        </button>
       </div>
 
       {/* Navigation */}
-      <nav className="flex-1 p-4">
-        <ul className="space-y-2">
+      <nav className="flex-1 p-2">
+        <ul className="space-y-1">
           {navItems.map((item) => {
             const isActive = currentView === item.id;
             const Icon = item.icon;
@@ -59,19 +69,16 @@ export default function Sidebar({ currentView, onViewChange }: SidebarProps) {
               <li key={item.id}>
                 <button
                   onClick={() => onViewChange(item.id)}
-                  className="w-full flex items-center gap-3 px-4 py-3 rounded-lg transition-all"
+                  className="w-full flex items-center gap-2.5 px-3 py-2.5 rounded-lg transition-all"
                   style={{
                     background: isActive ? "var(--bg-tertiary)" : "transparent",
-                    color: isActive
-                      ? "var(--accent-primary)"
-                      : "var(--text-secondary)",
-                    borderLeft: isActive
-                      ? "2px solid var(--accent-primary)"
-                      : "2px solid transparent",
+                    color: isActive ? "var(--accent-primary)" : "var(--text-secondary)",
+                    justifyContent: collapsed ? "center" : "flex-start",
                   }}
+                  title={collapsed ? item.label : undefined}
                 >
-                  <Icon size={18} />
-                  <span className="font-medium">{item.label}</span>
+                  <Icon size={18} className="flex-shrink-0" />
+                  {!collapsed && <span className="font-medium text-sm">{item.label}</span>}
                 </button>
               </li>
             );
@@ -79,52 +86,33 @@ export default function Sidebar({ currentView, onViewChange }: SidebarProps) {
         </ul>
       </nav>
 
-      {/* Status */}
-      <div
-        className="p-4 border-t"
-        style={{ borderColor: "var(--border-color)" }}
-      >
-        <div className="card p-3">
-          <div className="flex items-center justify-between mb-2">
-            <span
-              className="text-xs font-medium"
-              style={{ color: "var(--text-muted)" }}
-            >
-              API Status
-            </span>
-            <span className="flex items-center gap-1">
-              <span
-                className="w-2 h-2 rounded-full animate-pulse-glow"
-                style={{ background: "var(--accent-primary)" }}
-              />
-              <span className="text-xs" style={{ color: "var(--accent-primary)" }}>
-                Connected
+      {/* Status - only when expanded */}
+      {!collapsed && (
+        <div className="p-2 border-t" style={{ borderColor: "var(--border-color)" }}>
+          <div className="px-3 py-2 rounded-lg" style={{ background: "var(--bg-tertiary)" }}>
+            <div className="flex items-center justify-between">
+              <span className="text-xs" style={{ color: "var(--text-muted)" }}>API</span>
+              <span className="flex items-center gap-1">
+                <span className="w-1.5 h-1.5 rounded-full animate-pulse-glow" style={{ background: "var(--accent-primary)" }} />
+                <span className="text-xs" style={{ color: "var(--accent-primary)" }}>Connected</span>
               </span>
-            </span>
+            </div>
           </div>
-          <p
-            className="text-xs truncate"
-            style={{ color: "var(--text-muted)" }}
-          >
-            localhost:8000
-          </p>
         </div>
-      </div>
+      )}
 
       {/* Footer */}
-      <div
-        className="p-4 border-t"
-        style={{ borderColor: "var(--border-color)" }}
-      >
+      <div className="p-2 border-t" style={{ borderColor: "var(--border-color)" }}>
         <a
           href="https://github.com/dgiliver/bonito"
           target="_blank"
           rel="noopener noreferrer"
-          className="flex items-center gap-2 text-sm transition-colors"
-          style={{ color: "var(--text-muted)" }}
+          className="flex items-center gap-2 px-3 py-2 rounded-lg text-sm transition-colors hover:bg-[var(--bg-tertiary)]"
+          style={{ color: "var(--text-muted)", justifyContent: collapsed ? "center" : "flex-start" }}
+          title={collapsed ? "View on GitHub" : undefined}
         >
-          <Github size={16} />
-          <span>View on GitHub</span>
+          <Github size={16} className="flex-shrink-0" />
+          {!collapsed && <span>GitHub</span>}
         </a>
       </div>
     </aside>

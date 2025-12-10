@@ -1,0 +1,79 @@
+{
+  "id": "8b2d2d31-ff18-40f3-9bc7-6a42e1c74806",
+  "name": "adx_trend_strategy",
+  "description": "ADX trend strategy - Enter long when ADX > 25 (trending market) and RSI < 40 (oversold condition)",
+  "version": 1,
+  "config": {
+    "name": "adx_trend_strategy",
+    "description": "ADX trend strategy - Enter long when ADX > 25 (trending market) and RSI < 40 (oversold condition)",
+    "version": "1.0",
+    "symbols": [
+      "SPY"
+    ],
+    "timeframe": "1d",
+    "indicators": [
+      {
+        "type": "adx",
+        "name": "adx",
+        "params": {
+          "length": 14
+        }
+      },
+      {
+        "type": "rsi",
+        "name": "rsi",
+        "params": {
+          "period": 14
+        }
+      }
+    ],
+    "entry_rules": [
+      {
+        "conditions": [
+          {
+            "left": "adx_adx",
+            "comparison": "gt",
+            "right": 25.0
+          },
+          {
+            "left": "rsi",
+            "comparison": "lt",
+            "right": 40.0
+          }
+        ],
+        "logic": "AND"
+      }
+    ],
+    "exit_rules": [
+      {
+        "conditions": [
+          {
+            "left": "rsi",
+            "comparison": "gt",
+            "right": 70.0
+          }
+        ],
+        "logic": "AND"
+      }
+    ],
+    "position_size": {
+      "type": "percent_equity",
+      "value": 95.0
+    },
+    "max_positions": 1,
+    "stop_loss": {
+      "type": "percent",
+      "value": 0.05
+    },
+    "take_profit": null
+  },
+  "created_at": "2025-12-09T22:19:40.211884",
+  "updated_at": "2025-12-09T22:19:40.211903",
+  "tags": [
+    "trend-following",
+    "adx",
+    "rsi",
+    "momentum"
+  ],
+  "last_backtest": null
+}

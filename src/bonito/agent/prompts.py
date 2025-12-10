@@ -44,6 +44,7 @@ You must generate strategies in this exact JSON format:
 
 ## Available Indicators
 
+### Built-in Indicators
 - **SMA** (Simple Moving Average): params = {"period": int}
 - **EMA** (Exponential Moving Average): params = {"period": int}
 - **RSI** (Relative Strength Index): params = {"period": int}
@@ -54,6 +55,52 @@ You must generate strategies in this exact JSON format:
   - Creates: {name}_upper, {name}_middle, {name}_lower
 - **STOCH** (Stochastic): params = {"k_period": int, "d_period": int}
   - Creates: {name}_k, {name}_d
+
+### Extended Indicators (via pandas-ta)
+Use string types for these indicators. Full list: 130+ indicators available.
+
+**Volume Indicators:**
+- **vwap** (Volume Weighted Average Price): no params needed
+- **obv** (On-Balance Volume): no params needed
+- **cmf** (Chaikin Money Flow): params = {"length": int}
+- **mfi** (Money Flow Index): params = {"length": int}
+- **ad** (Accumulation/Distribution): no params needed
+
+**Trend Indicators:**
+- **adx** (Average Directional Index): params = {"length": int}
+  - Creates: {name}_adx, {name}_dmp (DI+), {name}_dmn (DI-)
+- **supertrend**: params = {"length": int, "multiplier": float}
+  - Creates: {name}_supertrend, {name}_supertrendd (direction)
+- **aroon**: params = {"length": int}
+  - Creates: {name}_aroon_down, {name}_aroon_up, {name}_aroon_osc
+- **psar** (Parabolic SAR): params = {"af": float, "max_af": float}
+
+**Volatility/Channels:**
+- **donchian** (Donchian Channels): params = {"lower_length": int, "upper_length": int}
+  - Creates: {name}_dcl (lower), {name}_dcm (middle), {name}_dcu (upper)
+- **kc** (Keltner Channels): params = {"length": int, "scalar": float}
+  - Creates: {name}_kce (upper), {name}_kcb (lower), {name}_kcl (basis)
+
+**Momentum:**
+- **cci** (Commodity Channel Index): params = {"length": int}
+- **roc** (Rate of Change): params = {"length": int}
+- **willr** (Williams %R): params = {"length": int}
+- **mom** (Momentum): params = {"length": int}
+
+**Statistics:**
+- **zscore**: params = {"length": int}
+- **stdev** (Standard Deviation): params = {"length": int}
+
+Example using extended indicators:
+```json
+{
+  "indicators": [
+    {"type": "vwap", "name": "vwap"},
+    {"type": "adx", "name": "trend", "params": {"length": 14}},
+    {"type": "donchian", "name": "dc", "params": {"lower_length": 20, "upper_length": 20}}
+  ]
+}
+```
 
 ## Built-in Price Fields
 
@@ -75,12 +122,30 @@ Always available: open, high, low, close, volume
    - Are there enough trades for statistical significance?
 
 3. Common improvements to try:
-   - Add volatility filters (ATR, Bollinger Bands)
-   - Add trend confirmation (longer MA)
+   - Add volatility filters (ATR, Bollinger Bands, Keltner Channels)
+   - Add trend confirmation (longer MA, ADX for trend strength)
    - Adjust entry timing (different crossover periods)
    - Tighten or widen stops
+   - Use trailing stops for trend strategies (trailing_stop_pct)
    - Add take profit targets
+
+## Stop Loss Options
+
+**Fixed Stop (set once at entry):**
+- stop_loss_pct: Fixed % below entry (e.g., 0.05 = 5%)
+
+**Trailing Stops (follow price, protect gains):**
+- trailing_stop_pct: Trail X% below highest price since entry
+- trailing_atr_multiple: Trail N × ATR below highest price (adapts to volatility)
+
+**When to use which:**
+- Mean reversion → Fixed stops (price expected to snap back)
+- Trend following → Trailing stops (let winners run, lock in gains)
    - Filter by RSI for overbought/oversold
+   - Use VWAP as a mean reversion anchor
+   - Add volume confirmation with OBV or MFI
+   - Use Donchian channels for breakout strategies
+   - Filter by ADX to avoid ranging markets (ADX < 20)
 
 ## Response Style
 

@@ -1,6 +1,6 @@
 [project]
 name = "bonito"
-version = "0.4.2"
+version = "0.8.0"
 description = "AI-native algorithmic trading platform"
 readme = "README.md"
 requires-python = ">=3.12"
@@ -15,6 +15,9 @@ dependencies = [
     "pandas>=2.1.0",
     "numpy>=1.26.0",
     "yfinance>=0.2.33",
+
+    # Technical Analysis (MIT License)
+    "pandas-ta>=0.3.14b",
 
     # LLM
     "anthropic>=0.39.0",

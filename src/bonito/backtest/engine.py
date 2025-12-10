@@ -13,7 +13,7 @@ from bonito.backtest.models import (
     PerformanceMetrics,
     Trade,
 )
-from bonito.backtest.strategy import Comparison, Rule, StrategyConfig
+from bonito.backtest.strategy import Comparison, Rule, StopLossConfig, StrategyConfig
 from bonito.data.models import BarData
 
 
@@ -206,7 +206,13 @@ class BacktestEngine:
 
         closes = data.close
         opens = data.open
+        highs = data.high
         timestamps = data.timestamps
+
+        # Pre-compute ATR if needed for trailing ATR stops
+        atr_values: np.ndarray | None = None
+        if strategy.stop_loss and strategy.stop_loss.type.value == "trailing_atr":
+            atr_values = self._compute_atr(data, strategy.stop_loss.atr_period)
 
         for i in range(1, len(data)):  # Start at 1 to use previous bar for signals
             current_equity = cash
@@ -219,19 +225,23 @@ class BacktestEngine:
                 should_exit = False
                 exit_reason = "signal"
 
+                # Update trailing stop state (high water mark, current stop)
+                if strategy.stop_loss:
+                    position = self._update_trailing_stop(
+                        position, strategy.stop_loss, highs[i], closes[i], atr_values, i
+                    )
+
                 # Check exit signal
                 if exit_signals[i - 1]:  # Signal from previous bar
                     should_exit = True
                     exit_reason = "signal"
 
-                # Check stop loss
-                if (
-                    strategy.stop_loss
-                    and not should_exit
-                    and strategy.stop_loss.type.value == "percent"
-                ):
-                    stop_price = position["entry_price"] * (1 - strategy.stop_loss.value)
-                    if closes[i] <= stop_price:
+                # Check stop loss (fixed or trailing)
+                if strategy.stop_loss and not should_exit:
+                    stop_price = self._get_current_stop_price(
+                        position, strategy.stop_loss, atr_values, i
+                    )
+                    if stop_price is not None and closes[i] <= stop_price:
                         should_exit = True
                         exit_reason = "stop_loss"
 
@@ -295,6 +305,9 @@ class BacktestEngine:
                         "entry_time": timestamps[i],
                         "entry_price": entry_price,
                         "quantity": quantity,
+                        # Trailing stop state
+                        "highest_price": entry_price,  # Start tracking from entry
+                        "breakeven_triggered": False,  # For breakeven stops
                     }
                     cash -= entry_price * quantity + commission
 
@@ -322,6 +335,109 @@ class BacktestEngine:
             equity_curve.append(cash)
 
         return trades, equity_curve
+
+    def _compute_atr(self, data: BarData, period: int) -> np.ndarray:
+        """Compute Average True Range for trailing ATR stops."""
+        highs = data.high
+        lows = data.low
+        closes = data.close
+
+        # True Range
+        tr1 = highs - lows
+        tr2 = np.abs(highs - np.roll(closes, 1))
+        tr3 = np.abs(lows - np.roll(closes, 1))
+        tr = np.maximum(tr1, np.maximum(tr2, tr3))
+        tr[0] = tr1[0]  # First bar has no previous close
+
+        # ATR (simple moving average of TR)
+        atr = np.zeros_like(tr)
+        for i in range(len(tr)):
+            if i < period:
+                atr[i] = np.mean(tr[: i + 1])
+            else:
+                atr[i] = np.mean(tr[i - period + 1 : i + 1])
+
+        return atr
+
+    def _update_trailing_stop(
+        self,
+        position: dict[str, Any],
+        stop_config: "StopLossConfig",
+        current_high: float,
+        current_close: float,
+        atr_values: np.ndarray | None,
+        bar_index: int,
+    ) -> dict[str, Any]:
+        """Update trailing stop state for the current bar.
+
+        Updates highest_price for trailing stops, and breakeven_triggered for breakeven stops.
+        """
+        stop_type = stop_config.type.value
+
+        if stop_type in ("trailing_percent", "trailing_atr"):
+            # Update high water mark (ratchet effect - never moves down)
+            new_high = max(position["highest_price"], current_high)
+            position["highest_price"] = new_high
+
+        elif stop_type == "breakeven":
+            # Check if profit threshold reached to trigger breakeven
+            if not position["breakeven_triggered"]:
+                entry_price = position["entry_price"]
+                trigger_pct = stop_config.trigger_percent or 0.05
+                trigger_price = entry_price * (1 + trigger_pct)
+
+                if current_close >= trigger_price:
+                    position["breakeven_triggered"] = True
+
+        return position
+
+    def _get_current_stop_price(
+        self,
+        position: dict[str, Any],
+        stop_config: "StopLossConfig",
+        atr_values: np.ndarray | None,
+        bar_index: int,
+    ) -> float | None:
+        """Calculate the current stop price based on stop type."""
+        stop_type = stop_config.type.value
+        entry_price = position["entry_price"]
+
+        if stop_type == "percent":
+            # Fixed percent stop
+            return entry_price * (1 - stop_config.value)
+
+        elif stop_type == "trailing_percent":
+            # Trailing percent stop - trails below high water mark
+            highest_price = position["highest_price"]
+            return highest_price * (1 - stop_config.value)
+
+        elif stop_type == "trailing_atr":
+            # Trailing ATR stop - trails ATR multiple below high water mark
+            if atr_values is None:
+                return None
+            highest_price = position["highest_price"]
+            atr = atr_values[bar_index]
+            return highest_price - (stop_config.value * atr)
+
+        elif stop_type == "breakeven":
+            # Breakeven stop - only active after trigger
+            if position["breakeven_triggered"]:
+                # Stop at entry price (breakeven)
+                return entry_price + stop_config.value  # value can add buffer
+            return None  # Not triggered yet, no stop
+
+        elif stop_type == "atr":
+            # Fixed ATR stop (not trailing)
+            if atr_values is None:
+                return None
+            atr = atr_values[bar_index]
+            return entry_price - (stop_config.value * atr)
+
+        elif stop_type == "fixed":
+            # Fixed price stop
+            return stop_config.value
+
+        return None
 
     def _calculate_metrics(
         self,

@@ -1,6 +1,6 @@
 ---
 description: Standards and conventions for the Bonito project
-globs: ["**/*.py", "**/*.md", "**/*.json"]
+globs: ["**/*.py", "**/*.md", "**/*.json", "**/*.ts", "**/*.tsx"]
 alwaysApply: true
 ---
 
@@ -109,3 +109,116 @@ When adding new dependencies:
 2. Pin major versions in pyproject.toml
 3. Add to appropriate section (core vs dev)
 4. Document why it's needed in commit message
+
+---
+
+## Agent-Chart Synthesis (Frontend)
+
+The agent and chart form a **unified visual analysis system**. Every chart feature should enhance the agent's capabilities, and every agent capability should manifest visually.
+
+### Core Architecture
+```
+┌─────────────┐                    ┌─────────────┐
+│    Agent    │◄──── Context ──────│    Chart    │
+│             │───── Intents ─────►│             │
+└─────────────┘                    └─────────────┘
+```
+
+### Shared State Rules
+- **ALL chart/agent state lives in `AnalysisContext`** - NEVER create parallel state in components
+- Chart provides `ChartContextPayload` to agent (symbol, interval, range, indicators, trades)
+- Agent sends `ChartIntent` to control chart (navigate, annotate, overlay, highlight)
+
+### Integration Checklist for New Chart Features
+
+Before adding ANY new chart feature, answer these questions:
+
+1. **Context Exposure**: Does the agent need to know about this feature's state?
+   - YES → Add to `ChartContextPayload` interface
+   - Update `buildChartContext()` function
+
+2. **Agent Control**: Should the agent be able to trigger this feature?
+   - YES → Add new `ChartIntent` type
+   - Implement handler in `IntelligentChart.tsx`
+
+3. **User Interaction → Agent**: Can user interact with this feature?
+   - YES → Dispatch action to context so agent is notified
+
+4. **Visual Feedback**: Does agent output need visual representation?
+   - YES → Implement annotation/marker/overlay
+
+### Pattern: Adding Indicators
+```typescript
+// 1. Context: Agent knows which indicators are active
+interface ChartContext {
+  indicators: { type: string; params: Record<string, number>; visible: boolean }[];
+}
+
+// 2. Intent: Agent can add/remove indicators
+interface ChartIntent {
+  type: "overlay";
+  indicator: { type: "rsi"; params: { period: 14 }; visible: true };
+}
+
+// 3. User Action → Agent: Toggle updates context automatically
+dispatch({ type: "TOGGLE_INDICATOR", indicator });
+```
+
+### Pattern: Adding Drawing Tools
+```typescript
+// 1. Context: Agent sees drawn elements
+interface ChartContext {
+  drawings: { type: "trendline" | "horizontal"; points: Point[]; label?: string }[];
+}
+
+// 2. Intent: Agent can draw
+interface ChartIntent {
+  type: "draw";
+  drawing: { type: "horizontal"; price: 450; label: "Resistance" };
+}
+
+// 3. User draws → Agent analyzes automatically
+```
+
+### Anti-Patterns to AVOID
+
+❌ **Silent Features**: Features the agent doesn't know about
+```typescript
+// BAD: Indicator added without context update
+addIndicator("RSI", 14);  // Agent has no idea this happened
+```
+
+❌ **Orphaned State**: State outside AnalysisContext
+```typescript
+// BAD: Component-local state for shared concerns
+const [drawings, setDrawings] = useState([]);  // Should be in context!
+```
+
+❌ **One-Way Integration**: Agent can see but not control (or vice versa)
+```typescript
+// BAD: Agent can read indicators but not add them
+```
+
+### Testing New Integrations
+
+Every new feature MUST pass:
+1. **Agent Awareness**: Enable feature → Ask agent "What's active?" → Agent knows
+2. **Agent Control**: Ask "Add [feature]" → Chart updates
+3. **Round-Trip**: User enables → Agent describes → Agent modifies → Chart reflects
+4. **Persistence**: Enable feature → Switch panels → Come back → State preserved
+
+### Quick Actions
+
+When adding features that users might want quick access to:
+- Add button to ChatPanel's quick actions section
+- Buttons appear contextually based on state
+
+### Files to Update
+
+| Change | Files |
+|--------|-------|
+| New state | `AnalysisContext.tsx` (state + action types) |
+| Agent awareness | `ChartContextPayload` interface |
+| Agent control | `ChartIntent` type + `IntelligentChart.tsx` handler |
+| Quick action | `AnalysisView.tsx` ChatPanel quick actions |
+| Backend support | `orchestrator.py` SYSTEM_PROMPT (if agent needs instructions)

@@ -49,7 +49,62 @@ Returns validation errors if any issues found."""
             config = StrategyConfig(**strategy)
 
             # Additional semantic validation
-            indicator_names = {ind.name for ind in config.indicators}
+            # Include base indicator names and potential multi-column suffixes
+            indicator_names = set()
+            for ind in config.indicators:
+                indicator_names.add(ind.name)
+                # Add common multi-column indicator suffixes
+                ind_type = str(ind.type).lower()
+                if ind_type in ("macd",):
+                    indicator_names.update(
+                        [f"{ind.name}_line", f"{ind.name}_signal", f"{ind.name}_hist"]
+                    )
+                elif ind_type in ("bbands",):
+                    indicator_names.update(
+                        [f"{ind.name}_upper", f"{ind.name}_middle", f"{ind.name}_lower"]
+                    )
+                elif ind_type in ("stoch",):
+                    indicator_names.update([f"{ind.name}_k", f"{ind.name}_d"])
+                elif ind_type in ("adx",):
+                    indicator_names.update(
+                        [
+                            f"{ind.name}_adx",
+                            f"{ind.name}_dmp",
+                            f"{ind.name}_dmn",
+                            f"{ind.name}_adxr",
+                        ]
+                    )
+                elif ind_type in ("donchian",):
+                    indicator_names.update(
+                        [f"{ind.name}_dcl", f"{ind.name}_dcm", f"{ind.name}_dcu"]
+                    )
+                elif ind_type in ("supertrend",):
+                    indicator_names.update(
+                        [
+                            f"{ind.name}_value",
+                            f"{ind.name}_direction",
+                            f"{ind.name}_long",
+                            f"{ind.name}_short",
+                        ]
+                    )
+                elif ind_type in ("aroon",):
+                    indicator_names.update(
+                        [f"{ind.name}_up", f"{ind.name}_down", f"{ind.name}_osc"]
+                    )
+                elif ind_type in ("kc",):
+                    indicator_names.update(
+                        [f"{ind.name}_lower", f"{ind.name}_middle", f"{ind.name}_upper"]
+                    )
+                elif ind_type in ("psar",):
+                    indicator_names.update(
+                        [
+                            f"{ind.name}_long",
+                            f"{ind.name}_short",
+                            f"{ind.name}_af",
+                            f"{ind.name}_reversal",
+                        ]
+                    )
+
             indicator_names.update({"open", "high", "low", "close", "volume"})
 
             # Check entry rules reference valid indicators

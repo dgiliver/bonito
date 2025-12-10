@@ -1,13 +1,13 @@
 """Strategy configuration models - the DSL for defining strategies."""
 
 from enum import Enum
-from typing import Literal
+from typing import Annotated, Literal
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, BeforeValidator, Field
 
 
 class IndicatorType(str, Enum):
-    """Available indicator types."""
+    """Built-in indicator types (legacy - maintained for backward compatibility)."""
 
     SMA = "sma"
     EMA = "ema"
@@ -18,10 +18,129 @@ class IndicatorType(str, Enum):
     STOCH = "stoch"  # Stochastic
 
 
-class IndicatorConfig(BaseModel):
-    """Configuration for a technical indicator."""
+# List of built-in indicator type values for validation
+BUILTIN_INDICATOR_TYPES = {e.value for e in IndicatorType}
 
-    type: IndicatorType
+# pandas-ta supported indicators (subset of most commonly used)
+# Full list: https://github.com/twopirllc/pandas-ta#indicators-by-category
+PANDAS_TA_INDICATORS = {
+    # Volume
+    "vwap",
+    "obv",
+    "cmf",
+    "mfi",
+    "ad",
+    "adosc",
+    "pvol",
+    "pvt",
+    # Trend
+    "adx",
+    "aroon",
+    "psar",
+    "supertrend",
+    "vortex",
+    # Volatility / Channels
+    "donchian",
+    "kc",
+    "massi",
+    "natr",
+    "pdist",
+    "rvi",
+    "ui",
+    # Momentum
+    "ao",
+    "cci",
+    "cmo",
+    "coppock",
+    "fisher",
+    "kst",
+    "mom",
+    "ppo",
+    "roc",
+    "rsi_pandas",
+    "stochrsi",
+    "trix",
+    "tsi",
+    "uo",
+    "willr",
+    # Overlap
+    "dema",
+    "ema_pandas",
+    "fwma",
+    "hma",
+    "kama",
+    "linreg",
+    "midpoint",
+    "midprice",
+    "pwma",
+    "rma",
+    "sinwma",
+    "sma_pandas",
+    "ssf",
+    "swma",
+    "t3",
+    "tema",
+    "trima",
+    "vidya",
+    "vwma",
+    "wma",
+    "zlma",
+    # Statistics
+    "entropy",
+    "kurtosis",
+    "mad",
+    "median",
+    "quantile",
+    "skew",
+    "stdev",
+    "variance",
+    "zscore",
+}
+
+
+def _validate_indicator_type(value: str | IndicatorType) -> str | IndicatorType:
+    """Validate indicator type - accepts enum or string for pandas-ta indicators."""
+    if isinstance(value, IndicatorType):
+        return value
+
+    # Convert string to lowercase for comparison
+    str_value = str(value).lower()
+
+    # Check if it's a built-in type
+    try:
+        return IndicatorType(str_value)
+    except ValueError:
+        pass
+
+    # Check if it's a valid pandas-ta indicator
+    if str_value in PANDAS_TA_INDICATORS:
+        return str_value
+
+    # Allow any string for flexibility (pandas-ta has 130+ indicators)
+    # The compute_indicators function will raise if truly invalid
+    return str_value
+
+
+# Type that accepts either IndicatorType enum or string for pandas-ta
+FlexibleIndicatorType = Annotated[str | IndicatorType, BeforeValidator(_validate_indicator_type)]
+
+
+class IndicatorConfig(BaseModel):
+    """Configuration for a technical indicator.
+
+    Supports both built-in indicators (SMA, EMA, RSI, etc.) and pandas-ta
+    indicators (VWAP, ADX, Donchian, OBV, etc.).
+
+    Examples:
+        # Built-in indicator
+        IndicatorConfig(type=IndicatorType.SMA, name="sma_20", params={"period": 20})
+
+        # pandas-ta indicator
+        IndicatorConfig(type="vwap", name="vwap")
+        IndicatorConfig(type="adx", name="trend", params={"length": 14})
+    """
+
+    type: FlexibleIndicatorType
     name: str = Field(..., description="Unique name for this indicator instance")
     params: dict = Field(default_factory=dict, description="Indicator parameters")
 
@@ -81,16 +200,49 @@ class PositionSizeConfig(BaseModel):
 class StopLossType(str, Enum):
     """Stop loss types."""
 
+    # Fixed stops (set at entry, never move)
     PERCENT = "percent"
     ATR = "atr"
     FIXED = "fixed"
 
+    # Trailing stops (follow price, protect profits)
+    TRAILING_PERCENT = "trailing_percent"
+    TRAILING_ATR = "trailing_atr"
+
+    # Breakeven stop (move to entry after profit threshold)
+    BREAKEVEN = "breakeven"
+
 
 class StopLossConfig(BaseModel):
-    """Stop loss configuration."""
+    """Stop loss configuration.
+
+    Supports fixed stops, trailing stops, and breakeven stops.
+
+    Examples:
+        # Fixed 5% stop
+        StopLossConfig(type=StopLossType.PERCENT, value=0.05)
+
+        # Trailing 5% stop (follows price up, protects gains)
+        StopLossConfig(type=StopLossType.TRAILING_PERCENT, value=0.05)
+
+        # Trailing 2x ATR stop
+        StopLossConfig(type=StopLossType.TRAILING_ATR, value=2.0, atr_period=14)
+
+        # Breakeven stop (move to entry after 5% profit)
+        StopLossConfig(type=StopLossType.BREAKEVEN, value=0.0, trigger_percent=0.05)
+    """
 
     type: StopLossType
-    value: float = Field(..., description="Stop loss value")
+    value: float = Field(..., description="Stop loss value (percent, ATR multiple, or fixed price)")
+
+    # For ATR-based stops
+    atr_period: int = Field(default=14, description="ATR period for ATR-based stops")
+
+    # For breakeven stops
+    trigger_percent: float | None = Field(
+        default=None,
+        description="Profit threshold to trigger breakeven stop (e.g., 0.05 = 5%)",
+    )
 
 
 class TakeProfitType(str, Enum):

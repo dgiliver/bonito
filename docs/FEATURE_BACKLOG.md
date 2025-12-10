@@ -205,29 +205,31 @@ def compute_indicators(data: BarData, indicators: list[IndicatorConfig]) -> dict
 
 ## 🔥 High Priority (Post-MVP Phase 1)
 
-### F019: pandas-ta Integration
-**Status**: Planned
-**Effort**: 1-2 days
-**Value**: Very High - 130+ indicators instantly available
+### ~~F019: pandas-ta Integration~~ ✅ COMPLETED
+**Status**: ✅ Completed (v0.5.0)
+**Effort**: 1.5 days (as estimated)
+**Value**: Very High - 130+ indicators now available
 
-Replace hand-rolled indicators with pandas-ta library. Unlocks:
+Integrated pandas-ta library with:
 - Volume indicators (VWAP, OBV, MFI, CMF)
-- Trend strength (ADX, Parabolic SAR, SuperTrend)
+- Trend strength (ADX with DI+/DI-, SuperTrend, Aroon)
 - Channels (Donchian, Keltner)
-- 100+ more indicators
+- 130+ more indicators via string type in IndicatorConfig
 
-**Requirements**:
-- Add pandas-ta to dependencies
-- Adapter layer to convert BarData → DataFrame → back to numpy
-- Update IndicatorType enum dynamically or use string matching
-- Maintain backward compatibility with existing strategies
+**Implementation:**
+- Added pandas-ta to dependencies
+- Created BarData → DataFrame adapter
+- Flexible type system: accepts enum or string indicator names
+- Multi-column output handling (ADX, Donchian, etc.)
+- Full backward compatibility maintained
+- 28 new tests for pandas-ta indicators
 
 **Example usage in strategy:**
 ```json
 {
   "indicators": [
     {"type": "vwap", "name": "vwap"},
-    {"type": "adx", "name": "adx", "params": {"length": 14}},
+    {"type": "adx", "name": "trend", "params": {"length": 14}},
     {"type": "donchian", "name": "dc", "params": {"lower_length": 20, "upper_length": 20}}
   ]
 }
@@ -303,8 +305,8 @@ Add ability to reference rolling windows in conditions:
 
 ---
 
-### F021: Trailing Stops
-**Status**: Planned
+### F021: Trailing Stops ✅ COMPLETE
+**Status**: Complete (v0.6.0)
 **Effort**: 1 day
 **Value**: High - Essential for trend-following
 
@@ -335,6 +337,77 @@ Add trailing stop capability:
 - Track highest price since entry per position
 - Update stop level each bar
 - Check against trailing stop, not just entry-based stop
+
+---
+
+### F024: UI Virtualization & Large Data Handling ✅ COMPLETE
+**Status**: Complete (v0.7.0)
+**Effort**: 1-2 days
+**Value**: High - UX bug fix + scalability
+
+Multiple UI components don't handle large data well. This is a unified fix using virtualization (best practice).
+
+**Issues:**
+1. **Chat Window:**
+   - Long agent responses overflow container
+   - Code blocks may not wrap properly
+   - Auto-scroll to bottom inconsistent
+   - Performance degrades with long conversations
+
+2. **Trade Log:**
+   - Currently hard-limited to 50 trades (`backtest.py[:50]`)
+   - Users can't see full trade history
+   - Need to support 1000+ trades smoothly
+
+3. **Equity Curve:**
+   - Downsampled to 200 points - acceptable for now
+
+**Solution: Virtualized Lists**
+
+Use `@tanstack/react-virtual` or `react-window` for:
+- Chat messages
+- Trade log table
+- Any list that could grow large
+
+**Implementation:**
+
+```typescript
+// Trade log with virtualization
+import { useVirtualizer } from '@tanstack/react-virtual';
+
+function TradeLog({ trades }: { trades: Trade[] }) {
+  const parentRef = useRef<HTMLDivElement>(null);
+
+  const virtualizer = useVirtualizer({
+    count: trades.length,
+    getScrollElement: () => parentRef.current,
+    estimateSize: () => 48, // Row height
+  });
+
+  return (
+    <div ref={parentRef} className="h-[400px] overflow-auto">
+      <div style={{ height: `${virtualizer.getTotalSize()}px` }}>
+        {virtualizer.getVirtualItems().map((virtualRow) => (
+          <TradeRow key={virtualRow.key} trade={trades[virtualRow.index]} />
+        ))}
+      </div>
+    </div>
+  );
+}
+```
+
+**Backend Changes:**
+- Remove `[:50]` limit in `backtest.py`
+- Return all trades (frontend handles rendering)
+
+**Requirements:**
+- [ ] Install `@tanstack/react-virtual`
+- [ ] Virtualize trade log table
+- [ ] Virtualize chat message list
+- [ ] Proper overflow handling with scroll
+- [ ] Code blocks: horizontal scroll, not break layout
+- [ ] Auto-scroll to latest message
+- [ ] Test with 500+ trades, 100+ messages
 
 ---
 
@@ -383,6 +456,28 @@ class MyStrategy(StrategyBase):
 
 ---
 
+### F023: Delete Market Data
+**Status**: Planned
+**Effort**: 0.5 day
+**Value**: High - Essential data management
+
+Allow users to delete ingested market data (symbols/date ranges).
+
+**Requirements**:
+- API endpoint: `DELETE /api/data/{symbol}` or `DELETE /api/data/{symbol}?start=&end=`
+- CLI command: `bonito data delete AAPL` or `bonito data delete AAPL --start 2024-01-01`
+- UI: Delete button in Data view per symbol
+- Confirmation dialog (prevent accidental deletion)
+- Cascade: Handle strategies that reference deleted data gracefully
+
+**Example API:**
+```
+DELETE /api/data/AAPL              # Delete all AAPL data
+DELETE /api/data/AAPL?timeframe=1h # Delete only 1h AAPL data
+```
+
+---
+
 ### F003: Strategy Comparison Tool
 **Status**: Planned
 **Effort**: 1 day
@@ -393,6 +488,142 @@ quant compare strategy1.json strategy2.json --symbol SPY
 ```
 
 Output: Side-by-side metrics, equity curve overlay, correlation analysis.
+
+---
+
+### F025: Advanced Financial Charts & Visualization
+**Status**: In Progress (Phase 1-2 Complete)
+**Effort**: 5 weeks total (Phase 1-2 done, Phase 3-5 remaining)
+**Value**: Very High - Professional-grade charting is table stakes
+
+Comprehensive financial timeseries visualization using Lightweight Charts (TradingView's open-source library).
+
+#### ✅ Phase 1-2 Complete: Visual Language Synthesis
+
+**Novel Feature:** Agent-Chart integration that enables conversational visual analysis.
+
+The chart and AI agent now share context:
+- Agent knows what symbol/timeframe user is viewing
+- Trade markers appear automatically from backtest results
+- Click trade markers to select and see details
+- Unified AnalysisView combines chart + chat in one view
+
+```
+┌────────────────────────────────────────────────────────────────┐
+│                   UNIFIED ANALYSIS VIEW                        │
+├───────────────────────────────────┬────────────────────────────┤
+│                                   │                            │
+│     INTELLIGENT CHART             │    CONTEXT-AWARE CHAT      │
+│  • Candlesticks + Volume          │  • Agent sees chart state  │
+│  • Trade markers (▲ entry ▼ exit) │  • Backtest results update │
+│  • Click trade → see details      │  • Strategy-aware responses│
+│                                   │                            │
+└───────────────────────────────────┴────────────────────────────┘
+```
+
+**Components Built:**
+- `AnalysisContext.tsx` - Shared state for chart-agent communication
+- `AnalysisView.tsx` - Unified view with chart + chat panel
+- `IntelligentChart.tsx` - Chart with trade markers and click handling
+- `ChartIntent` system for agent → chart control (foundation)
+
+**📖 Integration Rules:** See `.cursor/rules/bonito-standards.mdc` (Agent-Chart Synthesis section) for mandatory integration checklist. Extended examples in [`docs/AGENT_CHART_SYNTHESIS.md`](./AGENT_CHART_SYNTHESIS.md).
+
+#### Remaining Phases
+
+#### Chart Types
+- **Candlestick charts** - Standard OHLC candles
+- **OHLC bar charts** - Traditional bar format
+- **Line charts** - For indicators and overlays
+- **Area charts** - For equity curves, volume
+- **Heikin-Ashi candles** - Smoothed trend visualization
+- **Baseline charts** - Show deviation from baseline (e.g., VWAP)
+
+#### Price Overlays
+- Moving averages (SMA, EMA, etc.) with customizable colors
+- Bollinger Bands with fill
+- Keltner Channels
+- Donchian Channels
+- VWAP with standard deviation bands
+- SuperTrend
+- Ichimoku Cloud (future)
+- Support/Resistance levels
+- Trend lines (manual or auto-detected)
+- Fibonacci retracements
+
+#### Oscillator Panels (Below Chart)
+- RSI with overbought/oversold zones
+- MACD with histogram
+- Stochastic %K/%D
+- Volume bars (colored by direction)
+- OBV
+- ATR
+- ADX with DI+/DI-
+- CCI, MFI, ROC, etc.
+
+#### Trade Visualization
+- Entry/exit markers on chart
+- Trade annotations with P&L
+- Drawdown shading (red fill during drawdown periods)
+- Position size visualization
+- Stop loss / take profit lines
+
+#### Backtest Results View
+- Equity curve chart
+- Drawdown chart
+- Trade distribution histogram
+- Monthly returns heatmap
+- Rolling Sharpe ratio
+- Win/loss streak visualization
+
+#### Interactivity
+- Zoom and pan (mouse wheel, drag)
+- Crosshair with OHLCV tooltip
+- Time range selector (1D, 1W, 1M, 3M, 1Y, ALL)
+- Toggle indicators on/off
+- Click on trade marker to see details
+- Sync multiple charts (same symbol, different timeframes)
+
+#### Technical Implementation
+```
+Frontend (Next.js):
+├── lightweight-charts (TradingView)
+├── Custom indicator renderers
+├── Chart state management
+└── WebSocket for real-time updates (future)
+
+Backend (FastAPI):
+├── /api/charts/ohlcv/{symbol} - OHLCV data for charting
+├── /api/charts/indicators - Computed indicator data
+├── /api/charts/trades/{strategy} - Trade markers
+└── /api/charts/equity/{backtest_id} - Equity curve data
+```
+
+#### Example Chart Configuration
+```typescript
+{
+  symbol: "SPY",
+  timeframe: "1d",
+  dateRange: { start: "2024-01-01", end: "2024-12-01" },
+  overlays: [
+    { type: "sma", period: 20, color: "#2196F3" },
+    { type: "sma", period: 50, color: "#FF9800" },
+    { type: "bbands", period: 20, stdDev: 2, fillColor: "rgba(33, 150, 243, 0.1)" }
+  ],
+  panels: [
+    { type: "volume", height: 100 },
+    { type: "rsi", period: 14, height: 150, overbought: 70, oversold: 30 },
+    { type: "macd", height: 150 }
+  ],
+  trades: "backtest_123"  // Show trades from this backtest
+}
+```
+
+#### Milestones
+1. **Phase 1** (2 days): Basic candlestick chart with price overlays
+2. **Phase 2** (1 day): Oscillator panels (RSI, MACD, Volume)
+3. **Phase 3** (1 day): Trade markers and equity curve
+4. **Phase 4** (1 day): Interactivity, time range selector, polish
 
 ---
 
@@ -724,6 +955,7 @@ Combine signals from daily + hourly data.
 
 | ID | Feature | Completed | Notes |
 |----|---------|-----------|-------|
+| F019 | pandas-ta Integration | Week 5 | 130+ indicators available |
 | - | Market Data Ingestion | Week 1 | Yahoo Finance + DuckDB |
 | - | Vectorized Backtest Engine | Week 2 | 7 indicators, DSL strategies |
 | - | CLI Interface | Week 2 | ingest, data, backtest commands |

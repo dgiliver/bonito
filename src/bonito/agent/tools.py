@@ -37,18 +37,23 @@ class CreateStrategyTool(Tool):
     def description(self) -> str:
         return """Create a new trading strategy with indicators and rules.
 
-Available indicator types: sma, ema, rsi, macd, atr, bbands, stoch
+Built-in indicator types: sma, ema, rsi, macd, atr, bbands, stoch
+Extended indicators (pandas-ta): adx, vwap, obv, supertrend, donchian, cci, mfi, roc, and 130+ more
+
 Available comparisons: gt, gte, lt, lte, eq, crosses_above, crosses_below
 
 Example indicators:
 - {"type": "ema", "name": "fast_ema", "params": {"period": 12}}
 - {"type": "rsi", "name": "rsi_14", "params": {"period": 14}}
-- {"type": "macd", "name": "macd", "params": {"fast_period": 12, "slow_period": 26, "signal_period": 9}}
+- {"type": "adx", "name": "adx", "params": {"length": 14}}  # Returns adx_adx, adx_dmp, adx_dmn
+- {"type": "vwap", "name": "vwap"}
+- {"type": "donchian", "name": "dc", "params": {"lower_length": 20, "upper_length": 20}}
 
 Example conditions:
 - {"left": "fast_ema", "comparison": "crosses_above", "right": "slow_ema"}
 - {"left": "rsi_14", "comparison": "lt", "right": 30}
-- {"left": "close", "comparison": "gt", "right": "bbands_upper"}"""
+- {"left": "adx_adx", "comparison": "gt", "right": 25}  # ADX value > 25 (trending)
+- {"left": "close", "comparison": "gt", "right": "vwap"}"""
 
     @property
     def parameters(self) -> dict[str, Any]:
@@ -65,13 +70,13 @@ Example conditions:
                 },
                 "indicators": {
                     "type": "array",
-                    "description": "List of indicators to compute",
+                    "description": "List of indicators to compute. Built-in: sma, ema, rsi, macd, atr, bbands, stoch. Extended: adx, vwap, obv, supertrend, donchian, cci, mfi, roc, etc.",
                     "items": {
                         "type": "object",
                         "properties": {
                             "type": {
                                 "type": "string",
-                                "enum": ["sma", "ema", "rsi", "macd", "atr", "bbands", "stoch"],
+                                "description": "Indicator type (e.g., sma, ema, rsi, adx, vwap)",
                             },
                             "name": {"type": "string"},
                             "params": {"type": "object"},
@@ -123,7 +128,20 @@ Example conditions:
                 },
                 "stop_loss_pct": {
                     "type": "number",
-                    "description": "Stop loss as percentage (e.g., 0.05 for 5%)",
+                    "description": "Fixed stop loss as percentage (e.g., 0.05 for 5%). Use this OR trailing_stop_pct, not both.",
+                },
+                "trailing_stop_pct": {
+                    "type": "number",
+                    "description": "Trailing stop as percentage (e.g., 0.05 for 5%). Follows price up, protects gains. Better for trending strategies.",
+                },
+                "trailing_atr_multiple": {
+                    "type": "number",
+                    "description": "Trailing stop as ATR multiple (e.g., 2.0 for 2x ATR). Adapts to volatility.",
+                },
+                "atr_period": {
+                    "type": "integer",
+                    "description": "ATR period for trailing ATR stop (default: 14)",
+                    "default": 14,
                 },
                 "take_profit_pct": {
                     "type": "number",
@@ -146,10 +164,17 @@ Example conditions:
 
     async def execute(self, **kwargs: Any) -> ToolResult:
         try:
-            # Parse indicators
+            # Parse indicators - support both IndicatorType enum and string (for pandas-ta)
             indicators = []
             for ind in kwargs.get("indicators", []):
-                ind_type = IndicatorType(ind["type"])
+                ind_type_str = ind["type"].lower()
+                # Try to convert to IndicatorType enum, otherwise use string
+                try:
+                    ind_type = IndicatorType(ind_type_str)
+                except ValueError:
+                    # Not a built-in type - use string for pandas-ta indicator
+                    ind_type = ind_type_str
+
                 indicators.append(
                     IndicatorConfig(
                         type=ind_type,
@@ -180,6 +205,28 @@ Example conditions:
                     )
                 )
 
+            # Build stop loss config
+            stop_loss_config = None
+            if kwargs.get("trailing_stop_pct"):
+                # Trailing percent stop
+                stop_loss_config = StopLossConfig(
+                    type=StopLossType.TRAILING_PERCENT,
+                    value=kwargs["trailing_stop_pct"],
+                )
+            elif kwargs.get("trailing_atr_multiple"):
+                # Trailing ATR stop
+                stop_loss_config = StopLossConfig(
+                    type=StopLossType.TRAILING_ATR,
+                    value=kwargs["trailing_atr_multiple"],
+                    atr_period=kwargs.get("atr_period", 14),
+                )
+            elif kwargs.get("stop_loss_pct"):
+                # Fixed percent stop
+                stop_loss_config = StopLossConfig(
+                    type=StopLossType.PERCENT,
+                    value=kwargs["stop_loss_pct"],
+                )
+
             # Build strategy config
             timeframe = kwargs.get("timeframe", "1d")
             strategy = StrategyConfig(
@@ -189,17 +236,12 @@ Example conditions:
                 timeframe=timeframe,  # type: ignore
                 indicators=indicators,
                 entry_rules=[Rule(conditions=entry_conditions)] if entry_conditions else [],
-                exit_rules=[Rule(conditions=exit_conditions)] if exit_conditions else None,
+                exit_rules=[Rule(conditions=exit_conditions)] if exit_conditions else [],
                 position_size=PositionSizeConfig(
                     type=PositionSizeType.PERCENT_EQUITY,
                     value=kwargs.get("position_size_pct", 95),
                 ),
-                stop_loss=StopLossConfig(
-                    type=StopLossType.PERCENT,
-                    value=kwargs["stop_loss_pct"],
-                )
-                if kwargs.get("stop_loss_pct")
-                else None,
+                stop_loss=stop_loss_config,
                 take_profit=TakeProfitConfig(
                     type=TakeProfitType.PERCENT,
                     value=kwargs["take_profit_pct"],
@@ -338,17 +380,33 @@ Returns performance metrics including total return, Sharpe ratio, max drawdown, 
             "trades": result.trades,
         }
 
+        # Calculate buy & hold for comparison
+        buy_hold_return = 0.0
+        if data.closes is not None and len(data.closes) > 1:
+            first_price = data.closes[0]
+            last_price = data.closes[-1]
+            buy_hold_return = (last_price - first_price) / first_price
+
         # Format response
         m = result.metrics
+        alpha = m.total_return - buy_hold_return  # Strategy outperformance
         return ToolResult(
             success=True,
             data={
                 "result_id": result_id,
                 "strategy_name": strategy_name,
                 "symbol": symbol,
-                "period": f"{start_date} to {end_date}",
+                "period": {"start": start_date, "end": end_date},
                 "initial_capital": initial_capital,
                 "final_capital": round(result.final_capital, 2),
+                "performance": {
+                    "total_return": m.total_return * 100,  # As percentage number
+                    "sharpe_ratio": round(m.sharpe_ratio, 2),
+                    "max_drawdown": m.max_drawdown * 100,  # As percentage number
+                    "win_rate": m.win_rate * 100,  # As percentage number
+                    "buy_hold_return": buy_hold_return * 100,  # As percentage number
+                    "alpha": alpha * 100,  # Outperformance as percentage
+                },
                 "metrics": {
                     "total_return": f"{m.total_return:.2%}",
                     "annualized_return": f"{m.annualized_return:.2%}",
@@ -360,7 +418,25 @@ Returns performance metrics including total return, Sharpe ratio, max drawdown, 
                     "profit_factor": round(m.profit_factor, 2),
                     "average_win": f"{m.average_win:.2%}",
                     "average_loss": f"{m.average_loss:.2%}",
+                    "buy_hold_return": f"{buy_hold_return:.2%}",
+                    "alpha": f"{alpha:.2%}",
                 },
+                # Full trades for chart markers
+                "trades": [
+                    {
+                        "id": f"{strategy_name}_{i}",
+                        "entry_time": t.entry_time.isoformat(),
+                        "exit_time": t.exit_time.isoformat(),
+                        "side": "long",  # TODO: support short
+                        "entry_price": round(t.entry_price, 2),
+                        "exit_price": round(t.exit_price, 2),
+                        "quantity": t.quantity,
+                        "pnl": round(t.pnl, 2),
+                        "pnl_percent": round(t.pnl_percent * 100, 2),
+                        "exit_reason": t.exit_reason,
+                    }
+                    for i, t in enumerate(result.trades)
+                ],
                 "recent_trades": [
                     {
                         "entry": t.entry_time.strftime("%Y-%m-%d"),
@@ -369,7 +445,7 @@ Returns performance metrics including total return, Sharpe ratio, max drawdown, 
                         "return": f"{t.pnl_percent:.2%}",
                         "reason": t.exit_reason,
                     }
-                    for t in result.trades[-5:]  # Last 5 trades
+                    for t in result.trades[-5:]  # Last 5 trades for text display
                 ],
             },
         )

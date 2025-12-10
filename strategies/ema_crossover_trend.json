@@ -1,0 +1,64 @@
+{
+  "id": "62e1364e-537c-4aee-b11c-dec7260e2ca5",
+  "name": "ema_crossover_trend",
+  "description": "EMA crossover trend strategy: Buy when EMA 12 crosses above EMA 26, with 5% trailing stop to protect gains",
+  "version": 1,
+  "config": {
+    "name": "ema_crossover_trend",
+    "description": "EMA crossover trend strategy: Buy when EMA 12 crosses above EMA 26, with 5% trailing stop to protect gains",
+    "version": "1.0",
+    "symbols": [
+      "SPY"
+    ],
+    "timeframe": "1d",
+    "indicators": [
+      {
+        "type": "ema",
+        "name": "ema_12",
+        "params": {
+          "period": 12
+        }
+      },
+      {
+        "type": "ema",
+        "name": "ema_26",
+        "params": {
+          "period": 26
+        }
+      }
+    ],
+    "entry_rules": [
+      {
+        "conditions": [
+          {
+            "left": "ema_12",
+            "comparison": "crosses_above",
+            "right": "ema_26"
+          }
+        ],
+        "logic": "AND"
+      }
+    ],
+    "exit_rules": [],
+    "position_size": {
+      "type": "percent_equity",
+      "value": 95.0
+    },
+    "max_positions": 1,
+    "stop_loss": {
+      "type": "trailing_percent",
+      "value": 0.05,
+      "atr_period": 14,
+      "trigger_percent": null
+    },
+    "take_profit": null
+  },
+  "created_at": "2025-12-09T23:00:15.575223",
+  "updated_at": "2025-12-09T23:00:15.575242",
+  "tags": [
+    "trend-following",
+    "ema-crossover",
+    "trailing-stop"
+  ],
+  "last_backtest": null
+}

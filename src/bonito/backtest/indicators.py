@@ -1,9 +1,206 @@
-"""Technical indicator calculations."""
+"""Technical indicator calculations.
+
+Supports both built-in indicators and pandas-ta indicators.
+"""
 
 import numpy as np
+import pandas as pd
 
 from bonito.backtest.strategy import IndicatorConfig, IndicatorType
 from bonito.data.models import BarData
+
+# Lazy import for pandas_ta to avoid startup overhead
+_pandas_ta = None
+
+
+def _get_pandas_ta():
+    """Lazy load pandas_ta module."""
+    global _pandas_ta
+    if _pandas_ta is None:
+        import pandas_ta as ta
+
+        _pandas_ta = ta
+    return _pandas_ta
+
+
+def _bardata_to_dataframe(data: BarData) -> pd.DataFrame:
+    """Convert BarData to pandas DataFrame for pandas-ta.
+
+    Uses timestamps as DatetimeIndex which is required for VWAP and other
+    time-aware indicators.
+    """
+    df = pd.DataFrame(
+        {
+            "open": data.open,
+            "high": data.high,
+            "low": data.low,
+            "close": data.close,
+            "volume": data.volume,
+        }
+    )
+    # Set DatetimeIndex for indicators like VWAP that require it
+    if data.timestamps:
+        df.index = pd.DatetimeIndex(data.timestamps)
+    return df
+
+
+def _compute_pandas_ta_indicator(
+    df: pd.DataFrame,
+    indicator_type: str,
+    name: str,
+    params: dict,
+) -> dict[str, np.ndarray]:
+    """Compute a pandas-ta indicator and extract results.
+
+    Args:
+        df: DataFrame with OHLCV data
+        indicator_type: Name of the pandas-ta indicator (e.g., "vwap", "adx")
+        name: User-specified name prefix for the indicator
+        params: Parameters to pass to the indicator
+
+    Returns:
+        Dictionary of indicator name -> numpy array
+    """
+    ta = _get_pandas_ta()
+    results = {}
+
+    # Get the indicator function from pandas_ta
+    indicator_func = getattr(ta, indicator_type, None)
+    if indicator_func is None:
+        raise ValueError(f"Unknown pandas-ta indicator: {indicator_type}")
+
+    # Map common parameter names to pandas-ta conventions
+    mapped_params = _map_params(indicator_type, params)
+
+    try:
+        # Call the indicator function
+        result = indicator_func(
+            high=df["high"],
+            low=df["low"],
+            close=df["close"],
+            volume=df["volume"],
+            open_=df["open"],
+            **mapped_params,
+        )
+    except TypeError:
+        # Some indicators don't need all OHLCV - try with just what's needed
+        try:
+            result = indicator_func(close=df["close"], **mapped_params)
+        except TypeError:
+            try:
+                result = indicator_func(
+                    high=df["high"],
+                    low=df["low"],
+                    close=df["close"],
+                    **mapped_params,
+                )
+            except TypeError:
+                # Last resort - let pandas-ta figure it out
+                result = indicator_func(df, **mapped_params)
+
+    # Handle different result types
+    if result is None:
+        # Indicator returned nothing - likely insufficient data
+        results[name] = np.full(len(df), np.nan)
+    elif isinstance(result, pd.Series):
+        results[name] = result.values
+    elif isinstance(result, pd.DataFrame):
+        # Multi-column indicator - extract each column
+        for col in result.columns:
+            # Create meaningful suffix from column name
+            suffix = _clean_column_suffix(col, indicator_type)
+            results[f"{name}_{suffix}"] = result[col].values
+    else:
+        # Unexpected type
+        results[name] = np.array(result)
+
+    return results
+
+
+def _map_params(indicator_type: str, params: dict) -> dict:
+    """Map common parameter names to pandas-ta conventions.
+
+    Our DSL uses "period" but pandas-ta often uses "length".
+    """
+    mapped = params.copy()
+
+    # Common mappings
+    if "period" in mapped and "length" not in mapped:
+        mapped["length"] = mapped.pop("period")
+
+    # Indicator-specific mappings
+    if indicator_type == "donchian" and "length" in mapped:
+        # Donchian uses lower_length and upper_length
+        length = mapped.pop("length")
+        mapped.setdefault("lower_length", length)
+        mapped.setdefault("upper_length", length)
+
+    return mapped
+
+
+def _clean_column_suffix(col_name: str, indicator_type: str) -> str:
+    """Clean up pandas-ta column names for our naming convention.
+
+    pandas-ta returns columns like:
+    - "ADX_14", "DMP_14" → we want "adx", "dmp"
+    - "SUPERT_10_3.0", "SUPERTd_10_3.0" → we want "value", "direction"
+    - "AROOND_25", "AROONU_25" → we want "down", "up"
+    - "KCLe_20_2.0", "KCBe_20_2.0" → we want "lower", "basis", "upper"
+    """
+    col_lower = col_name.lower()
+    indicator_lower = indicator_type.lower()
+
+    # Special mappings for known indicators with complex output names
+    # Order matters - more specific prefixes should come first!
+    special_mappings = {
+        # SuperTrend: SUPERTd (direction), SUPERTl (long), SUPERTs (short), SUPERT (value)
+        # Must check longer prefixes first!
+        "supertrend": [
+            ("supertd", "direction"),
+            ("supertl", "long"),
+            ("superts", "short"),
+            ("supert", "value"),
+        ],
+        # Aroon: AROONOSC (oscillator), AROOND (down), AROONU (up)
+        "aroon": [("aroonosc", "osc"), ("aroond", "down"), ("aroonu", "up")],
+        # Keltner Channels: KCLe (lower), KCBe (basis/middle), KCUe (upper)
+        "kc": [("kcle", "lower"), ("kcbe", "middle"), ("kcue", "upper")],
+        # PSAR: PSARaf (acceleration), PSARl (long), PSARs (short), PSARr (reversal)
+        "psar": [("psaraf", "af"), ("psarl", "long"), ("psars", "short"), ("psarr", "reversal")],
+    }
+
+    # Check if we have special mappings for this indicator
+    if indicator_lower in special_mappings:
+        mappings = special_mappings[indicator_lower]
+        # Look for matching prefix in the column name (order matters!)
+        for prefix, suffix in mappings:
+            if prefix in col_lower:
+                return suffix
+
+    # Generic cleaning
+    parts = col_lower.split("_")
+
+    # Filter out numeric parts (integers and floats like "14", "3.0", "0.02")
+    def is_numeric(s: str) -> bool:
+        try:
+            float(s)
+            return True
+        except ValueError:
+            return False
+
+    non_numeric = [p for p in parts if not is_numeric(p)]
+
+    if not non_numeric:
+        return indicator_lower
+
+    # Remove indicator name prefix if present
+    if non_numeric[0] == indicator_lower:
+        non_numeric = non_numeric[1:]
+
+    if not non_numeric:
+        return indicator_lower
+
+    return "_".join(non_numeric) if non_numeric else indicator_lower
 
 
 def compute_indicators(
@@ -11,6 +208,9 @@ def compute_indicators(
     indicators: list[IndicatorConfig],
 ) -> dict[str, np.ndarray]:
     """Compute all configured indicators.
+
+    Supports both built-in indicators (SMA, EMA, RSI, etc.) and pandas-ta
+    indicators (VWAP, ADX, Donchian, OBV, etc.).
 
     Args:
         data: Bar data to compute indicators on
@@ -28,24 +228,30 @@ def compute_indicators(
         "volume": data.volume,
     }
 
+    # Prepare DataFrame once for pandas-ta indicators (lazy)
+    df: pd.DataFrame | None = None
+
     for config in indicators:
-        if config.type == IndicatorType.SMA:
+        indicator_type = config.type
+
+        # Handle built-in indicators (IndicatorType enum)
+        if indicator_type == IndicatorType.SMA:
             period = config.params.get("period", 20)
             results[config.name] = sma(data.close, period)
 
-        elif config.type == IndicatorType.EMA:
+        elif indicator_type == IndicatorType.EMA:
             period = config.params.get("period", 20)
             results[config.name] = ema(data.close, period)
 
-        elif config.type == IndicatorType.RSI:
+        elif indicator_type == IndicatorType.RSI:
             period = config.params.get("period", 14)
             results[config.name] = rsi(data.close, period)
 
-        elif config.type == IndicatorType.ATR:
+        elif indicator_type == IndicatorType.ATR:
             period = config.params.get("period", 14)
             results[config.name] = atr(data.high, data.low, data.close, period)
 
-        elif config.type == IndicatorType.MACD:
+        elif indicator_type == IndicatorType.MACD:
             fast = config.params.get("fast_period", 12)
             slow = config.params.get("slow_period", 26)
             signal = config.params.get("signal_period", 9)
@@ -54,7 +260,7 @@ def compute_indicators(
             results[f"{config.name}_signal"] = signal_line
             results[f"{config.name}_hist"] = histogram
 
-        elif config.type == IndicatorType.BBANDS:
+        elif indicator_type == IndicatorType.BBANDS:
             period = config.params.get("period", 20)
             std_dev = config.params.get("std_dev", 2.0)
             upper, middle, lower = bollinger_bands(data.close, period, std_dev)
@@ -62,12 +268,23 @@ def compute_indicators(
             results[f"{config.name}_middle"] = middle
             results[f"{config.name}_lower"] = lower
 
-        elif config.type == IndicatorType.STOCH:
+        elif indicator_type == IndicatorType.STOCH:
             k_period = config.params.get("k_period", 14)
             d_period = config.params.get("d_period", 3)
             k, d = stochastic(data.high, data.low, data.close, k_period, d_period)
             results[f"{config.name}_k"] = k
             results[f"{config.name}_d"] = d
+
+        else:
+            # Handle pandas-ta indicators (string type)
+            if df is None:
+                df = _bardata_to_dataframe(data)
+
+            indicator_name = str(indicator_type).lower()
+            pandas_ta_results = _compute_pandas_ta_indicator(
+                df, indicator_name, config.name, config.params
+            )
+            results.update(pandas_ta_results)
 
     return results
 
