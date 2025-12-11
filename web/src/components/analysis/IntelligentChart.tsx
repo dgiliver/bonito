@@ -6,6 +6,7 @@ import {
   ColorType,
   CandlestickSeries,
   HistogramSeries,
+  LineSeries,
   createSeriesMarkers,
 } from "lightweight-charts";
 import type {
@@ -13,6 +14,7 @@ import type {
   ISeriesApi,
   CandlestickData,
   HistogramData,
+  LineData,
   Time,
   SeriesMarker,
   ISeriesMarkersPluginApi,
@@ -72,6 +74,153 @@ const RANGES = ["1D", "1W", "1M", "3M", "YTD", "1Y", "5Y", "ALL"];
 const INTRADAY_RANGES = ["1D", "1W", "1M"];
 
 const API_BASE = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
+
+// Indicator colors
+const INDICATOR_COLORS = {
+  sma: "#3b82f6", // blue
+  ema: "#f97316", // orange
+  rsi: "#8b5cf6", // purple
+  macd: "#22c55e", // green
+  macd_signal: "#ef4444", // red
+  macd_hist: "#94a3b8", // gray
+  bbands_upper: "#64748b", // slate
+  bbands_lower: "#64748b",
+  bbands_middle: "#3b82f6",
+  vwap: "#06b6d4", // cyan
+  atr: "#f59e0b", // amber
+};
+
+// ============================================================================
+// Indicator Calculations
+// ============================================================================
+
+interface IndicatorData {
+  time: Time;
+  value: number;
+}
+
+function calculateSMA(
+  data: CandlestickData<Time>[],
+  period: number,
+): IndicatorData[] {
+  const result: IndicatorData[] = [];
+  for (let i = period - 1; i < data.length; i++) {
+    let sum = 0;
+    for (let j = 0; j < period; j++) {
+      sum += data[i - j].close;
+    }
+    result.push({ time: data[i].time, value: sum / period });
+  }
+  return result;
+}
+
+function calculateEMA(
+  data: CandlestickData<Time>[],
+  period: number,
+): IndicatorData[] {
+  const result: IndicatorData[] = [];
+  const multiplier = 2 / (period + 1);
+
+  // Start with SMA for first value
+  let sum = 0;
+  for (let i = 0; i < period; i++) {
+    sum += data[i].close;
+  }
+  let ema = sum / period;
+  result.push({ time: data[period - 1].time, value: ema });
+
+  // Calculate EMA for remaining values
+  for (let i = period; i < data.length; i++) {
+    ema = (data[i].close - ema) * multiplier + ema;
+    result.push({ time: data[i].time, value: ema });
+  }
+  return result;
+}
+
+function calculateRSI(
+  data: CandlestickData<Time>[],
+  period: number,
+): IndicatorData[] {
+  const result: IndicatorData[] = [];
+
+  if (data.length < period + 1) return result;
+
+  // Calculate price changes
+  const changes: number[] = [];
+  for (let i = 1; i < data.length; i++) {
+    changes.push(data[i].close - data[i - 1].close);
+  }
+
+  // Initial average gains and losses
+  let avgGain = 0;
+  let avgLoss = 0;
+  for (let i = 0; i < period; i++) {
+    if (changes[i] > 0) avgGain += changes[i];
+    else avgLoss -= changes[i];
+  }
+  avgGain /= period;
+  avgLoss /= period;
+
+  // Calculate RSI
+  for (let i = period; i < changes.length; i++) {
+    const change = changes[i];
+    if (change > 0) {
+      avgGain = (avgGain * (period - 1) + change) / period;
+      avgLoss = (avgLoss * (period - 1)) / period;
+    } else {
+      avgGain = (avgGain * (period - 1)) / period;
+      avgLoss = (avgLoss * (period - 1) - change) / period;
+    }
+
+    const rs = avgLoss === 0 ? 100 : avgGain / avgLoss;
+    const rsi = 100 - 100 / (1 + rs);
+    result.push({ time: data[i + 1].time, value: rsi });
+  }
+
+  return result;
+}
+
+interface BollingerData {
+  time: Time;
+  upper: number;
+  middle: number;
+  lower: number;
+}
+
+function calculateBollingerBands(
+  data: CandlestickData<Time>[],
+  period: number,
+  stdDev: number,
+): BollingerData[] {
+  const result: BollingerData[] = [];
+
+  for (let i = period - 1; i < data.length; i++) {
+    let sum = 0;
+    const prices: number[] = [];
+    for (let j = 0; j < period; j++) {
+      const price = data[i - j].close;
+      sum += price;
+      prices.push(price);
+    }
+    const middle = sum / period;
+
+    // Standard deviation
+    let variance = 0;
+    for (const price of prices) {
+      variance += Math.pow(price - middle, 2);
+    }
+    const std = Math.sqrt(variance / period);
+
+    result.push({
+      time: data[i].time,
+      upper: middle + stdDev * std,
+      middle,
+      lower: middle - stdDev * std,
+    });
+  }
+
+  return result;
+}
 
 // ============================================================================
 // Trade Markers
@@ -205,6 +354,10 @@ export default function IntelligentChart() {
   const candleSeriesRef = useRef<ISeriesApi<"Candlestick"> | null>(null);
   const volumeSeriesRef = useRef<ISeriesApi<"Histogram"> | null>(null);
   const markersPluginRef = useRef<ISeriesMarkersPluginApi<Time> | null>(null);
+
+  // Indicator series refs (dynamically created/removed)
+  const indicatorSeriesRef = useRef<Map<string, ISeriesApi<"Line">>>(new Map());
+  const rsiPaneRef = useRef<ISeriesApi<"Line"> | null>(null);
 
   // Derived values
   const { symbol, interval } = state.chart;
@@ -511,6 +664,153 @@ export default function IntelligentChart() {
     });
   }, [selectedTrade, candleData]);
 
+  // ============================================================================
+  // Indicator Rendering
+  // ============================================================================
+
+  // Render indicators when data or indicator config changes
+  useEffect(() => {
+    if (!chartRef.current || candleData.length === 0) return;
+
+    const chart = chartRef.current;
+    const indicators = state.chart.indicators;
+
+    // Track which indicators should exist
+    const activeIndicatorNames = new Set(
+      indicators.filter((i) => i.visible).map((i) => i.name),
+    );
+
+    // Remove indicators that are no longer active
+    indicatorSeriesRef.current.forEach((series, name) => {
+      if (!activeIndicatorNames.has(name)) {
+        chart.removeSeries(series);
+        indicatorSeriesRef.current.delete(name);
+      }
+    });
+
+    // Add/update active indicators
+    for (const indicator of indicators) {
+      if (!indicator.visible) continue;
+
+      const existingSeries = indicatorSeriesRef.current.get(indicator.name);
+      if (existingSeries) continue; // Already exists
+
+      const indType = indicator.type.toLowerCase();
+      let lineData: LineData<Time>[] = [];
+      let color =
+        INDICATOR_COLORS[indType as keyof typeof INDICATOR_COLORS] || "#888";
+
+      // Calculate indicator data based on type
+      if (indType === "sma") {
+        const period = (indicator.params.period as number) || 20;
+        const smaData = calculateSMA(candleData, period);
+        lineData = smaData.map((d) => ({ time: d.time, value: d.value }));
+      } else if (indType === "ema") {
+        const period = (indicator.params.period as number) || 12;
+        const emaData = calculateEMA(candleData, period);
+        lineData = emaData.map((d) => ({ time: d.time, value: d.value }));
+      } else if (indType === "rsi") {
+        // RSI is rendered in a separate pane (handled separately)
+        const period = (indicator.params.period as number) || 14;
+        const rsiData = calculateRSI(candleData, period);
+
+        // Create RSI series if it doesn't exist
+        if (!rsiPaneRef.current) {
+          const rsiSeries = chart.addSeries(LineSeries, {
+            color: INDICATOR_COLORS.rsi,
+            lineWidth: 2,
+            priceScaleId: "rsi",
+            title: indicator.name,
+          });
+          rsiSeries.priceScale().applyOptions({
+            scaleMargins: { top: 0.8, bottom: 0 },
+            borderVisible: false,
+          });
+          rsiPaneRef.current = rsiSeries;
+        }
+
+        rsiPaneRef.current.setData(
+          rsiData.map((d) => ({ time: d.time, value: d.value })),
+        );
+        indicatorSeriesRef.current.set(
+          indicator.name,
+          rsiPaneRef.current as unknown as ISeriesApi<"Line">,
+        );
+        continue;
+      } else if (indType === "bbands") {
+        const period = (indicator.params.period as number) || 20;
+        const stdDev = (indicator.params.std_dev as number) || 2;
+        const bbData = calculateBollingerBands(candleData, period, stdDev);
+
+        // Upper band
+        const upperSeries = chart.addSeries(LineSeries, {
+          color: INDICATOR_COLORS.bbands_upper,
+          lineWidth: 1,
+          lineStyle: 2, // Dashed
+          priceScaleId: "right",
+        });
+        upperSeries.setData(
+          bbData.map((d) => ({ time: d.time, value: d.upper })),
+        );
+        indicatorSeriesRef.current.set(`${indicator.name}_upper`, upperSeries);
+
+        // Middle band (SMA)
+        const middleSeries = chart.addSeries(LineSeries, {
+          color: INDICATOR_COLORS.bbands_middle,
+          lineWidth: 1,
+          priceScaleId: "right",
+        });
+        middleSeries.setData(
+          bbData.map((d) => ({ time: d.time, value: d.middle })),
+        );
+        indicatorSeriesRef.current.set(
+          `${indicator.name}_middle`,
+          middleSeries,
+        );
+
+        // Lower band
+        const lowerSeries = chart.addSeries(LineSeries, {
+          color: INDICATOR_COLORS.bbands_lower,
+          lineWidth: 1,
+          lineStyle: 2,
+          priceScaleId: "right",
+        });
+        lowerSeries.setData(
+          bbData.map((d) => ({ time: d.time, value: d.lower })),
+        );
+        indicatorSeriesRef.current.set(`${indicator.name}_lower`, lowerSeries);
+        continue;
+      } else if (indType === "vwap") {
+        // VWAP requires volume - approximate with typical price * volume cumulative
+        // For now, use a simple implementation
+        color = INDICATOR_COLORS.vwap;
+        // TODO: Proper VWAP calculation
+        continue;
+      }
+
+      // Create line series for overlay indicators (SMA, EMA)
+      if (lineData.length > 0) {
+        const series = chart.addSeries(LineSeries, {
+          color,
+          lineWidth: 2,
+          priceScaleId: "right",
+          title: indicator.name,
+        });
+        series.setData(lineData);
+        indicatorSeriesRef.current.set(indicator.name, series);
+      }
+    }
+
+    // Cleanup RSI pane if no RSI indicator is active
+    const hasRsi = indicators.some(
+      (i) => i.type.toLowerCase() === "rsi" && i.visible,
+    );
+    if (!hasRsi && rsiPaneRef.current) {
+      chart.removeSeries(rsiPaneRef.current);
+      rsiPaneRef.current = null;
+    }
+  }, [state.chart.indicators, candleData]);
+
   // Fetch symbols when search opens
   useEffect(() => {
     if (symbolSearchOpen) {
@@ -712,6 +1012,8 @@ export default function IntelligentChart() {
     for (const intent of intents) {
       if (intent.processed) continue;
 
+      console.log("[Chart] Processing intent:", intent.type, intent);
+
       switch (intent.type) {
         case "navigate":
           if (intent.timestamp && chartRef.current) {
@@ -729,7 +1031,34 @@ export default function IntelligentChart() {
 
         case "overlay":
           if (intent.indicator) {
+            console.log("[Chart] Adding indicator:", intent.indicator);
             dispatch({ type: "ADD_INDICATOR", indicator: intent.indicator });
+          }
+          break;
+
+        case "annotate":
+          if (intent.annotation) {
+            const annotation = {
+              ...intent.annotation,
+              id: crypto.randomUUID(),
+            };
+            console.log("[Chart] Adding annotation:", annotation);
+            dispatch({ type: "ADD_ANNOTATION", annotation });
+          }
+          break;
+
+        case "highlight":
+          if (intent.highlightRange) {
+            // Create a highlight annotation (region type)
+            const highlight = {
+              id: crypto.randomUUID(),
+              type: "region" as const,
+              timestamp: intent.highlightRange.start,
+              endTimestamp: intent.highlightRange.end,
+              color: intent.highlightRange.color,
+            };
+            console.log("[Chart] Adding highlight:", highlight);
+            dispatch({ type: "ADD_ANNOTATION", annotation: highlight });
           }
           break;
 
@@ -740,11 +1069,18 @@ export default function IntelligentChart() {
           ) {
             dispatch({ type: "CLEAR_ANNOTATIONS" });
           }
+          if (intent.clearType === "indicators" || intent.clearType === "all") {
+            // Remove all indicators from state
+            state.chart.indicators.forEach((ind) => {
+              dispatch({ type: "REMOVE_INDICATOR", name: ind.name });
+            });
+          }
           break;
       }
 
       processIntent(intent.id);
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- Intentionally excluding state.chart.indicators to avoid infinite loop
   }, [intents, dispatch, processIntent]);
 
   // ============================================================================

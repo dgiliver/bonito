@@ -852,6 +852,318 @@ class ListSavedStrategiesTool(Tool):
         )
 
 
+class ChartControlTool(Tool):
+    """Tool for controlling the chart display.
+
+    This tool allows the agent to manipulate the chart:
+    - Add/remove indicator overlays (SMA, EMA, RSI, etc.)
+    - Add annotations (arrows, labels)
+    - Highlight regions
+    - Navigate to specific times
+    - Clear overlays/annotations
+
+    The tool returns chart "intents" that the frontend processes.
+    """
+
+    @property
+    def name(self) -> str:
+        return "chart_control"
+
+    @property
+    def description(self) -> str:
+        return """Control the chart display to help explain analysis visually.
+
+Actions:
+- add_indicator: Add a technical indicator overlay
+- remove_indicator: Remove an indicator overlay
+- annotate: Add a visual annotation (arrow, label, marker)
+- highlight: Highlight a time region on the chart
+- navigate: Pan/zoom to a specific time or range
+- clear: Clear annotations, indicators, or highlights
+
+Use this to show users what you're explaining - point to candles, add indicators, highlight periods.
+
+Examples:
+- "Let me add RSI to show the oversold condition" → add_indicator
+- "See this candle here" → annotate with arrow
+- "The drawdown period from March to April" → highlight
+- "Let's look at January" → navigate"""
+
+    @property
+    def parameters(self) -> dict[str, Any]:
+        return {
+            "type": "object",
+            "properties": {
+                "action": {
+                    "type": "string",
+                    "enum": [
+                        "add_indicator",
+                        "remove_indicator",
+                        "annotate",
+                        "highlight",
+                        "navigate",
+                        "clear",
+                    ],
+                    "description": "The chart control action to perform",
+                },
+                # For add_indicator
+                "indicator_type": {
+                    "type": "string",
+                    "description": "Indicator type: sma, ema, rsi, macd, bbands, vwap, atr",
+                },
+                "indicator_params": {
+                    "type": "object",
+                    "description": "Indicator parameters like {period: 14} or {fast: 12, slow: 26}",
+                },
+                # For remove_indicator
+                "indicator_name": {
+                    "type": "string",
+                    "description": "Name of indicator to remove",
+                },
+                # For annotate
+                "annotation_type": {
+                    "type": "string",
+                    "enum": ["arrow", "label", "marker"],
+                    "description": "Type of annotation",
+                },
+                "annotation_text": {
+                    "type": "string",
+                    "description": "Text for label or marker",
+                },
+                "timestamp": {
+                    "type": "string",
+                    "description": "ISO date string (YYYY-MM-DD) for annotation position",
+                },
+                "price": {
+                    "type": "number",
+                    "description": "Price level for annotation (optional)",
+                },
+                # For highlight
+                "start_date": {
+                    "type": "string",
+                    "description": "Start date (YYYY-MM-DD) for highlight region",
+                },
+                "end_date": {
+                    "type": "string",
+                    "description": "End date (YYYY-MM-DD) for highlight region",
+                },
+                "highlight_color": {
+                    "type": "string",
+                    "description": "Color for highlight (e.g., 'red', 'green', '#22c55e')",
+                    "default": "yellow",
+                },
+                # For clear
+                "clear_type": {
+                    "type": "string",
+                    "enum": ["annotations", "indicators", "highlights", "all"],
+                    "description": "What to clear from the chart",
+                },
+            },
+            "required": ["action"],
+        }
+
+    async def execute(self, **kwargs: Any) -> ToolResult:
+        action = kwargs.get("action")
+
+        try:
+            if action == "add_indicator":
+                ind_type = kwargs.get("indicator_type", "").lower()
+                params = kwargs.get("indicator_params", {})
+
+                if not ind_type:
+                    return ToolResult(
+                        success=False, error="indicator_type is required for add_indicator"
+                    )
+
+                # Build indicator name from type and params
+                if ind_type in ("sma", "ema"):
+                    period = params.get("period", 20)
+                    name = f"{ind_type.upper()}({period})"
+                elif ind_type == "rsi":
+                    period = params.get("period", 14)
+                    name = f"RSI({period})"
+                elif ind_type == "macd":
+                    name = "MACD"
+                elif ind_type == "bbands":
+                    period = params.get("period", 20)
+                    name = f"BB({period})"
+                elif ind_type == "vwap":
+                    name = "VWAP"
+                elif ind_type == "atr":
+                    period = params.get("period", 14)
+                    name = f"ATR({period})"
+                else:
+                    name = ind_type.upper()
+
+                return ToolResult(
+                    success=True,
+                    data={
+                        "intent": {
+                            "type": "overlay",
+                            "indicator": {
+                                "type": ind_type,
+                                "name": name,
+                                "params": params,
+                                "visible": True,
+                            },
+                        },
+                        "message": f"Added {name} indicator to chart",
+                    },
+                )
+
+            elif action == "remove_indicator":
+                name = kwargs.get("indicator_name")
+                if not name:
+                    return ToolResult(
+                        success=False, error="indicator_name is required for remove_indicator"
+                    )
+
+                return ToolResult(
+                    success=True,
+                    data={
+                        "intent": {
+                            "type": "clear",
+                            "clearType": "indicators",
+                            "indicatorName": name,
+                        },
+                        "message": f"Removed {name} from chart",
+                    },
+                )
+
+            elif action == "annotate":
+                ann_type = kwargs.get("annotation_type", "marker")
+                text = kwargs.get("annotation_text", "")
+                timestamp_str = kwargs.get("timestamp")
+
+                if not timestamp_str:
+                    return ToolResult(success=False, error="timestamp is required for annotate")
+
+                # Convert date string to timestamp
+                from datetime import datetime
+
+                dt = datetime.strptime(timestamp_str, "%Y-%m-%d")
+                timestamp = int(dt.timestamp())
+
+                # Map annotation type to icon
+                icon_map = {
+                    "arrow": "signal",
+                    "label": "info",
+                    "marker": "signal",
+                }
+
+                return ToolResult(
+                    success=True,
+                    data={
+                        "intent": {
+                            "type": "annotate",
+                            "annotation": {
+                                "type": "marker" if ann_type == "arrow" else ann_type,
+                                "timestamp": timestamp,
+                                "text": text,
+                                "icon": icon_map.get(ann_type, "signal"),
+                                "price": kwargs.get("price"),
+                            },
+                        },
+                        "message": f"Added {ann_type} annotation at {timestamp_str}",
+                    },
+                )
+
+            elif action == "highlight":
+                start_str = kwargs.get("start_date")
+                end_str = kwargs.get("end_date")
+                color = kwargs.get("highlight_color", "rgba(255, 193, 7, 0.2)")
+
+                if not start_str or not end_str:
+                    return ToolResult(
+                        success=False,
+                        error="start_date and end_date are required for highlight",
+                    )
+
+                from datetime import datetime
+
+                start_dt = datetime.strptime(start_str, "%Y-%m-%d")
+                end_dt = datetime.strptime(end_str, "%Y-%m-%d")
+
+                # Convert named colors to rgba
+                color_map = {
+                    "red": "rgba(239, 68, 68, 0.2)",
+                    "green": "rgba(34, 197, 94, 0.2)",
+                    "yellow": "rgba(255, 193, 7, 0.2)",
+                    "blue": "rgba(59, 130, 246, 0.2)",
+                }
+                rgba_color = color_map.get(color.lower(), color)
+
+                return ToolResult(
+                    success=True,
+                    data={
+                        "intent": {
+                            "type": "highlight",
+                            "highlightRange": {
+                                "start": int(start_dt.timestamp()),
+                                "end": int(end_dt.timestamp()),
+                                "color": rgba_color,
+                            },
+                        },
+                        "message": f"Highlighted region from {start_str} to {end_str}",
+                    },
+                )
+
+            elif action == "navigate":
+                timestamp_str = kwargs.get("timestamp")
+                start_str = kwargs.get("start_date")
+                end_str = kwargs.get("end_date")
+
+                from datetime import datetime
+
+                if start_str and end_str:
+                    # Navigate to range
+                    start_ts = int(datetime.strptime(start_str, "%Y-%m-%d").timestamp())
+                    end_ts = int(datetime.strptime(end_str, "%Y-%m-%d").timestamp())
+
+                    return ToolResult(
+                        success=True,
+                        data={
+                            "intent": {
+                                "type": "navigate",
+                                "range": {"start": start_ts, "end": end_ts},
+                            },
+                            "message": f"Navigated to {start_str} - {end_str}",
+                        },
+                    )
+                elif timestamp_str:
+                    # Navigate to timestamp
+                    ts = int(datetime.strptime(timestamp_str, "%Y-%m-%d").timestamp())
+                    return ToolResult(
+                        success=True,
+                        data={
+                            "intent": {"type": "navigate", "timestamp": ts},
+                            "message": f"Navigated to {timestamp_str}",
+                        },
+                    )
+                else:
+                    return ToolResult(
+                        success=False,
+                        error="timestamp or start_date/end_date required for navigate",
+                    )
+
+            elif action == "clear":
+                clear_type = kwargs.get("clear_type", "all")
+
+                return ToolResult(
+                    success=True,
+                    data={
+                        "intent": {"type": "clear", "clearType": clear_type},
+                        "message": f"Cleared {clear_type} from chart",
+                    },
+                )
+
+            else:
+                return ToolResult(success=False, error=f"Unknown action: {action}")
+
+        except Exception as e:
+            return ToolResult(success=False, error=f"Chart control failed: {e!s}")
+
+
 def get_agent_tools() -> tuple[ToolRegistry, dict[str, StrategyConfig], dict[str, Any]]:
     """Create and return agent tools with shared state.
 
@@ -870,5 +1182,6 @@ def get_agent_tools() -> tuple[ToolRegistry, dict[str, StrategyConfig], dict[str
     registry.register(SaveStrategyTool(strategy_store, result_store))
     registry.register(LoadStrategyTool(strategy_store))
     registry.register(ListSavedStrategiesTool())
+    registry.register(ChartControlTool())  # NEW: Chart control for agent
 
     return registry, strategy_store, result_store

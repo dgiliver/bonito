@@ -9,6 +9,53 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+---
+
+## [0.9.0] - 2025-12-11 - Agent Chart Control (Phase 3)
+
+### Added
+- **Phase 3: Agent Chart Control** - Agent can now manipulate the chart during conversation!
+  - `ChartControlTool` - New agent tool for chart manipulation
+  - **Add Indicators**: "Add RSI" → RSI(14) appears on chart
+  - **Annotations**: "See this candle" → Arrow points to specific bar
+  - **Highlights**: "The drawdown period" → Region gets highlighted
+  - **Navigate**: "Look at January" → Chart pans to time range
+  - **Clear**: "Clear the chart" → Removes all overlays
+- **Indicator Overlays**: SMA, EMA, RSI, Bollinger Bands calculated and rendered
+- **24 new tests** for ChartControlTool covering all actions
+- **Trade Spotlight**: Selected trade now highlighted with gold markers and auto-zoom
+
+### Technical Design
+```
+┌─────────────┐                    ┌─────────────┐
+│    Agent    │◄──── Context ──────│    Chart    │
+│             │───── Intents ─────►│             │
+└─────────────┘                    └─────────────┘
+
+User: "Add RSI to help me understand oversold"
+Agent: [calls chart_control(add_indicator, rsi, {period: 14})]
+Chart: RSI(14) panel appears
+Agent: "I've added RSI(14). See how entries align with RSI < 30?"
+```
+
+### How to Use
+The agent now responds to visual requests naturally:
+- "Add an SMA to the chart" → SMA overlay appears
+- "Highlight March to April" → Region highlighted
+- "Point to the entry signal" → Arrow annotation
+- "Clear everything" → All overlays removed
+
+### Vision Progress
+1. ✅ Context Bridge - Agent knows chart state
+2. ✅ Trade Visualization - Trades on chart
+3. ✅ **Agent Chart Control** - Agent manipulates chart ← NEW
+4. 🔜 Interactive Analysis - Click anywhere → agent explains
+5. 🔜 Visual Strategy Building - Draw → agent interprets
+
+---
+
+## [0.8.1] - 2025-12-11 - UI Polish
+
 ### Added
 - **Quick Action Buttons** in chat panel: Save Strategy, View Trades, Clear Chart, New Chat
 - **Trade Navigation** in Trade Details panel: prev/next buttons to browse all trades

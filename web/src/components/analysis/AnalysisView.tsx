@@ -62,7 +62,7 @@ interface Message {
 // ============================================================================
 
 function ChatPanel() {
-  const { state, getChartContext, dispatch } = useAnalysis();
+  const { state, getChartContext, dispatch, addAgentIntent } = useAnalysis();
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState("");
   const [isLoading, setIsLoading] = useState(false);
@@ -153,6 +153,30 @@ function ChatPanel() {
                     dispatch({ type: "SET_BACKTEST_RESULT", result });
                     // Note: Chart will show trades based on current visible data
                     // User can adjust range to see all trades
+                  }, 0);
+                }
+              }
+
+              // Handle chart_control tool results - dispatch intents to chart
+              if (
+                event.tool === "chart_control" &&
+                event.success &&
+                event.data
+              ) {
+                const toolData = event.data as {
+                  intent?: Record<string, unknown>;
+                  message?: string;
+                };
+                if (toolData.intent) {
+                  console.log(
+                    "[ChatPanel] Dispatching chart intent:",
+                    toolData.intent,
+                  );
+                  // Defer to avoid "cannot update during render" error
+                  setTimeout(() => {
+                    addAgentIntent(
+                      toolData.intent as Parameters<typeof addAgentIntent>[0],
+                    );
                   }, 0);
                 }
               }
