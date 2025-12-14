@@ -52,7 +52,9 @@ class ErrorEvent:
 AgentEvent = ThinkingEvent | ToolCallEvent | ToolResultEvent | ResponseEvent | ErrorEvent
 
 
-SYSTEM_PROMPT = """You are a quantitative trading assistant. You help users design, backtest, and refine algorithmic trading strategies.
+_SYSTEM_PROMPT_BASE = """You are a quantitative trading assistant. You help users design, backtest, and refine algorithmic trading strategies.
+
+**Current Date: {CURRENT_DATE_PLACEHOLDER}** - Use this year when users reference dates without a year.
 
 You are integrated with an interactive chart. You can SEE what the user is viewing and CONTROL the chart to explain your analysis visually.
 
@@ -165,7 +167,23 @@ If the user's message includes context like "[Viewing SPY 1d]", USE that context
 
 ## Chart Control (Visual Teaching)
 
-You can manipulate the chart to teach visually! Use the `chart_control` tool:
+You can manipulate the chart to teach visually! Use the `chart_control` tool.
+
+### Indicator Display Architecture
+
+The chart uses a **multi-panel architecture** for clarity:
+
+**Overlay Indicators** (on the price chart, share price scale):
+- SMA, EMA, Bollinger Bands, VWAP
+- Values shown in top-left legend with OHLCV
+
+**Panel Indicators** (separate charts below price, own scales):
+- RSI (0-100 scale, threshold lines at 30/70)
+- MACD (auto-scaled, shows MACD line + Signal line + Histogram)
+- Stochastic (0-100 scale, shows %K and %D lines)
+- ADX, ATR (auto-scaled)
+
+Each panel has its **own right-side scale** showing correct values (e.g., RSI shows 0-100, not price).
 
 ### Add Indicators
 Show indicators to explain your analysis:
@@ -228,7 +246,13 @@ class AgentOrchestrator:
         self.llm = llm
         self.tools = tools
         self.max_iterations = max_iterations
-        self.messages: list[Message] = [Message(role="system", content=SYSTEM_PROMPT)]
+
+        # Format system prompt with current date
+        from datetime import datetime
+
+        current_date = datetime.now().strftime("%Y-%m-%d")
+        system_prompt = _SYSTEM_PROMPT_BASE.replace("{CURRENT_DATE_PLACEHOLDER}", current_date)
+        self.messages: list[Message] = [Message(role="system", content=system_prompt)]
         self._last_successful_results: list[dict] = []  # Track successful tool results
 
     async def process(self, user_message: str) -> AsyncIterator[AgentEvent]:
@@ -356,7 +380,11 @@ class AgentOrchestrator:
 
     def reset(self) -> None:
         """Reset conversation history (keep system prompt)."""
-        self.messages = [Message(role="system", content=SYSTEM_PROMPT)]
+        from datetime import datetime
+
+        current_date = datetime.now().strftime("%Y-%m-%d")
+        system_prompt = _SYSTEM_PROMPT_BASE.replace("{CURRENT_DATE_PLACEHOLDER}", current_date)
+        self.messages = [Message(role="system", content=system_prompt)]
         self._last_successful_results = []
 
     def get_context_summary(self) -> dict[str, Any]:

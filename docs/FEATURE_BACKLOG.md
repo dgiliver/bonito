@@ -627,6 +627,281 @@ Backend (FastAPI):
 
 ---
 
+### F026: Chart Legend Panel (Robinhood Pro Style)
+**Status**: Planned
+**Effort**: 2-3 days
+**Value**: High - Professional UX, critical for agent-chart integration
+
+A sidebar legend panel showing all active indicators and tickers with interactive controls.
+
+**Features:**
+- **Per-Indicator Controls:**
+  - 👁️ Hide/Show toggle (visibility)
+  - 🗑️ Delete button (remove from chart)
+  - ⚙️ Settings button (opens config modal)
+  - Color swatch indicator
+  - Drag to reorder
+
+- **Per-Ticker Controls:**
+  - Symbol display with current price
+  - Hide/Show price line
+  - Settings (interval, chart type)
+
+- **Settings Modal Per Indicator:**
+  - Period/length adjustment
+  - Color picker
+  - Line style (solid, dashed, dotted)
+  - Line width
+  - Indicator-specific params (e.g., std dev for BBands)
+
+**Implementation:**
+```typescript
+interface LegendItem {
+  id: string;
+  type: 'indicator' | 'ticker';
+  name: string;         // "SMA(50)" or "AAPL"
+  color: string;
+  visible: boolean;
+  params: Record<string, number | string>;
+}
+
+// Legend dispatches intents that agent can also use
+dispatch({ type: "TOGGLE_INDICATOR", name: "SMA(50)" });
+dispatch({ type: "UPDATE_INDICATOR_PARAMS", name: "RSI(14)", params: { period: 21 } });
+```
+
+**Agent Integration:**
+- Agent can query: "What indicators are active?"
+- Agent can control: "Hide the RSI" / "Change SMA to 100 period"
+- All legend actions emit `ChartIntent` for bidirectional sync
+
+**UI Layout:**
+```
+┌─────────────────────────────────────────────────────┐
+│ CHART                          │ LEGEND            │
+│                                │ ─────────────────  │
+│                                │ 📊 SPY   $688.85  │
+│                                │    ○ Hide ⚙️      │
+│  [candlesticks + overlays]     │ ─────────────────  │
+│                                │ 📈 SMA(50)        │
+│                                │    ○ 👁️ 🗑️ ⚙️    │
+│                                │ 📈 BB(20)         │
+│                                │    ○ 👁️ 🗑️ ⚙️    │
+│                                │ 📉 RSI(14)        │
+│                                │    ○ 👁️ 🗑️ ⚙️    │
+└─────────────────────────────────────────────────────┘
+```
+
+---
+
+### F027: Bollinger Bands Fill/Area Highlighting
+**Status**: Planned
+**Effort**: 0.5 day
+**Value**: Medium - Visual polish, better readability
+
+Add semi-transparent fill between Bollinger Band upper and lower lines.
+
+**Implementation:**
+- Use Lightweight Charts `addAreaSeries()` for the fill
+- Render as: upper line → fill → middle line → lower line
+- Default fill color: `rgba(33, 150, 243, 0.1)` (light blue)
+- Configurable via Legend settings
+
+**Code approach:**
+```typescript
+// Create filled area between upper and lower bands
+const bbFillSeries = chart.addAreaSeries({
+  topColor: 'rgba(33, 150, 243, 0.15)',
+  bottomColor: 'rgba(33, 150, 243, 0.05)',
+  lineWidth: 0,
+  priceScaleId: 'right',
+});
+
+// Set data as midpoint with upper/lower as fill boundaries
+bbFillSeries.setData(bbData.map(d => ({
+  time: d.time,
+  value: d.upper,
+  // Custom rendering for filled bands
+})));
+```
+
+**Alternative:** Use custom series renderer or overlay two area series back-to-back.
+
+---
+
+### F028: Universal Indicator Threshold Zones & Enhanced Tooltips
+**Status**: In Progress (Crosshair fixed, threshold zones partial)
+**Effort**: 1-2 days
+**Value**: High - Critical for understanding strategy signals
+
+Extend threshold zones and tooltips to ALL indicators, not just RSI.
+
+**Threshold Zones by Indicator:**
+- **RSI**: 30 (oversold) / 70 (overbought) - ✅ Implemented
+- **Stochastic**: 20 (oversold) / 80 (overbought)
+- **MACD**: 0 line (bullish/bearish crossover)
+- **ADX**: 25 line (trend strength threshold)
+- **Bollinger Bands**: %B = 0 (lower) / 1 (upper) zones
+- **CCI**: -100 (oversold) / +100 (overbought)
+- **Williams %R**: -20 (overbought) / -80 (oversold)
+
+**Enhanced Crosshair Tooltip:**
+- ✅ Shows ALL active indicator values (not just RSI)
+- Color-coded based on thresholds (red/green for overbought/oversold)
+- Scrollable for many indicators
+- Shows indicator name + current value + threshold status
+
+**Implementation:**
+```typescript
+interface IndicatorThresholds {
+  rsi: { oversold: 30; overbought: 70 };
+  stoch: { oversold: 20; overbought: 80 };
+  macd: { zero: 0 };
+  adx: { trend: 25 };
+  // ... etc
+}
+
+// Auto-add threshold lines when indicator is added
+function addThresholdLines(chart, indicatorType, thresholds) {
+  // Create horizontal lines at threshold values
+  // Use same price scale as indicator
+}
+```
+
+---
+
+### F029: Strategy Builder Interface (Super User Mode)
+**Status**: Planned
+**Effort**: 5-7 days
+**Value**: Very High - Enables power users to build complex strategies visually
+
+A comprehensive visual interface for building, testing, and refining compound strategies with multiple indicators and filters.
+
+**Core Features:**
+
+1. **Visual Strategy Builder Panel:**
+   ```
+   ┌─────────────────────────────────────────────┐
+   │ Strategy Builder                             │
+   ├─────────────────────────────────────────────┤
+   │ Entry Conditions:                            │
+   │ ┌─────────────────────────────────────────┐ │
+   │ │ [RSI < 30] AND [Price > SMA(50)]        │ │
+   │ │     + Add Condition                      │ │
+   │ └─────────────────────────────────────────┘ │
+   │                                             │
+   │ Exit Conditions:                            │
+   │ ┌─────────────────────────────────────────┐ │
+   │ │ [RSI > 70] OR [Stop Loss: -5%]          │ │
+   │ │     + Add Condition                      │ │
+   │ └─────────────────────────────────────────┘ │
+   │                                             │
+   │ Filters:                                    │
+   │ ┌─────────────────────────────────────────┐ │
+   │ │ ☑ ADX > 25 (trending only)              │ │
+   │ │ ☐ Volume > 1.5x average                  │ │
+   │ │ ☐ Avoid earnings week                   │ │
+   │ └─────────────────────────────────────────┘ │
+   │                                             │
+   │ [Test Strategy] [Save] [Export JSON]       │
+   └─────────────────────────────────────────────┘
+   ```
+
+2. **Indicator Library Browser:**
+   - Searchable list of all 130+ pandas-ta indicators
+   - Grouped by category (Trend, Momentum, Volatility, Volume)
+   - Click to add to chart + strategy
+   - Shows indicator description, parameters, typical use cases
+
+3. **Live Strategy Preview:**
+   - As you build conditions, show potential signals on chart
+   - Highlight bars where conditions would trigger
+   - Show entry/exit markers in real-time
+   - "Dry run" mode: see signals without running full backtest
+
+4. **Compound Strategy Templates:**
+   - Pre-built templates: "Golden Cross + RSI", "Bollinger Squeeze", etc.
+   - One-click apply with customization
+   - Community templates (future)
+
+5. **Strategy Comparison:**
+   - Side-by-side comparison of strategy variants
+   - A/B test different parameter sets
+   - Visual diff of conditions
+
+**Technical Implementation:**
+
+```typescript
+interface StrategyBuilderState {
+  entryRules: Condition[];
+  exitRules: Condition[];
+  filters: Filter[];
+  positionSizing: PositionSizingConfig;
+  stopLoss: StopLossConfig;
+  takeProfit: TakeProfitConfig;
+}
+
+interface Condition {
+  id: string;
+  left: string;           // "rsi", "close", "sma_20", etc.
+  comparison: "gt" | "lt" | "gte" | "lte" | "eq" | "crosses_above" | "crosses_below";
+  right: number | string; // 30 or "sma_50"
+  logic: "AND" | "OR";    // How to combine with next condition
+}
+
+// Visual condition builder
+<ConditionBuilder
+  availableIndicators={allIndicators}
+  onAdd={(condition) => dispatch({ type: "ADD_CONDITION", condition })}
+  onRemove={(id) => dispatch({ type: "REMOVE_CONDITION", id })}
+/>
+```
+
+**UI Layout Options:**
+
+**Option A: Side Panel (Recommended)**
+- Expandable sidebar on right side of chart
+- Collapsible sections for Entry/Exit/Filters
+- Doesn't obstruct chart view
+- Can dock/undock
+
+**Option B: Modal/Overlay**
+- Full-screen modal for focused strategy building
+- Better for complex strategies
+- Can minimize to sidebar
+
+**Option C: Bottom Panel**
+- Slides up from bottom
+- Good for mobile
+- Less screen real estate
+
+**Agent Integration:**
+- Agent can read current strategy builder state
+- Agent can suggest improvements: "Add ADX filter to avoid choppy markets"
+- Agent can explain why conditions aren't triggering
+- Bidirectional: User builds → Agent explains, Agent suggests → User applies
+
+**Workflow:**
+1. User opens Strategy Builder
+2. Adds indicators to chart (visual reference)
+3. Builds entry/exit conditions visually
+4. Adds filters (ADX, volume, etc.)
+5. Clicks "Test Strategy" → Quick backtest with results
+6. Refines based on results
+7. Saves strategy → Available in Strategies page
+
+**Requirements:**
+- [ ] Visual condition builder (drag-drop or form-based)
+- [ ] Indicator autocomplete/search
+- [ ] Live preview of signals on chart
+- [ ] Parameter sliders for quick tuning
+- [ ] Strategy templates library
+- [ ] Export/import JSON
+- [ ] Agent integration hooks
+- [ ] Mobile-responsive layout
+
+---
+
 ## 🟡 Medium Priority (Post-MVP Phase 2)
 
 ### F004: Sandboxed Python Execution

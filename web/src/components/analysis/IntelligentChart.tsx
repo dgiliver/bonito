@@ -35,6 +35,8 @@ import {
   Trade,
   ChartEvent as AnalysisChartEvent,
 } from "@/contexts/AnalysisContext";
+import { IndicatorRegistry } from "./indicators/registry/IndicatorRegistry";
+import "./indicators/registry/registerIndicators"; // Auto-register indicators
 
 // ============================================================================
 // Types
@@ -91,136 +93,8 @@ const INDICATOR_COLORS = {
 };
 
 // ============================================================================
-// Indicator Calculations
+// Indicator Calculations - Now handled by indicator classes
 // ============================================================================
-
-interface IndicatorData {
-  time: Time;
-  value: number;
-}
-
-function calculateSMA(
-  data: CandlestickData<Time>[],
-  period: number,
-): IndicatorData[] {
-  const result: IndicatorData[] = [];
-  for (let i = period - 1; i < data.length; i++) {
-    let sum = 0;
-    for (let j = 0; j < period; j++) {
-      sum += data[i - j].close;
-    }
-    result.push({ time: data[i].time, value: sum / period });
-  }
-  return result;
-}
-
-function calculateEMA(
-  data: CandlestickData<Time>[],
-  period: number,
-): IndicatorData[] {
-  const result: IndicatorData[] = [];
-  const multiplier = 2 / (period + 1);
-
-  // Start with SMA for first value
-  let sum = 0;
-  for (let i = 0; i < period; i++) {
-    sum += data[i].close;
-  }
-  let ema = sum / period;
-  result.push({ time: data[period - 1].time, value: ema });
-
-  // Calculate EMA for remaining values
-  for (let i = period; i < data.length; i++) {
-    ema = (data[i].close - ema) * multiplier + ema;
-    result.push({ time: data[i].time, value: ema });
-  }
-  return result;
-}
-
-function calculateRSI(
-  data: CandlestickData<Time>[],
-  period: number,
-): IndicatorData[] {
-  const result: IndicatorData[] = [];
-
-  if (data.length < period + 1) return result;
-
-  // Calculate price changes
-  const changes: number[] = [];
-  for (let i = 1; i < data.length; i++) {
-    changes.push(data[i].close - data[i - 1].close);
-  }
-
-  // Initial average gains and losses
-  let avgGain = 0;
-  let avgLoss = 0;
-  for (let i = 0; i < period; i++) {
-    if (changes[i] > 0) avgGain += changes[i];
-    else avgLoss -= changes[i];
-  }
-  avgGain /= period;
-  avgLoss /= period;
-
-  // Calculate RSI
-  for (let i = period; i < changes.length; i++) {
-    const change = changes[i];
-    if (change > 0) {
-      avgGain = (avgGain * (period - 1) + change) / period;
-      avgLoss = (avgLoss * (period - 1)) / period;
-    } else {
-      avgGain = (avgGain * (period - 1)) / period;
-      avgLoss = (avgLoss * (period - 1) - change) / period;
-    }
-
-    const rs = avgLoss === 0 ? 100 : avgGain / avgLoss;
-    const rsi = 100 - 100 / (1 + rs);
-    result.push({ time: data[i + 1].time, value: rsi });
-  }
-
-  return result;
-}
-
-interface BollingerData {
-  time: Time;
-  upper: number;
-  middle: number;
-  lower: number;
-}
-
-function calculateBollingerBands(
-  data: CandlestickData<Time>[],
-  period: number,
-  stdDev: number,
-): BollingerData[] {
-  const result: BollingerData[] = [];
-
-  for (let i = period - 1; i < data.length; i++) {
-    let sum = 0;
-    const prices: number[] = [];
-    for (let j = 0; j < period; j++) {
-      const price = data[i - j].close;
-      sum += price;
-      prices.push(price);
-    }
-    const middle = sum / period;
-
-    // Standard deviation
-    let variance = 0;
-    for (const price of prices) {
-      variance += Math.pow(price - middle, 2);
-    }
-    const std = Math.sqrt(variance / period);
-
-    result.push({
-      time: data[i].time,
-      upper: middle + stdDev * std,
-      middle,
-      lower: middle - stdDev * std,
-    });
-  }
-
-  return result;
-}
 
 // ============================================================================
 // Trade Markers
@@ -342,11 +216,25 @@ export default function IntelligentChart() {
   // Ref to track pendingZoom for use in fetchData (avoids stale closure)
   const pendingZoomRef = useRef<{ start: number; end: number } | null>(null);
   const lastBacktestId = useRef<string | null>(null);
+  // Ref to track candleData for auto-range callback (avoids stale closure)
+  const candleDataRef = useRef<CandlestickData<Time>[]>([]);
+  // Ref to store volume data for crosshair lookup
+  const volumeDataRef = useRef<Map<number, number>>(new Map());
+  // Ref to track current range for auto-range callback
+  const currentRangeRef = useRef<string>("1Y");
 
-  // Keep ref in sync with state
+  // Keep refs in sync with state
   useEffect(() => {
     pendingZoomRef.current = pendingZoom;
   }, [pendingZoom]);
+
+  useEffect(() => {
+    candleDataRef.current = candleData;
+  }, [candleData]);
+
+  useEffect(() => {
+    currentRangeRef.current = range;
+  }, [range]);
 
   // Chart refs
   const chartContainerRef = useRef<HTMLDivElement>(null);
@@ -354,10 +242,24 @@ export default function IntelligentChart() {
   const candleSeriesRef = useRef<ISeriesApi<"Candlestick"> | null>(null);
   const volumeSeriesRef = useRef<ISeriesApi<"Histogram"> | null>(null);
   const markersPluginRef = useRef<ISeriesMarkersPluginApi<Time> | null>(null);
+  const rsiValueOverlayRef = useRef<HTMLDivElement | null>(null);
 
-  // Indicator series refs (dynamically created/removed)
-  const indicatorSeriesRef = useRef<Map<string, ISeriesApi<"Line">>>(new Map());
-  const rsiPaneRef = useRef<ISeriesApi<"Line"> | null>(null);
+  // Indicator registry - manages all indicators
+  const indicatorRegistryRef = useRef<IndicatorRegistry>(
+    new IndicatorRegistry(),
+  );
+
+  // Crosshair tooltip state - dynamic for all indicators
+  const [crosshairData, setCrosshairData] = useState<{
+    time: string;
+    timestamp: number; // Unix timestamp for time-based lookups
+    price: number | null; // Price at crosshair Y position (for right-side display)
+    ohlc: { open: number; high: number; low: number; close: number } | null; // OHLC at crosshair X position (time)
+    volume: number | null; // Volume at crosshair X position (time)
+    indicators: Record<string, number | null>; // indicator name -> value at crosshair X position (time)
+    activePanel: string | null; // Which panel is currently hovered (e.g., "RSI(14)" or "price")
+    activePanelYValue: number | null; // Y-axis value at crosshair position for active panel (for right-side display)
+  } | null>(null);
 
   // Derived values
   const { symbol, interval } = state.chart;
@@ -404,23 +306,17 @@ export default function IntelligentChart() {
         );
         candleSeriesRef.current.setData(candles);
         setCandleData(candles);
-        console.log("[Chart] Loaded candles:", {
-          count: candles.length,
-          firstTime: candles[0]?.time,
-          firstDate: candles[0]?.time
-            ? new Date((candles[0].time as number) * 1000).toISOString()
-            : null,
-          lastTime: candles[candles.length - 1]?.time,
-          lastDate: candles[candles.length - 1]?.time
-            ? new Date(
-                (candles[candles.length - 1].time as number) * 1000,
-              ).toISOString()
-            : null,
-        });
         // Trade markers are updated in a separate effect when trades change
       }
 
       if (volumeSeriesRef.current && data.bars) {
+        // Build volume lookup map for crosshair
+        const volumeMap = new Map<number, number>();
+        data.bars.forEach((bar: OHLCVBar) => {
+          volumeMap.set(bar.time, bar.volume);
+        });
+        volumeDataRef.current = volumeMap;
+
         const volumeData: HistogramData<Time>[] = data.bars.map(
           (bar: OHLCVBar) => ({
             time: bar.time as Time,
@@ -435,11 +331,8 @@ export default function IntelligentChart() {
       }
 
       // Only fit content if no pending zoom (backtest will apply its own zoom)
-      // Use ref to get current value (avoids stale closure)
       if (!pendingZoomRef.current) {
         chartRef.current?.timeScale().fitContent();
-      } else {
-        console.log("[Chart] Skipping fitContent - pending zoom exists");
       }
     } catch (err) {
       console.error("Failed to fetch chart data:", err);
@@ -481,11 +374,15 @@ export default function IntelligentChart() {
         horzLines: { color: "rgba(255, 255, 255, 0.05)" },
       },
       crosshair: {
+        mode: 0, // CrosshairMode.Normal - free-moving crosshair (not snapped to candles)
         vertLine: { color: "#d4a574", labelBackgroundColor: "#2a2a2a" },
         horzLine: { color: "#d4a574", labelBackgroundColor: "#2a2a2a" },
       },
       rightPriceScale: {
         borderColor: "rgba(255, 255, 255, 0.1)",
+      },
+      leftPriceScale: {
+        visible: false, // Not used - panel indicators use their own priceScaleId on the right
       },
       timeScale: {
         borderColor: "rgba(255, 255, 255, 0.1)",
@@ -503,25 +400,94 @@ export default function IntelligentChart() {
       borderDownColor: "#ef4444",
       wickUpColor: "#22c55e",
       wickDownColor: "#ef4444",
+      priceScaleId: "right", // Explicitly set price scale ID for price chart
+      lastValueVisible: true, // Show price on right side (Robinhood style)
     });
-    candleSeries.priceScale().applyOptions({
-      scaleMargins: { top: 0.05, bottom: 0.25 },
+    const priceScale = candleSeries.priceScale();
+    priceScale.applyOptions({
+      scaleMargins: { top: 0.05, bottom: 0.15 }, // Price chart uses most of its panel
+      borderVisible: true, // Show border to clearly separate scales (Robinhood style)
+      borderColor: "rgba(255, 255, 255, 0.1)", // Subtle border
+      entireTextOnly: false, // Show all scale labels
+      autoScale: true, // Auto-scale based on visible data
+      visible: true, // Ensure price scale is visible by default
     });
+    // #region agent log
+    const initialPriceScaleOptions = priceScale.options();
+    fetch("http://127.0.0.1:7242/ingest/3d78da6f-49c7-481a-bafb-b1cb31305326", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        location: "IntelligentChart.tsx:401",
+        message: "Price scale INITIAL configuration",
+        data: {
+          priceScaleId: "right",
+          scaleMargins: initialPriceScaleOptions.scaleMargins,
+          autoScale: initialPriceScaleOptions.autoScale,
+          visible: initialPriceScaleOptions.visible,
+          borderVisible: initialPriceScaleOptions.borderVisible,
+        },
+        timestamp: Date.now(),
+        sessionId: "debug-session",
+        hypothesisId: "H1",
+      }),
+    }).catch(() => {});
+    // #endregion
     candleSeriesRef.current = candleSeries;
 
     // Create markers plugin for trade visualization
     const markersPlugin = createSeriesMarkers(candleSeries, []);
     markersPluginRef.current = markersPlugin;
 
-    // Volume series
+    // Volume series - separate price scale to avoid affecting price chart scale
+    // Volume values (millions) would break price scale (hundreds) if shared
+    // #region agent log
+    fetch("http://127.0.0.1:7242/ingest/3d78da6f-49c7-481a-bafb-b1cb31305326", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        location: "IntelligentChart.tsx:398",
+        message: "Creating volume series",
+        data: { priceScaleId: "volume" },
+        timestamp: Date.now(),
+        sessionId: "debug-session",
+        hypothesisId: "H1",
+      }),
+    }).catch(() => {});
+    // #endregion
     const volumeSeries = chart.addSeries(HistogramSeries, {
       priceFormat: { type: "volume" },
-      priceScaleId: "volume",
+      priceScaleId: "volume", // Separate price scale for volume - creates middle panel
+      title: "", // No title widget - volume shown in top-left legend only
+      lastValueVisible: false, // Hide automatic last value - shown in top-left legend
     });
+    // Initial margins - will be adjusted dynamically when panels are added
     volumeSeries.priceScale().applyOptions({
-      scaleMargins: { top: 0.85, bottom: 0 },
+      scaleMargins: { top: 0.85, bottom: 0 }, // Volume - will adjust based on panels
+      borderVisible: true, // Show border to clearly separate scales (Robinhood style)
+      borderColor: "rgba(255, 255, 255, 0.1)", // Subtle border
+      entireTextOnly: false, // Show all scale labels
+      autoScale: true, // Auto-scale based on visible data
     });
     volumeSeriesRef.current = volumeSeries;
+
+    // #region agent log
+    fetch("http://127.0.0.1:7242/ingest/3d78da6f-49c7-481a-bafb-b1cb31305326", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        location: "IntelligentChart.tsx:404",
+        message: "Volume series created",
+        data: {
+          priceScaleId: "volume",
+          hasVolumeSeries: !!volumeSeriesRef.current,
+        },
+        timestamp: Date.now(),
+        sessionId: "debug-session",
+        hypothesisId: "H3",
+      }),
+    }).catch(() => {});
+    // #endregion
 
     // Handle click events
     chart.subscribeClick((param) => {
@@ -555,16 +521,650 @@ export default function IntelligentChart() {
       emitChartEvent(event);
     });
 
-    // Handle visible range change
-    chart.timeScale().subscribeVisibleTimeRangeChange((range) => {
-      if (range) {
+    // Handle crosshair move - Robinhood-style free-moving crosshair
+    // The cursor IS the crosshair, showing Y-axis value on right and time-based data in top-left
+    let lastCrosshairUpdate = 0;
+    chart.subscribeCrosshairMove((param) => {
+      // Throttle updates to max 30fps (33ms)
+      const now = Date.now();
+      if (now - lastCrosshairUpdate < 33) return;
+      lastCrosshairUpdate = now;
+
+      if (!param.point) {
+        setCrosshairData(null);
+        return;
+      }
+
+      const registry = indicatorRegistryRef.current;
+      const yCoord = param.point.y;
+      const time = param.time as number | undefined;
+      const dateStr = time ? new Date(time * 1000).toLocaleDateString() : "";
+
+      // Helper to find closest candle at timestamp
+      const findCandleAtTime = (
+        targetTime: number,
+      ): CandlestickData<Time> | null => {
+        if (candleDataRef.current.length === 0) return null;
+        let closest = candleDataRef.current[0];
+        let minDiff = Math.abs(
+          (candleDataRef.current[0].time as number) - targetTime,
+        );
+        for (const candle of candleDataRef.current) {
+          const diff = Math.abs((candle.time as number) - targetTime);
+          if (diff < minDiff) {
+            minDiff = diff;
+            closest = candle;
+          }
+        }
+        return minDiff < 86400 ? closest : null;
+      };
+
+      // Detect which panel the Y coordinate is in
+      // Use chart height and scaleMargins to determine panel boundaries
+      const chartHeight = chartRef.current?.chartElement().clientHeight || 0;
+      const yPercent = (yCoord / chartHeight) * 100;
+
+      let activePanel: string | null = null;
+      let activePanelYValue: number | null = null;
+
+      // Check panel indicators first (they're at the bottom)
+      // Use coordinateToPrice to detect which panel the Y coordinate is in
+      // This is more accurate than using hardcoded percentages
+      const panelIndicators = registry.getPanelIndicators();
+      for (const panelIndicator of panelIndicators) {
+        if (!panelIndicator.isVisible()) continue;
+        const priceScaleId = (panelIndicator as any).getPriceScaleId?.();
+        if (!priceScaleId) continue;
+
+        // Try to get Y-axis value using coordinateToPrice
+        // If this succeeds, we're in this panel's coordinate space
+        const series = (panelIndicator as any).getSeries?.();
+        if (series && !(series instanceof Map)) {
+          try {
+            const panelYValue = (
+              series as ISeriesApi<"Line">
+            ).coordinateToPrice(yCoord);
+            // #region agent log
+            fetch(
+              "http://127.0.0.1:7242/ingest/3d78da6f-49c7-481a-bafb-b1cb31305326",
+              {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                  location: "IntelligentChart.tsx:520",
+                  message: "Panel detection - coordinateToPrice",
+                  data: {
+                    indicatorName: panelIndicator.getName(),
+                    priceScaleId,
+                    yCoord,
+                    yPercent,
+                    panelYValue,
+                    isValid: panelYValue !== null && !isNaN(panelYValue),
+                  },
+                  timestamp: Date.now(),
+                  sessionId: "debug-session",
+                  hypothesisId: "H3",
+                }),
+              },
+            ).catch(() => {});
+            // #endregion
+            if (panelYValue !== null && !isNaN(panelYValue)) {
+              // Successfully got a value - we're in this panel
+              activePanel = panelIndicator.getName();
+              activePanelYValue = panelYValue;
+              break;
+            }
+          } catch (e) {
+            // coordinateToPrice failed - not in this panel's coordinate space
+            // #region agent log
+            fetch(
+              "http://127.0.0.1:7242/ingest/3d78da6f-49c7-481a-bafb-b1cb31305326",
+              {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                  location: "IntelligentChart.tsx:530",
+                  message: "Panel detection - coordinateToPrice failed",
+                  data: {
+                    indicatorName: panelIndicator.getName(),
+                    priceScaleId,
+                    yCoord,
+                    yPercent,
+                    error: String(e),
+                  },
+                  timestamp: Date.now(),
+                  sessionId: "debug-session",
+                  hypothesisId: "H3",
+                }),
+              },
+            ).catch(() => {});
+            // #endregion
+          }
+        }
+      }
+
+      // If not in a panel indicator, we're in the price chart area
+      if (!activePanel) {
+        activePanel = "price";
+        // Get Y-axis price value at crosshair position
+        if (candleSeriesRef.current) {
+          try {
+            activePanelYValue =
+              candleSeriesRef.current.coordinateToPrice(yCoord);
+          } catch {
+            // Fallback: get close price at time
+            if (time) {
+              const candle = findCandleAtTime(time);
+              activePanelYValue = candle?.close || null;
+            }
+          }
+        }
+      }
+
+      // Get time-based data (OHLC, Volume, Indicator values) at crosshair X position
+      let ohlc: {
+        open: number;
+        high: number;
+        low: number;
+        close: number;
+      } | null = null;
+      let volumeValue: number | null = null;
+      const indicatorValues: Record<string, number | null> = {};
+
+      // Try to get time from param, or use closest candle if time is undefined
+      let effectiveTime = time;
+      if (!effectiveTime && candleDataRef.current.length > 0) {
+        // If no time (crosshair between candles), use the most recent candle's time for data lookup
+        const lastCandle =
+          candleDataRef.current[candleDataRef.current.length - 1];
+        effectiveTime = lastCandle.time as number;
+      }
+
+      if (effectiveTime) {
+        // Get OHLC from candle at this time
+        const candle = findCandleAtTime(effectiveTime);
+        if (
+          candle &&
+          "open" in candle &&
+          "high" in candle &&
+          "low" in candle &&
+          "close" in candle
+        ) {
+          ohlc = {
+            open: candle.open,
+            high: candle.high,
+            low: candle.low,
+            close: candle.close,
+          };
+
+          // Get volume from volume data ref
+          volumeValue = volumeDataRef.current.get(effectiveTime) || null;
+          // #region agent log
+          fetch(
+            "http://127.0.0.1:7242/ingest/3d78da6f-49c7-481a-bafb-b1cb31305326",
+            {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({
+                location: "IntelligentChart.tsx:590",
+                message: "Volume extraction",
+                data: {
+                  effectiveTime,
+                  volumeValue,
+                  hasVolumeData: volumeDataRef.current.size > 0,
+                },
+                timestamp: Date.now(),
+                sessionId: "debug-session",
+                hypothesisId: "H9",
+              }),
+            },
+          ).catch(() => {});
+          // #endregion
+        }
+
+        // Get indicator values at this time
+        const allIndicators = registry.getAllIndicators();
+        for (const indicator of allIndicators) {
+          if (!indicator.isVisible()) continue;
+          const indicatorName = indicator.getName();
+          indicatorValues[indicatorName] =
+            indicator.getCrosshairValue(effectiveTime);
+        }
+      }
+
+      // Control right-side value display based on active panel
+      // In Lightweight Charts, each unique priceScaleId creates its own scale on the right
+      // We need to ensure the correct scale is visible and shows its value
+      if (candleSeriesRef.current && chartRef.current) {
+        // #region agent log - BEFORE scale switching
+        const priceScaleBefore = candleSeriesRef.current.priceScale();
+        const priceScaleOptionsBefore = priceScaleBefore.options();
+        const allPanelScalesBefore: Record<string, any> = {};
+        for (const panelIndicator of panelIndicators) {
+          const panelPriceScaleId = (panelIndicator as any).getPriceScaleId?.();
+          if (panelPriceScaleId) {
+            try {
+              const panelScale = chartRef.current.priceScale(panelPriceScaleId);
+              allPanelScalesBefore[panelPriceScaleId] = panelScale.options();
+            } catch (e) {
+              allPanelScalesBefore[panelPriceScaleId] = { error: String(e) };
+            }
+          }
+        }
+        const logDataBefore = {
+          location: "IntelligentChart.tsx:621",
+          message: "Scale switching - BEFORE",
+          data: {
+            activePanel,
+            panelCount: panelIndicators.length,
+            priceScaleVisible: priceScaleOptionsBefore.visible,
+            priceScaleAutoScale: priceScaleOptionsBefore.autoScale,
+            panelScalesBefore: allPanelScalesBefore,
+          },
+          timestamp: Date.now(),
+          sessionId: "debug-session",
+          hypothesisId: "H1,H2",
+        };
+        console.log("[DEBUG]", logDataBefore);
+        fetch(
+          "http://127.0.0.1:7242/ingest/3d78da6f-49c7-481a-bafb-b1cb31305326",
+          {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(logDataBefore),
+          },
+        ).catch((e) => console.error("[DEBUG] Log fetch failed:", e));
+        // #endregion
+
+        if (activePanel === "price") {
+          // Hovering in price chart - show price value on right
+          // #region agent log
+          fetch(
+            "http://127.0.0.1:7242/ingest/3d78da6f-49c7-481a-bafb-b1cb31305326",
+            {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({
+                location: "IntelligentChart.tsx:612",
+                message: "Price panel active - setting series options",
+                data: { activePanel },
+                timestamp: Date.now(),
+                sessionId: "debug-session",
+                hypothesisId: "H1",
+              }),
+            },
+          ).catch(() => {});
+          // #endregion
+          candleSeriesRef.current.applyOptions({
+            lastValueVisible: true,
+          });
+
+          // Hide all panel indicator values and scales
+          for (const panelIndicator of panelIndicators) {
+            const series = (panelIndicator as any).getSeries?.();
+            if (series && !(series instanceof Map)) {
+              // #region agent log
+              fetch(
+                "http://127.0.0.1:7242/ingest/3d78da6f-49c7-481a-bafb-b1cb31305326",
+                {
+                  method: "POST",
+                  headers: { "Content-Type": "application/json" },
+                  body: JSON.stringify({
+                    location: "IntelligentChart.tsx:620",
+                    message: "Hiding panel indicator series",
+                    data: { indicatorName: panelIndicator.getName() },
+                    timestamp: Date.now(),
+                    sessionId: "debug-session",
+                    hypothesisId: "H1",
+                  }),
+                },
+              ).catch(() => {});
+              // #endregion
+              (series as ISeriesApi<"Line">).applyOptions({
+                lastValueVisible: false,
+              });
+            }
+
+            // DO NOT hide panel scales - this breaks the chart
+            // Just control lastValueVisible on the series
+          }
+
+          // #region agent log
+          fetch(
+            "http://127.0.0.1:7242/ingest/3d78da6f-49c7-481a-bafb-b1cb31305326",
+            {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({
+                location: "IntelligentChart.tsx:650",
+                message: "Price panel active - series visibility set",
+                data: { activePanel },
+                timestamp: Date.now(),
+                sessionId: "debug-session",
+                hypothesisId: "H8",
+              }),
+            },
+          ).catch(() => {});
+          // #endregion
+        } else {
+          // Hovering in a panel indicator - hide price value and scale
+          // #region agent log
+          fetch(
+            "http://127.0.0.1:7242/ingest/3d78da6f-49c7-481a-bafb-b1cb31305326",
+            {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({
+                location: "IntelligentChart.tsx:655",
+                message: "Panel indicator active - setting series options",
+                data: { activePanel },
+                timestamp: Date.now(),
+                sessionId: "debug-session",
+                hypothesisId: "H1",
+              }),
+            },
+          ).catch(() => {});
+          // #endregion
+          candleSeriesRef.current.applyOptions({
+            lastValueVisible: false, // Hide price value on right when in panel indicator area
+          });
+
+          // #region agent log
+          const logDataPriceScale = {
+            location: "IntelligentChart.tsx:687",
+            message: "Panel active - hiding price lastValue",
+            data: { activePanel },
+            timestamp: Date.now(),
+            sessionId: "debug-session",
+            hypothesisId: "H8",
+          };
+          console.log(
+            "[DEBUG] Panel Active - Hiding Price LastValue",
+            logDataPriceScale,
+          );
+          fetch(
+            "http://127.0.0.1:7242/ingest/3d78da6f-49c7-481a-bafb-b1cb31305326",
+            {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify(logDataPriceScale),
+            },
+          ).catch((e) => console.error("[DEBUG] Log fetch failed:", e));
+          // #endregion
+
+          // DO NOT hide scales - this breaks the chart
+          // Instead, just control lastValueVisible on series
+
+          // Show active panel indicator's value on right
+          const activeIndicator = registry.getIndicator(activePanel);
+          if (activeIndicator) {
+            const series = (activeIndicator as any).getSeries?.();
+            if (series && !(series instanceof Map)) {
+              // #region agent log
+              fetch(
+                "http://127.0.0.1:7242/ingest/3d78da6f-49c7-481a-bafb-b1cb31305326",
+                {
+                  method: "POST",
+                  headers: { "Content-Type": "application/json" },
+                  body: JSON.stringify({
+                    location: "IntelligentChart.tsx:703",
+                    message: "Showing panel indicator series",
+                    data: { activePanel, hasSeries: !!series },
+                    timestamp: Date.now(),
+                    sessionId: "debug-session",
+                    hypothesisId: "H1",
+                  }),
+                },
+              ).catch(() => {});
+              // #endregion
+              (series as ISeriesApi<"Line">).applyOptions({
+                lastValueVisible: true, // Show RSI value on right side
+              });
+
+              // Get the price scale for this panel indicator and ensure it's visible
+              const panelPriceScaleId = (
+                activeIndicator as any
+              ).getPriceScaleId?.();
+              if (panelPriceScaleId && chartRef.current) {
+                const panelPriceScale =
+                  chartRef.current.priceScale(panelPriceScaleId);
+                const panelScaleOptionsBeforeShow = panelPriceScale.options();
+                // #region agent log
+                fetch(
+                  "http://127.0.0.1:7242/ingest/3d78da6f-49c7-481a-bafb-b1cb31305326",
+                  {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({
+                      location: "IntelligentChart.tsx:715",
+                      message: "Showing panel scale - BEFORE",
+                      data: {
+                        panelPriceScaleId,
+                        visibleBefore: panelScaleOptionsBeforeShow.visible,
+                        autoScaleBefore: panelScaleOptionsBeforeShow.autoScale,
+                        scaleMarginsBefore:
+                          panelScaleOptionsBeforeShow.scaleMargins,
+                      },
+                      timestamp: Date.now(),
+                      sessionId: "debug-session",
+                      hypothesisId: "H1,H2",
+                    }),
+                  },
+                ).catch(() => {});
+                // #endregion
+
+                // Ensure panel scale is configured correctly - DO NOT toggle visibility
+                // The panel scale should auto-scale to its data range (0-100 for RSI)
+                panelPriceScale.applyOptions({
+                  autoScale: true, // Ensure autoScale is true for RSI (0-100 range)
+                  scaleMargins: { top: 0.8, bottom: 0 }, // No bottom margin - use full bottom 20%
+                });
+
+                const panelScaleOptionsAfterShow = panelPriceScale.options();
+                let scaleWidth = 0;
+                try {
+                  scaleWidth = panelPriceScale.width();
+                } catch (e) {
+                  // width() might not be available or might throw
+                }
+                // #region agent log
+                fetch(
+                  "http://127.0.0.1:7242/ingest/3d78da6f-49c7-481a-bafb-b1cb31305326",
+                  {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({
+                      location: "IntelligentChart.tsx:730",
+                      message: "Showing panel scale - AFTER",
+                      data: {
+                        panelPriceScaleId,
+                        visibleAfter: panelScaleOptionsAfterShow.visible,
+                        autoScaleAfter: panelScaleOptionsAfterShow.autoScale,
+                        scaleMarginsAfter:
+                          panelScaleOptionsAfterShow.scaleMargins,
+                        scaleWidth,
+                        borderVisible: panelScaleOptionsAfterShow.borderVisible,
+                      },
+                      timestamp: Date.now(),
+                      sessionId: "debug-session",
+                      hypothesisId: "H1,H2",
+                    }),
+                  },
+                ).catch(() => {});
+                // #endregion
+              } else {
+                // #region agent log
+                fetch(
+                  "http://127.0.0.1:7242/ingest/3d78da6f-49c7-481a-bafb-b1cb31305326",
+                  {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({
+                      location: "IntelligentChart.tsx:705",
+                      message: "Panel scale NOT FOUND",
+                      data: {
+                        activePanel,
+                        panelPriceScaleId,
+                        hasChart: !!chartRef.current,
+                      },
+                      timestamp: Date.now(),
+                      sessionId: "debug-session",
+                      hypothesisId: "H1",
+                    }),
+                  },
+                ).catch(() => {});
+                // #endregion
+              }
+            } else {
+              // #region agent log
+              fetch(
+                "http://127.0.0.1:7242/ingest/3d78da6f-49c7-481a-bafb-b1cb31305326",
+                {
+                  method: "POST",
+                  headers: { "Content-Type": "application/json" },
+                  body: JSON.stringify({
+                    location: "IntelligentChart.tsx:710",
+                    message: "Panel indicator series NOT FOUND",
+                    data: { activePanel, hasIndicator: !!activeIndicator },
+                    timestamp: Date.now(),
+                    sessionId: "debug-session",
+                    hypothesisId: "H1",
+                  }),
+                },
+              ).catch(() => {});
+              // #endregion
+            }
+          } else {
+            // #region agent log
+            fetch(
+              "http://127.0.0.1:7242/ingest/3d78da6f-49c7-481a-bafb-b1cb31305326",
+              {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                  location: "IntelligentChart.tsx:715",
+                  message: "Active indicator NOT FOUND in registry",
+                  data: {
+                    activePanel,
+                    registrySize: registry.getAllIndicators().length,
+                  },
+                  timestamp: Date.now(),
+                  sessionId: "debug-session",
+                  hypothesisId: "H1",
+                }),
+              },
+            ).catch(() => {});
+            // #endregion
+          }
+
+          // Hide other panel indicator values
+          for (const panelIndicator of panelIndicators) {
+            if (panelIndicator.getName() === activePanel) continue;
+            const series = (panelIndicator as any).getSeries?.();
+            if (series && !(series instanceof Map)) {
+              (series as ISeriesApi<"Line">).applyOptions({
+                lastValueVisible: false,
+              });
+            }
+          }
+        }
+
+        // #region agent log - AFTER scale switching
+        const priceScaleAfter = candleSeriesRef.current.priceScale();
+        const priceScaleOptionsAfter = priceScaleAfter.options();
+        const allPanelScalesAfter: Record<string, any> = {};
+        for (const panelIndicator of panelIndicators) {
+          const panelPriceScaleId = (panelIndicator as any).getPriceScaleId?.();
+          if (panelPriceScaleId) {
+            try {
+              const panelScale = chartRef.current.priceScale(panelPriceScaleId);
+              allPanelScalesAfter[panelPriceScaleId] = panelScale.options();
+            } catch (e) {
+              allPanelScalesAfter[panelPriceScaleId] = { error: String(e) };
+            }
+          }
+        }
+        const logDataAfter = {
+          location: "IntelligentChart.tsx:762",
+          message: "Scale switching - AFTER",
+          data: {
+            activePanel,
+            priceScaleVisible: priceScaleOptionsAfter.visible,
+            priceScaleAutoScale: priceScaleOptionsAfter.autoScale,
+            panelScalesAfter: allPanelScalesAfter,
+          },
+          timestamp: Date.now(),
+          sessionId: "debug-session",
+          hypothesisId: "H1,H2",
+        };
+        console.log("[DEBUG]", logDataAfter);
+        fetch(
+          "http://127.0.0.1:7242/ingest/3d78da6f-49c7-481a-bafb-b1cb31305326",
+          {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(logDataAfter),
+          },
+        ).catch((e) => console.error("[DEBUG] Log fetch failed:", e));
+        // #endregion
+      }
+
+      const crosshairPayload = {
+        time: dateStr,
+        timestamp: time || 0,
+        price: activePanelYValue, // Y-axis value at crosshair position (for right-side display)
+        ohlc, // OHLC at crosshair X position (time) - for top-left legend
+        volume: volumeValue, // Volume at crosshair X position (time) - for top-left legend
+        indicators: indicatorValues, // Indicator values at crosshair X position (time) - for top-left legend
+        activePanel, // Which panel is active
+        activePanelYValue, // Y-axis value for active panel (for right-side display)
+      };
+
+      setCrosshairData(crosshairPayload);
+    });
+
+    // Handle visible range change - auto-load more data when zooming out
+    let lastAutoRangeUpdate = 0;
+    chart.timeScale().subscribeVisibleTimeRangeChange((visibleRange) => {
+      if (visibleRange) {
         emitChartEvent({
           type: "range_change",
           visibleRange: {
-            start: range.from as number,
-            end: range.to as number,
+            start: visibleRange.from as number,
+            end: visibleRange.to as number,
           },
         });
+
+        // Auto-expand range when user zooms out past data boundaries
+        // Throttle to avoid rapid updates
+        const now = Date.now();
+        if (now - lastAutoRangeUpdate < 500) return; // Reduced throttle for debugging
+
+        // Use refs to get current data (avoids stale closure)
+        const currentData = candleDataRef.current;
+        if (!currentData || currentData.length === 0) return;
+
+        const dataStart = currentData[0]?.time as number;
+        if (!dataStart) return;
+
+        const visibleStart = visibleRange.from as number;
+
+        // If user is at the left edge of data, auto-load more history
+        if (visibleStart <= dataStart) {
+          lastAutoRangeUpdate = now;
+
+          const rangeOrder = ["1D", "1W", "1M", "3M", "YTD", "1Y", "5Y", "ALL"];
+          const currentRangeIndex = rangeOrder.indexOf(currentRangeRef.current);
+
+          if (currentRangeIndex < rangeOrder.length - 1) {
+            const newRange = rangeOrder[currentRangeIndex + 1];
+            window.dispatchEvent(
+              new CustomEvent("chart-auto-range", {
+                detail: { range: newRange },
+              }),
+            );
+          }
+        }
       }
     });
 
@@ -621,9 +1221,6 @@ export default function IntelligentChart() {
           candleData,
           selectedTrade?.id,
         );
-        console.log(
-          `[Chart] Creating ${markers.length} markers for ${trades.length} trades${selectedTrade ? ` (selected: ${selectedTrade.id})` : ""}`,
-        );
         markersPluginRef.current.setMarkers(markers);
       } else {
         markersPluginRef.current.setMarkers([]);
@@ -650,10 +1247,6 @@ export default function IntelligentChart() {
     const zoomStart = entryTs - padding;
     const zoomEnd = exitTs + padding;
 
-    console.log(
-      `[Chart] Zooming to selected trade: ${new Date(entryTs * 1000).toLocaleDateString()} - ${new Date(exitTs * 1000).toLocaleDateString()}`,
-    );
-
     requestAnimationFrame(() => {
       if (chartRef.current) {
         chartRef.current.timeScale().setVisibleRange({
@@ -668,147 +1261,425 @@ export default function IntelligentChart() {
   // Indicator Rendering
   // ============================================================================
 
-  // Render indicators when data or indicator config changes
+  // Render indicators when data or indicator config changes (Using Registry Pattern)
   useEffect(() => {
     if (!chartRef.current || candleData.length === 0) return;
 
     const chart = chartRef.current;
-    const indicators = state.chart.indicators;
+    const registry = indicatorRegistryRef.current;
 
-    // Track which indicators should exist
-    const activeIndicatorNames = new Set(
-      indicators.filter((i) => i.visible).map((i) => i.name),
-    );
+    // Small delay to ensure chart data is fully rendered
+    const timeoutId = setTimeout(() => {
+      if (!chartRef.current) return;
 
-    // Remove indicators that are no longer active
-    indicatorSeriesRef.current.forEach((series, name) => {
-      if (!activeIndicatorNames.has(name)) {
-        chart.removeSeries(series);
-        indicatorSeriesRef.current.delete(name);
+      // Use ref to get LATEST candleData (avoid stale closure)
+      const currentCandleData = candleDataRef.current;
+      if (currentCandleData.length === 0) return;
+
+      // Track which indicators should exist
+      const activeIndicatorNames = new Set(
+        state.chart.indicators.filter((i) => i.visible).map((i) => i.name),
+      );
+
+      // Remove indicators that are no longer active
+      const allIndicators = registry.getAllIndicators();
+      for (const indicator of allIndicators) {
+        if (!activeIndicatorNames.has(indicator.getName())) {
+          indicator.cleanup(chart);
+          registry.removeIndicator(indicator.getName());
+        }
       }
-    });
 
-    // Add/update active indicators
-    for (const indicator of indicators) {
-      if (!indicator.visible) continue;
+      // Add/update active indicators
+      for (const indicatorConfig of state.chart.indicators) {
+        if (!indicatorConfig.visible) continue;
 
-      const existingSeries = indicatorSeriesRef.current.get(indicator.name);
-      if (existingSeries) continue; // Already exists
+        let indicator = registry.getIndicator(indicatorConfig.name);
 
-      const indType = indicator.type.toLowerCase();
-      let lineData: LineData<Time>[] = [];
-      let color =
-        INDICATOR_COLORS[indType as keyof typeof INDICATOR_COLORS] || "#888";
+        if (!indicator) {
+          // Create new indicator
+          indicator = registry.addIndicator(indicatorConfig);
+          // #region agent log
+          fetch(
+            "http://127.0.0.1:7242/ingest/3d78da6f-49c7-481a-bafb-b1cb31305326",
+            {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({
+                location: "IntelligentChart.tsx:708",
+                message: "Creating indicator",
+                data: {
+                  type: indicatorConfig.type,
+                  name: indicatorConfig.name,
+                  created: !!indicator,
+                  isPanel: indicatorConfig.type.toLowerCase() === "rsi",
+                  hasGetPriceScaleId: indicator
+                    ? !!(indicator as any).getPriceScaleId
+                    : false,
+                  priceScaleId: indicator
+                    ? (indicator as any).getPriceScaleId?.()
+                    : "N/A",
+                },
+                timestamp: Date.now(),
+                sessionId: "debug-session",
+                hypothesisId: "H1,H5",
+              }),
+            },
+          ).catch(() => {});
+          // #endregion
+          if (!indicator) continue; // Failed to create (unregistered type)
 
-      // Calculate indicator data based on type
-      if (indType === "sma") {
-        const period = (indicator.params.period as number) || 20;
-        const smaData = calculateSMA(candleData, period);
-        lineData = smaData.map((d) => ({ time: d.time, value: d.value }));
-      } else if (indType === "ema") {
-        const period = (indicator.params.period as number) || 12;
-        const emaData = calculateEMA(candleData, period);
-        lineData = emaData.map((d) => ({ time: d.time, value: d.value }));
-      } else if (indType === "rsi") {
-        // RSI is rendered in a separate pane (handled separately)
-        const period = (indicator.params.period as number) || 14;
-        const rsiData = calculateRSI(candleData, period);
-
-        // Create RSI series if it doesn't exist
-        if (!rsiPaneRef.current) {
-          const rsiSeries = chart.addSeries(LineSeries, {
-            color: INDICATOR_COLORS.rsi,
-            lineWidth: 2,
-            priceScaleId: "rsi",
-            title: indicator.name,
-          });
-          rsiSeries.priceScale().applyOptions({
-            scaleMargins: { top: 0.8, bottom: 0 },
-            borderVisible: false,
-          });
-          rsiPaneRef.current = rsiSeries;
+          // Set candle data ref for Bollinger Bands (needs full candle data)
+          if (
+            indicatorConfig.type.toLowerCase() === "bbands" ||
+            indicatorConfig.type.toLowerCase() === "bollinger"
+          ) {
+            const bbIndicator = indicator as any;
+            if (bbIndicator.setCandleDataRef) {
+              bbIndicator.setCandleDataRef(candleDataRef);
+            }
+          }
         }
 
-        rsiPaneRef.current.setData(
-          rsiData.map((d) => ({ time: d.time, value: d.value })),
-        );
-        indicatorSeriesRef.current.set(
-          indicator.name,
-          rsiPaneRef.current as unknown as ISeriesApi<"Line">,
-        );
-        continue;
-      } else if (indType === "bbands") {
-        const period = (indicator.params.period as number) || 20;
-        const stdDev = (indicator.params.std_dev as number) || 2;
-        const bbData = calculateBollingerBands(candleData, period, stdDev);
+        // Calculate and render indicator
+        const calculatedData = indicator.calculate(currentCandleData);
+        indicator.updateData(calculatedData);
+        const priceScaleId = (indicator as any).getPriceScaleId?.() || "N/A";
 
-        // Upper band
-        const upperSeries = chart.addSeries(LineSeries, {
-          color: INDICATOR_COLORS.bbands_upper,
-          lineWidth: 1,
-          lineStyle: 2, // Dashed
-          priceScaleId: "right",
-        });
-        upperSeries.setData(
-          bbData.map((d) => ({ time: d.time, value: d.upper })),
-        );
-        indicatorSeriesRef.current.set(`${indicator.name}_upper`, upperSeries);
+        // Calculate data range for verification
+        const minValue =
+          calculatedData.length > 0
+            ? Math.min(...calculatedData.map((d) => d.value))
+            : null;
+        const maxValue =
+          calculatedData.length > 0
+            ? Math.max(...calculatedData.map((d) => d.value))
+            : null;
 
-        // Middle band (SMA)
-        const middleSeries = chart.addSeries(LineSeries, {
-          color: INDICATOR_COLORS.bbands_middle,
-          lineWidth: 1,
-          priceScaleId: "right",
-        });
-        middleSeries.setData(
-          bbData.map((d) => ({ time: d.time, value: d.middle })),
-        );
-        indicatorSeriesRef.current.set(
-          `${indicator.name}_middle`,
-          middleSeries,
-        );
+        // #region agent log
+        const logData1 = {
+          location: "IntelligentChart.tsx:1001",
+          message: "Rendering indicator - BEFORE",
+          data: {
+            name: indicatorConfig.name,
+            type: indicatorConfig.type,
+            dataPoints: calculatedData.length,
+            priceScaleId,
+            minValue,
+            maxValue,
+            firstValue: calculatedData[0]?.value,
+            lastValue: calculatedData[calculatedData.length - 1]?.value,
+            priceDataMin:
+              currentCandleData.length > 0
+                ? Math.min(...currentCandleData.map((d) => d.close))
+                : null,
+            priceDataMax:
+              currentCandleData.length > 0
+                ? Math.max(...currentCandleData.map((d) => d.close))
+                : null,
+          },
+          timestamp: Date.now(),
+          sessionId: "debug-session",
+          hypothesisId: "H2",
+        };
+        console.log("[DEBUG]", logData1);
+        fetch(
+          "http://127.0.0.1:7242/ingest/3d78da6f-49c7-481a-bafb-b1cb31305326",
+          {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(logData1),
+          },
+        ).catch((e) => console.error("[DEBUG] Log fetch failed:", e));
+        // #endregion
 
-        // Lower band
-        const lowerSeries = chart.addSeries(LineSeries, {
-          color: INDICATOR_COLORS.bbands_lower,
-          lineWidth: 1,
-          lineStyle: 2,
-          priceScaleId: "right",
-        });
-        lowerSeries.setData(
-          bbData.map((d) => ({ time: d.time, value: d.lower })),
-        );
-        indicatorSeriesRef.current.set(`${indicator.name}_lower`, lowerSeries);
-        continue;
-      } else if (indType === "vwap") {
-        // VWAP requires volume - approximate with typical price * volume cumulative
-        // For now, use a simple implementation
-        color = INDICATOR_COLORS.vwap;
-        // TODO: Proper VWAP calculation
-        continue;
+        indicator.render(chart, calculatedData);
+
+        // CRITICAL: After rendering a panel indicator, immediately configure scale visibility
+        // This ensures the correct scale is visible when the indicator is first added
+        const isPanelIndicator =
+          (indicator as any).getPriceScaleId &&
+          priceScaleId !== "right" &&
+          priceScaleId !== "N/A" &&
+          priceScaleId !== "volume";
+        if (isPanelIndicator && chartRef.current && candleSeriesRef.current) {
+          // #region agent log
+          console.log(
+            "[DEBUG] Panel indicator rendered, configuring initial scale visibility",
+            { indicatorName: indicatorConfig.name, priceScaleId },
+          );
+          // #endregion
+
+          // HYPOTHESIS: In Lightweight Charts, overlay scales (custom priceScaleIds) might need
+          // the base "right" scale to be visible to render properly. The overlay scale shares
+          // the same visual space as the right scale but shows different values.
+          // We'll keep the right scale visible but ensure the panel scale is configured correctly
+          const priceScale = candleSeriesRef.current.priceScale();
+          const priceScaleOptionsBefore = priceScale.options();
+          // #region agent log
+          const logData2 = {
+            location: "IntelligentChart.tsx:1015",
+            message: "Initial scale config after panel add - BEFORE",
+            data: {
+              indicatorName: indicatorConfig.name,
+              priceScaleId,
+              priceScaleVisible: priceScaleOptionsBefore.visible,
+              priceScaleAutoScale: priceScaleOptionsBefore.autoScale,
+            },
+            timestamp: Date.now(),
+            sessionId: "debug-session",
+            hypothesisId: "H1",
+          };
+          console.log("[DEBUG]", logData2);
+          fetch(
+            "http://127.0.0.1:7242/ingest/3d78da6f-49c7-481a-bafb-b1cb31305326",
+            {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify(logData2),
+            },
+          ).catch((e) => console.error("[DEBUG] Log fetch failed:", e));
+          // #endregion
+
+          // Keep price scale visible - overlay scales might need it to render
+          // We'll control which values are shown via lastValueVisible instead
+          priceScale.applyOptions({
+            visible: true, // Keep visible for overlay scales to work
+          });
+
+          const panelPriceScale = chartRef.current.priceScale(priceScaleId);
+          const panelScaleOptionsBefore = panelPriceScale.options();
+          let panelScaleWidthBefore = 0;
+          try {
+            panelScaleWidthBefore = panelPriceScale.width();
+          } catch (e) {
+            // width() might not be available
+          }
+          // #region agent log
+          const logData3 = {
+            location: "IntelligentChart.tsx:1025",
+            message:
+              "Initial scale config after panel add - Panel scale BEFORE",
+            data: {
+              indicatorName: indicatorConfig.name,
+              priceScaleId,
+              panelScaleVisible: panelScaleOptionsBefore.visible,
+              panelScaleAutoScale: panelScaleOptionsBefore.autoScale,
+              panelScaleWidth: panelScaleWidthBefore,
+            },
+            timestamp: Date.now(),
+            sessionId: "debug-session",
+            hypothesisId: "H1",
+          };
+          console.log("[DEBUG]", logData3);
+          fetch(
+            "http://127.0.0.1:7242/ingest/3d78da6f-49c7-481a-bafb-b1cb31305326",
+            {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify(logData3),
+            },
+          ).catch((e) => console.error("[DEBUG] Log fetch failed:", e));
+          // #endregion
+
+          panelPriceScale.applyOptions({
+            visible: true, // Show panel scale when panel indicator is added
+            autoScale: true, // Ensure autoScale is true
+          });
+
+          let panelScaleWidthAfter = 0;
+          try {
+            panelScaleWidthAfter = panelPriceScale.width();
+          } catch (e) {
+            // width() might not be available
+          }
+
+          const priceScaleOptionsAfter = priceScale.options();
+          const panelScaleOptionsAfter = panelPriceScale.options();
+          // #region agent log
+          const logData4 = {
+            location: "IntelligentChart.tsx:1045",
+            message: "Initial scale config after panel add - AFTER",
+            data: {
+              indicatorName: indicatorConfig.name,
+              priceScaleId,
+              priceScaleVisible: priceScaleOptionsAfter.visible,
+              priceScaleAutoScale: priceScaleOptionsAfter.autoScale,
+              panelScaleVisible: panelScaleOptionsAfter.visible,
+              panelScaleAutoScale: panelScaleOptionsAfter.autoScale,
+              panelScaleWidth: panelScaleWidthAfter,
+            },
+            timestamp: Date.now(),
+            sessionId: "debug-session",
+            hypothesisId: "H1",
+          };
+          console.log("[DEBUG]", logData4);
+          fetch(
+            "http://127.0.0.1:7242/ingest/3d78da6f-49c7-481a-bafb-b1cb31305326",
+            {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify(logData4),
+            },
+          ).catch((e) => console.error("[DEBUG] Log fetch failed:", e));
+          // #endregion
+        }
+
+        // Verify price scale is properly configured after rendering
+        if (
+          priceScaleId &&
+          priceScaleId !== "N/A" &&
+          priceScaleId !== "right"
+        ) {
+          const series = (indicator as any).getSeries?.();
+          if (series && !(series instanceof Map)) {
+            const priceScale = (series as ISeriesApi<"Line">).priceScale();
+            const scaleOptions = priceScale.options();
+
+            // Get all price scales from chart to verify separation
+            const allPriceScales: string[] = [];
+            try {
+              // Try to get all scales (Lightweight Charts doesn't expose this directly)
+              // We'll check by trying to access the scale
+              const scaleWidth = priceScale.width();
+              // #region agent log
+              fetch(
+                "http://127.0.0.1:7242/ingest/3d78da6f-49c7-481a-bafb-b1cb31305326",
+                {
+                  method: "POST",
+                  headers: { "Content-Type": "application/json" },
+                  body: JSON.stringify({
+                    location: "IntelligentChart.tsx:862",
+                    message: "Panel scale AFTER render",
+                    data: {
+                      priceScaleId,
+                      scaleWidth,
+                      scaleMargins: scaleOptions.scaleMargins,
+                      borderVisible: scaleOptions.borderVisible,
+                      autoScale: scaleOptions.autoScale,
+                      indicatorMinValue: minValue,
+                      indicatorMaxValue: maxValue,
+                      priceMinValue:
+                        currentCandleData.length > 0
+                          ? Math.min(...currentCandleData.map((d) => d.close))
+                          : null,
+                      priceMaxValue:
+                        currentCandleData.length > 0
+                          ? Math.max(...currentCandleData.map((d) => d.close))
+                          : null,
+                    },
+                    timestamp: Date.now(),
+                    sessionId: "debug-session",
+                    hypothesisId: "H2",
+                  }),
+                },
+              ).catch(() => {});
+              // #endregion
+            } catch (e) {
+              // #region agent log
+              fetch(
+                "http://127.0.0.1:7242/ingest/3d78da6f-49c7-481a-bafb-b1cb31305326",
+                {
+                  method: "POST",
+                  headers: { "Content-Type": "application/json" },
+                  body: JSON.stringify({
+                    location: "IntelligentChart.tsx:870",
+                    message: "Panel scale error",
+                    data: { priceScaleId, error: String(e) },
+                    timestamp: Date.now(),
+                    sessionId: "debug-session",
+                    hypothesisId: "H2",
+                  }),
+                },
+              ).catch(() => {});
+              // #endregion
+            }
+          }
+        }
       }
 
-      // Create line series for overlay indicators (SMA, EMA)
-      if (lineData.length > 0) {
-        const series = chart.addSeries(LineSeries, {
-          color,
-          lineWidth: 2,
-          priceScaleId: "right",
-          title: indicator.name,
-        });
-        series.setData(lineData);
-        indicatorSeriesRef.current.set(indicator.name, series);
-      }
-    }
+      // Dynamically adjust price/volume margins based on panel indicators
+      const panelIndicators = registry.getPanelIndicators();
+      const hasPanels = panelIndicators.length > 0;
 
-    // Cleanup RSI pane if no RSI indicator is active
-    const hasRsi = indicators.some(
-      (i) => i.type.toLowerCase() === "rsi" && i.visible,
-    );
-    if (!hasRsi && rsiPaneRef.current) {
-      chart.removeSeries(rsiPaneRef.current);
-      rsiPaneRef.current = null;
-    }
+      // #region agent log
+      fetch(
+        "http://127.0.0.1:7242/ingest/3d78da6f-49c7-481a-bafb-b1cb31305326",
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            location: "IntelligentChart.tsx:777",
+            message: "Adjusting margins",
+            data: {
+              hasPanels,
+              panelCount: panelIndicators.length,
+              panelNames: panelIndicators.map((p) => p.getName()),
+            },
+            timestamp: Date.now(),
+            sessionId: "debug-session",
+            hypothesisId: "H1",
+          }),
+        },
+      ).catch(() => {});
+      // #endregion
+
+      // In Lightweight Charts, each unique priceScaleId creates a separate panel
+      // Panels stack vertically in the order they are created
+      // scaleMargins control how much of EACH panel's vertical space is used
+      // We need to ensure panels don't overlap by setting appropriate margins
+
+      if (candleSeriesRef.current) {
+        // Price chart panel (top) - uses top portion of chart
+        // scaleMargins are relative to ENTIRE chart height
+        // When panels exist: price uses top 60% (0% to 65% of chart, leaving room for volume/RSI)
+        // When no panels: price uses top 80% (0% to 85% of chart)
+        candleSeriesRef.current.priceScale().applyOptions({
+          scaleMargins: {
+            top: 0.05,
+            bottom: hasPanels ? 0.35 : 0.15, // Leave 35% for volume+RSI when panels exist, 15% for volume when not
+          },
+        });
+      }
+
+      if (volumeSeriesRef.current) {
+        // Volume panel (middle) - positioned between price and RSI
+        // scaleMargins are relative to ENTIRE chart height
+        // When panels exist: volume uses middle section (65% to 80% of chart)
+        // When no panels: volume uses bottom section (85% to 100% of chart)
+        volumeSeriesRef.current.priceScale().applyOptions({
+          scaleMargins: {
+            top: hasPanels ? 0.65 : 0.85, // Start at 65% when panels exist, 85% when not
+            bottom: hasPanels ? 0.2 : 0, // Leave 20% for RSI below when panels exist
+          },
+        });
+      }
+
+      // Panel indicators use their own priceScaleId on the right side
+      // Each panel's scale auto-scales to its own data range (0-100 for RSI)
+      // We don't need to show/hide scales - just let them coexist
+      // #region agent log
+      const logDataPanels = {
+        location: "IntelligentChart.tsx:1150",
+        message: "Panel configuration",
+        data: { hasPanels, panelCount: panelIndicators.length },
+        timestamp: Date.now(),
+        sessionId: "debug-session",
+        hypothesisId: "H8",
+      };
+      console.log("[DEBUG] Panel Configuration", logDataPanels);
+      fetch(
+        "http://127.0.0.1:7242/ingest/3d78da6f-49c7-481a-bafb-b1cb31305326",
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(logDataPanels),
+        },
+      ).catch((e) => console.error("[DEBUG] Log fetch failed:", e));
+      // #endregion
+    }, 100); // Delay to ensure chart data is fully rendered
+
+    return () => clearTimeout(timeoutId);
   }, [state.chart.indicators, candleData]);
 
   // Fetch symbols when search opens
@@ -825,6 +1696,22 @@ export default function IntelligentChart() {
     }
   }, [isIntraday, range]);
 
+  // Listen for auto-range events (triggered when user zooms out past data)
+  useEffect(() => {
+    const handleAutoRange = (e: Event) => {
+      const customEvent = e as CustomEvent<{ range: string }>;
+      const newRange = customEvent.detail.range;
+      if (newRange && newRange !== range && !isIntraday) {
+        setRange(newRange);
+        localStorage.setItem("chart-range", newRange);
+      }
+    };
+
+    window.addEventListener("chart-auto-range", handleAutoRange);
+    return () =>
+      window.removeEventListener("chart-auto-range", handleAutoRange);
+  }, [range, isIntraday]);
+
   // Smart symbol + range selection when backtest completes
   useEffect(() => {
     const backtestResult = state.backtest.result;
@@ -837,20 +1724,12 @@ export default function IntelligentChart() {
 
     // Sync chart symbol to backtest symbol
     if (backtestResult.symbol && backtestResult.symbol !== symbol) {
-      console.log(
-        `[Chart] Switching symbol from ${symbol} to ${backtestResult.symbol} for backtest`,
-      );
       dispatch({ type: "SET_SYMBOL", symbol: backtestResult.symbol });
     }
 
     const startDate = new Date(backtestResult.period.start);
     const endDate = new Date(backtestResult.period.end);
     const now = new Date();
-
-    console.log("[Chart] ========== BACKTEST ZOOM DEBUG ==========");
-    console.log("[Chart] Raw period:", backtestResult.period);
-    console.log("[Chart] Parsed startDate:", startDate.toISOString());
-    console.log("[Chart] Parsed endDate:", endDate.toISOString());
 
     // Calculate backtest duration and how far back it starts
     const backtestDays = Math.ceil(
@@ -879,23 +1758,14 @@ export default function IntelligentChart() {
       newRange = "1W";
     }
 
-    console.log(
-      `[Chart] Backtest: ${backtestDays} days duration, ${daysBack} days back → range=${newRange}`,
-    );
-
     // Calculate zoom range with padding
     const startTs = Math.floor(startDate.getTime() / 1000);
     const endTs = Math.floor(endDate.getTime() / 1000);
     const padding = (endTs - startTs) * 0.05;
     const zoomRange = { start: startTs - padding, end: endTs + padding };
 
-    console.log(
-      `[Chart] Zoom target: ${new Date(zoomRange.start * 1000).toLocaleDateString()} - ${new Date(zoomRange.end * 1000).toLocaleDateString()}`,
-    );
-
     // Update range if needed - this will trigger a data fetch
     if (newRange !== range && !isIntraday) {
-      console.log(`[Chart] Changing range from ${range} to ${newRange}`);
       // Set pending zoom AFTER setting range to avoid race condition
       // The fetch will use the ref, and the effect will run after new data loads
       setRange(newRange);
@@ -916,35 +1786,18 @@ export default function IntelligentChart() {
       const zStart = Math.max(dataStart, zoomRange.start);
       const zEnd = Math.min(dataEnd, zoomRange.end);
 
-      console.log(
-        `[Chart] Data range: ${new Date(dataStart * 1000).toLocaleDateString()} - ${new Date(dataEnd * 1000).toLocaleDateString()}`,
-      );
-      console.log(
-        `[Chart] Calculated zoom: ${new Date(zStart * 1000).toLocaleDateString()} - ${new Date(zEnd * 1000).toLocaleDateString()}`,
-      );
-
       if (zStart < zEnd) {
-        console.log("[Chart] Applying setVisibleRange with:", {
-          from: zStart,
-          to: zEnd,
-          fromDate: new Date(zStart * 1000).toISOString(),
-          toDate: new Date(zEnd * 1000).toISOString(),
-        });
         requestAnimationFrame(() => {
           if (chartRef.current) {
             chartRef.current.timeScale().setVisibleRange({
               from: zStart as Time,
               to: zEnd as Time,
             });
-            console.log("[Chart] Immediate zoom applied successfully");
           }
         });
       }
-      // Clear pending zoom since we applied it
       setPendingZoom(null);
     }
-    // If no data yet, pendingZoom will be applied when data loads
-    console.log("[Chart] ========== END DEBUG ==========");
     // eslint-disable-next-line react-hooks/exhaustive-deps -- Only react to backtest result changes
   }, [state.backtest.result]);
 
@@ -962,46 +1815,22 @@ export default function IntelligentChart() {
     const dataStart = candleData[0]?.time as number;
     const dataEnd = candleData[candleData.length - 1]?.time as number;
 
-    console.log("[Chart] Raw timestamps:", {
-      dataStart,
-      dataEnd,
-      pendingStart: pendingZoom.start,
-      pendingEnd: pendingZoom.end,
-      candleCount: candleData.length,
-      firstCandle: candleData[0],
-      lastCandle: candleData[candleData.length - 1],
-    });
-    console.log(
-      `[Chart] Pending zoom check: data=${new Date(dataStart * 1000).toLocaleDateString()}-${new Date(dataEnd * 1000).toLocaleDateString()}, ` +
-        `target=${new Date(pendingZoom.start * 1000).toLocaleDateString()}-${new Date(pendingZoom.end * 1000).toLocaleDateString()}`,
-    );
-
     // Calculate intersection
     const zoomStart = Math.max(dataStart, pendingZoom.start);
     const zoomEnd = Math.min(dataEnd, pendingZoom.end);
 
     if (zoomStart < zoomEnd) {
-      // Use requestAnimationFrame for more reliable timing
       requestAnimationFrame(() => {
         if (chartRef.current) {
-          console.log(
-            `[Chart] Applying zoom: ${new Date(zoomStart * 1000).toLocaleDateString()} - ${new Date(zoomEnd * 1000).toLocaleDateString()}`,
-          );
           chartRef.current.timeScale().setVisibleRange({
             from: zoomStart as Time,
             to: zoomEnd as Time,
           });
         }
       });
-      // Only clear pendingZoom after successful zoom
       setPendingZoom(null);
-    } else {
-      // Data doesn't cover backtest period - might be stale, wait for fresh data
-      console.log(
-        `[Chart] No overlap yet - data may be stale, waiting for fresh data...`,
-      );
-      // Don't clear pendingZoom - let it retry when new data arrives
     }
+    // If no overlap, keep pendingZoom - retry when fresh data arrives
   }, [pendingZoom, candleData, loading]);
 
   // ============================================================================
@@ -1011,8 +1840,6 @@ export default function IntelligentChart() {
   useEffect(() => {
     for (const intent of intents) {
       if (intent.processed) continue;
-
-      console.log("[Chart] Processing intent:", intent.type, intent);
 
       switch (intent.type) {
         case "navigate":
@@ -1031,7 +1858,11 @@ export default function IntelligentChart() {
 
         case "overlay":
           if (intent.indicator) {
-            console.log("[Chart] Adding indicator:", intent.indicator);
+            // Expand data range to 5Y when adding indicators to ensure full coverage
+            if (range !== "5Y" && range !== "ALL" && !isIntraday) {
+              setRange("5Y");
+              localStorage.setItem("chart-range", "5Y");
+            }
             dispatch({ type: "ADD_INDICATOR", indicator: intent.indicator });
           }
           break;
@@ -1042,14 +1873,12 @@ export default function IntelligentChart() {
               ...intent.annotation,
               id: crypto.randomUUID(),
             };
-            console.log("[Chart] Adding annotation:", annotation);
             dispatch({ type: "ADD_ANNOTATION", annotation });
           }
           break;
 
         case "highlight":
           if (intent.highlightRange) {
-            // Create a highlight annotation (region type)
             const highlight = {
               id: crypto.randomUUID(),
               type: "region" as const,
@@ -1057,7 +1886,6 @@ export default function IntelligentChart() {
               endTimestamp: intent.highlightRange.end,
               color: intent.highlightRange.color,
             };
-            console.log("[Chart] Adding highlight:", highlight);
             dispatch({ type: "ADD_ANNOTATION", annotation: highlight });
           }
           break;
@@ -1070,10 +1898,34 @@ export default function IntelligentChart() {
             dispatch({ type: "CLEAR_ANNOTATIONS" });
           }
           if (intent.clearType === "indicators" || intent.clearType === "all") {
-            // Remove all indicators from state
-            state.chart.indicators.forEach((ind) => {
-              dispatch({ type: "REMOVE_INDICATOR", name: ind.name });
-            });
+            const registry = indicatorRegistryRef.current;
+            const chart = chartRef.current;
+
+            // Check if we're clearing a specific indicator or all
+            const specificIndicator = (intent as { indicatorName?: string })
+              .indicatorName;
+
+            if (specificIndicator && chart) {
+              // Remove only the specific indicator
+              const indicator = registry.getIndicator(specificIndicator);
+              if (indicator) {
+                indicator.cleanup(chart);
+                registry.removeIndicator(specificIndicator);
+                dispatch({ type: "REMOVE_INDICATOR", name: specificIndicator });
+              }
+            } else if (chart) {
+              // Clear all indicators
+              const allIndicators = registry.getAllIndicators();
+              for (const indicator of allIndicators) {
+                indicator.cleanup(chart);
+              }
+              registry.clear();
+
+              // Dispatch remove for all indicators in state
+              state.chart.indicators.forEach((ind) => {
+                dispatch({ type: "REMOVE_INDICATOR", name: ind.name });
+              });
+            }
           }
           break;
       }
@@ -1360,7 +2212,325 @@ export default function IntelligentChart() {
           </div>
         )}
 
-        <div ref={chartContainerRef} className="w-full h-full" />
+        {/* Crosshair Tooltip - shows values at hover position */}
+        {crosshairData && (
+          <div
+            className="absolute top-2 left-2 z-20 px-3 py-2.5 rounded-lg text-xs max-h-64 overflow-y-auto"
+            style={{
+              color: "var(--text-primary)",
+            }}
+          >
+            {/* #region agent log */}
+            {(() => {
+              fetch(
+                "http://127.0.0.1:7242/ingest/3d78da6f-49c7-481a-bafb-b1cb31305326",
+                {
+                  method: "POST",
+                  headers: { "Content-Type": "application/json" },
+                  body: JSON.stringify({
+                    location: "IntelligentChart.tsx:1310",
+                    message: "Rendering crosshair tooltip",
+                    data: {
+                      hasCrosshairData: !!crosshairData,
+                      volume: crosshairData.volume,
+                      indicatorCount: Object.keys(crosshairData.indicators)
+                        .length,
+                      indicatorNames: Object.keys(crosshairData.indicators),
+                    },
+                    timestamp: Date.now(),
+                    sessionId: "debug-session",
+                    hypothesisId: "H4",
+                  }),
+                },
+              ).catch(() => {});
+              return null;
+            })()}
+            {/* #endregion */}
+            {/* Robinhood-style legend: OHLC + Volume + Overlay indicators for main chart */}
+            {(crosshairData.ohlc || crosshairData.volume !== null) && (
+              <div className="mb-2 space-y-1">
+                {/* OHLCV displayed inline: O H L C V */}
+                {crosshairData.ohlc &&
+                  (() => {
+                    // Determine if candle is green (close > open) or red (close < open)
+                    const isGreen =
+                      crosshairData.ohlc.close >= crosshairData.ohlc.open;
+                    const numberColor = isGreen ? "#22c55e" : "#ef4444"; // green-500 or red-500
+
+                    // Format volume for display
+                    const formatVolume = (vol: number | null) => {
+                      if (vol === null) return null;
+                      if (vol >= 1000000)
+                        return `${(vol / 1000000).toFixed(2)}M`;
+                      if (vol >= 1000) return `${(vol / 1000).toFixed(2)}K`;
+                      return vol.toFixed(0);
+                    };
+
+                    return (
+                      <div className="flex items-center gap-2 text-xs">
+                        <span style={{ color: "#000000" }}>O</span>
+                        <span
+                          className="font-mono font-semibold"
+                          style={{ color: numberColor }}
+                        >
+                          {crosshairData.ohlc.open.toFixed(2)}
+                        </span>
+                        <span style={{ color: "#000000" }}>H</span>
+                        <span
+                          className="font-mono font-semibold"
+                          style={{ color: numberColor }}
+                        >
+                          {crosshairData.ohlc.high.toFixed(2)}
+                        </span>
+                        <span style={{ color: "#000000" }}>L</span>
+                        <span
+                          className="font-mono font-semibold"
+                          style={{ color: numberColor }}
+                        >
+                          {crosshairData.ohlc.low.toFixed(2)}
+                        </span>
+                        <span style={{ color: "#000000" }}>C</span>
+                        <span
+                          className="font-mono font-semibold"
+                          style={{ color: numberColor }}
+                        >
+                          {crosshairData.ohlc.close.toFixed(2)}
+                        </span>
+                        {crosshairData.volume !== null && (
+                          <>
+                            <span style={{ color: "#000000" }}>V</span>
+                            <span
+                              className="font-mono font-semibold"
+                              style={{ color: numberColor }}
+                            >
+                              {formatVolume(crosshairData.volume)}
+                            </span>
+                          </>
+                        )}
+                      </div>
+                    );
+                  })()}
+              </div>
+            )}
+            {/* Show overlay indicator values (not panel indicators - they show in their own panel) */}
+            {Object.entries(crosshairData.indicators).map(([name, value]) => {
+              if (value === null) return null;
+
+              // Skip panel indicators - they display in their own panel's top-left
+              const panelIndicators =
+                indicatorRegistryRef.current?.getPanelIndicators() || [];
+              const isPanelIndicator = panelIndicators.some(
+                (ind) => ind.getName() === name,
+              );
+              if (isPanelIndicator) return null;
+
+              // Get indicator config for threshold info
+              const indicator = state.chart.indicators.find(
+                (i) => i.name === name,
+              );
+              const indType = indicator?.type.toLowerCase() || "";
+
+              // Determine color based on indicator type and thresholds
+              let color = "var(--text-primary)";
+              let suffix = "";
+              let bgColor: string | undefined = undefined;
+
+              if (indType === "rsi") {
+                // Always show RSI value, color-code based on thresholds
+                const overbought =
+                  (indicator?.params.overbought as number) || 70;
+                const oversold = (indicator?.params.oversold as number) || 30;
+                if (value >= overbought) {
+                  color = "#ef4444"; // red-500
+                  bgColor = "rgba(239, 68, 68, 0.1)";
+                  suffix = " Overbought";
+                } else if (value <= oversold) {
+                  color = "#22c55e"; // green-500
+                  bgColor = "rgba(34, 197, 94, 0.1)";
+                  suffix = " Oversold";
+                } else {
+                  // Neutral RSI - use indicator color
+                  color = INDICATOR_COLORS.rsi || "#8b5cf6";
+                  bgColor = "rgba(139, 92, 246, 0.1)";
+                }
+              } else if (indType === "sma" || indType === "ema") {
+                // Moving averages - compare to price for trend
+                if (crosshairData.price && value > crosshairData.price) {
+                  color = "#22c55e"; // green - above price (bullish)
+                  bgColor = "rgba(34, 197, 94, 0.1)";
+                } else if (crosshairData.price && value < crosshairData.price) {
+                  color = "#ef4444"; // red - below price (bearish)
+                  bgColor = "rgba(239, 68, 68, 0.1)";
+                } else {
+                  color =
+                    (INDICATOR_COLORS as Record<string, string>)[indType] ||
+                    "var(--text-primary)";
+                  bgColor = "rgba(0, 0, 0, 0.05)";
+                }
+              } else if (indType === "stoch" || indType === "stochastic") {
+                if (value >= 80) {
+                  color = "#ef4444";
+                  bgColor = "rgba(239, 68, 68, 0.1)";
+                  suffix = " Overbought";
+                } else if (value <= 20) {
+                  color = "#22c55e";
+                  bgColor = "rgba(34, 197, 94, 0.1)";
+                  suffix = " Oversold";
+                } else {
+                  color =
+                    (INDICATOR_COLORS as Record<string, string>)[indType] ||
+                    "var(--text-primary)";
+                  bgColor = "rgba(0, 0, 0, 0.05)";
+                }
+              } else {
+                // Default indicator color
+                color =
+                  (INDICATOR_COLORS as Record<string, string>)[indType] ||
+                  "var(--text-primary)";
+                bgColor = "rgba(0, 0, 0, 0.05)";
+              }
+
+              return (
+                <div
+                  key={name}
+                  className="flex items-center justify-between gap-3 mb-1.5 px-2 py-1 rounded"
+                  style={{ background: bgColor }}
+                >
+                  <span
+                    className="text-xs font-medium"
+                    style={{ color: "var(--text-muted)" }}
+                  >
+                    {name}
+                  </span>
+                  <div className="flex items-center gap-1.5">
+                    <span
+                      className="font-mono font-semibold text-sm"
+                      style={{ color }}
+                    >
+                      {value.toFixed(2)}
+                    </span>
+                    {suffix && (
+                      <span
+                        className="text-xs font-medium"
+                        style={{ color, opacity: 0.8 }}
+                      >
+                        {suffix}
+                      </span>
+                    )}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        )}
+
+        <div ref={chartContainerRef} className="w-full h-full relative">
+          {/* Panel background overlays - add subtle hue to distinguish panels (especially RSI) */}
+          {indicatorRegistryRef.current &&
+            (() => {
+              const panelIndicators =
+                indicatorRegistryRef.current.getPanelIndicators();
+              return panelIndicators.map((indicator) => {
+                const priceScaleId =
+                  (indicator as any).getPriceScaleId?.() || "";
+                const indicatorType = indicator.getType().toLowerCase();
+
+                // Calculate panel position
+                let topPercent = 80; // Default for RSI
+                const panelPositions: Record<string, number> = {
+                  rsi: 80,
+                  macd: 80,
+                  stoch: 80,
+                  adx: 80,
+                  atr: 80,
+                };
+                topPercent = panelPositions[priceScaleId] || 80;
+
+                // Remove full-panel background - threshold zone is handled by RSI indicator itself
+                // The RSI indicator will render a shaded area between 30-70 using AreaSeries
+                return null;
+              });
+            })()}
+
+          {/* Panel indicator labels - show in top-left of each panel (Robinhood style) */}
+          {indicatorRegistryRef.current &&
+            crosshairData &&
+            (() => {
+              const panelIndicators =
+                indicatorRegistryRef.current.getPanelIndicators();
+              return panelIndicators.map((indicator) => {
+                const indicatorName = indicator.getName();
+                // Get value at crosshair X position (time), not Y position
+                const indicatorValue =
+                  crosshairData.indicators[indicatorName] ?? null;
+                const isActive = crosshairData.activePanel === indicatorName;
+
+                // Calculate vertical position based on panel's scaleMargins
+                // RSI panel starts at 80% (scaleMargins.top = 0.8)
+                const priceScaleId =
+                  (indicator as any).getPriceScaleId?.() || "";
+                let topPercent = 80; // Default for RSI
+
+                // Map price scale IDs to their panel start positions (from scaleMargins.top)
+                const panelPositions: Record<string, number> = {
+                  rsi: 80,
+                  macd: 80,
+                  stoch: 80,
+                  adx: 80,
+                  atr: 80,
+                };
+
+                topPercent = panelPositions[priceScaleId] || 80;
+
+                // Position label at top of panel (slightly above the panel start for visibility)
+                const labelTop = Math.max(0, topPercent - 1.5);
+
+                return (
+                  <div
+                    key={indicatorName}
+                    className="absolute left-2 z-30 px-2 py-1 rounded text-xs"
+                    style={{
+                      top: `${labelTop}%`,
+                      background: isActive
+                        ? "rgba(139, 92, 246, 0.15)"
+                        : "rgba(0, 0, 0, 0.4)",
+                      backdropFilter: "blur(4px)",
+                      color: "var(--text-primary)",
+                      border: `1px solid ${isActive ? "rgba(139, 92, 246, 0.3)" : "rgba(255, 255, 255, 0.08)"}`,
+                      transition: "all 0.15s ease",
+                    }}
+                  >
+                    <span
+                      className="font-medium"
+                      style={{
+                        color: isActive ? "#8b5cf6" : "var(--text-muted)",
+                      }}
+                    >
+                      {indicatorName}
+                    </span>
+                    {indicatorValue !== null && (
+                      <>
+                        <span
+                          className="mx-1.5"
+                          style={{ color: "var(--text-muted)", opacity: 0.6 }}
+                        >
+                          ·
+                        </span>
+                        <span
+                          className="font-mono font-semibold"
+                          style={{
+                            color: isActive ? "#8b5cf6" : "var(--text-primary)",
+                          }}
+                        >
+                          {indicatorValue.toFixed(2)}
+                        </span>
+                      </>
+                    )}
+                  </div>
+                );
+              });
+            })()}
+        </div>
       </div>
 
       {/* Footer with selected trade info */}

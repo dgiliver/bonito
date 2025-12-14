@@ -467,12 +467,28 @@ interface AnalysisContextValue {
   addAgentIntent: (intent: Omit<ChartIntent, "id" | "processed">) => void;
 }
 
+// Panel indicator types (for multi-chart architecture)
+export type PanelIndicatorType = "rsi" | "macd" | "stoch" | "adx" | "atr";
+export type OverlayIndicatorType = "sma" | "ema" | "bbands" | "vwap";
+
+// Detailed indicator info for agent
+export interface IndicatorInfo {
+  name: string;
+  type: string;
+  displayLocation: "overlay" | "panel";
+  params: Record<string, number | string>;
+  visible: boolean;
+}
+
 // What we send to the agent
 export interface ChartContextPayload {
   symbol: string;
   interval: string;
   visibleRange: { start: number; end: number } | null;
-  indicators: string[];
+  indicators: string[]; // Legacy: just names for simple use
+  indicatorDetails: IndicatorInfo[]; // New: full details for analysis
+  activePanels: PanelIndicatorType[]; // Which panel indicators are shown
+  activeOverlays: string[]; // Which overlay indicators are shown
   activeStrategy: string | null;
   hasBacktestResult: boolean;
   tradeCount: number;
@@ -494,13 +510,43 @@ export function AnalysisProvider({ children }: { children: ReactNode }) {
 
   // Get context payload for agent
   const getChartContext = useCallback((): ChartContextPayload => {
+    const visibleIndicators = state.chart.indicators.filter((i) => i.visible);
+
+    // Categorize indicators by display location
+    const panelTypes: PanelIndicatorType[] = [
+      "rsi",
+      "macd",
+      "stoch",
+      "adx",
+      "atr",
+    ];
+    const activePanels = visibleIndicators
+      .filter((i) => panelTypes.includes(i.type as PanelIndicatorType))
+      .map((i) => i.type as PanelIndicatorType);
+
+    const activeOverlays = visibleIndicators
+      .filter((i) => !panelTypes.includes(i.type as PanelIndicatorType))
+      .map((i) => i.name);
+
+    // Build detailed indicator info
+    const indicatorDetails: IndicatorInfo[] = visibleIndicators.map((i) => ({
+      name: i.name,
+      type: i.type,
+      displayLocation: panelTypes.includes(i.type as PanelIndicatorType)
+        ? "panel"
+        : "overlay",
+      params: i.params,
+      visible: i.visible,
+    }));
+
     return {
       symbol: state.chart.symbol,
       interval: state.chart.interval,
       visibleRange: state.chart.visibleRange,
-      indicators: state.chart.indicators
-        .filter((i) => i.visible)
-        .map((i) => i.name),
+      indicators: visibleIndicators.map((i) => i.name), // Legacy
+      indicatorDetails,
+      activePanels,
+      activeOverlays,
       activeStrategy: state.strategy?.name || null,
       hasBacktestResult: !!state.backtest.result,
       tradeCount: state.backtest.result?.trades.length || 0,

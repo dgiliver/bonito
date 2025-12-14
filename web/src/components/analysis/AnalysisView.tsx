@@ -29,7 +29,8 @@ import ReactMarkdown from "react-markdown";
 import dynamic from "next/dynamic";
 
 // Dynamically import chart to avoid SSR issues
-const IntelligentChart = dynamic(() => import("./IntelligentChart"), {
+// Using V2 with multi-chart architecture for proper panel scales
+const IntelligentChart = dynamic(() => import("./IntelligentChartV2"), {
   ssr: false,
   loading: () => (
     <div
