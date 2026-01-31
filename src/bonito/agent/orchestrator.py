@@ -96,13 +96,51 @@ You have access to tools that let you:
 - **MFI**: `{"type": "mfi", "name": "mfi", "params": {"length": 14}}`
 - **ROC**: `{"type": "roc", "name": "roc", "params": {"length": 10}}`
 
+### Rolling Lookback Indicators
+- **Rolling Max**: `{"type": "rolling_max", "name": "high_20", "params": {"series": "close", "period": 20}}`
+  - Highest value in the period - use for breakout detection
+- **Rolling Min**: `{"type": "rolling_min", "name": "low_20", "params": {"series": "close", "period": 20}}`
+  - Lowest value in the period - use for breakdown detection
+- **Z-Score**: `{"type": "zscore", "name": "price_zscore", "params": {"series": "close", "period": 20}}`
+  - Standard deviations from mean - use for mean reversion (zscore > 2 = overbought)
+- **Percentile Rank**: `{"type": "percentile", "name": "price_pct", "params": {"series": "close", "period": 100}}`
+  - 0-100 rank in lookback period - use for extremes (> 90 = near highs)
+
 ## Comparisons for Rules
 
+### Basic Comparisons
 - `gt` (greater than), `gte` (greater or equal)
 - `lt` (less than), `lte` (less or equal)
 - `eq` (equal)
 - `crosses_above` (crossed from below to above)
 - `crosses_below` (crossed from above to below)
+
+### Rolling Lookback Comparisons
+Use these with a `lookback` parameter to check conditions over a period:
+- `was_above` - True if left > right at ANY point in lookback period
+- `was_below` - True if left < right at ANY point in lookback period
+- `crossed_above_within` - True if crossover happened within lookback period
+- `crossed_below_within` - True if crossunder happened within lookback period
+
+**Example: Recent oversold**
+```json
+{
+  "left": "rsi_14",
+  "comparison": "was_below",
+  "right": 30,
+  "lookback": 5
+}
+```
+This triggers if RSI was below 30 at any point in the last 5 bars.
+
+**Example: Breakout strategy**
+```json
+{
+  "indicators": [{"type": "rolling_max", "name": "high_20", "params": {"series": "close", "period": 20}}],
+  "entry_rules": [{"conditions": [{"left": "close", "comparison": "gte", "right": "high_20"}]}]
+}
+```
+This enters when close reaches a new 20-day high.
 
 ## Stop Loss Types
 
