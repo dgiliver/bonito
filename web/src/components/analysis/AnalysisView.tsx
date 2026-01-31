@@ -809,12 +809,12 @@ function TradeDetailsPanel() {
               className="font-medium"
               style={{
                 color:
-                  trade.side === "long"
-                    ? "var(--accent-success)"
-                    : "var(--accent-danger)",
+                  trade.position_side === "short"
+                    ? "var(--accent-danger)"
+                    : "var(--accent-success)",
               }}
             >
-              {trade.side.toUpperCase()}
+              {(trade.position_side || "long").toUpperCase()}
             </span>
           </div>
 

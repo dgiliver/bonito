@@ -44,7 +44,8 @@ export interface Trade {
   id: string;
   entry_time: string;
   exit_time: string;
-  side: "long" | "short";
+  side: "buy" | "sell"; // Order side (buy for long entry, sell for short entry)
+  position_side: "long" | "short"; // Position type
   entry_price: number;
   exit_price: number;
   quantity: number;

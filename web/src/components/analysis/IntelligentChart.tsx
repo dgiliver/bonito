@@ -156,9 +156,9 @@ function createTradeMarkers(
         position: "belowBar",
         color: isSelected
           ? "#fbbf24"
-          : trade.side === "long"
-            ? "#22c55e"
-            : "#ef4444",
+          : trade.position_side === "short"
+            ? "#ef4444"
+            : "#22c55e",
         shape: isSelected ? "circle" : "arrowUp",
         size: isSelected ? 3 : 1,
         text: isSelected

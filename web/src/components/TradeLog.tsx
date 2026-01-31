@@ -7,11 +7,13 @@ interface Trade {
   entry_time: string;
   exit_time: string;
   side: string;
+  position_side?: "long" | "short";
   quantity: number;
   entry_price: number;
   exit_price: number;
   pnl: number;
   return_pct?: string;
+  exit_reason?: string;
 }
 
 interface TradeLogProps {
@@ -87,6 +89,7 @@ export default function TradeLog({
         >
           <thead>
             <tr style={{ color: "var(--text-muted)" }}>
+              <th className="text-left font-medium px-2 py-1.5 w-14">Side</th>
               <th className="text-left font-medium px-2 py-1.5 w-16">Entry</th>
               <th className="text-left font-medium px-2 py-1.5 w-16">Exit</th>
               <th className="text-right font-medium px-2 py-1.5 w-14">In</th>
@@ -140,6 +143,17 @@ export default function TradeLog({
                         : "transparent",
                   }}
                 >
+                  <div
+                    className="w-14 px-2 py-1 text-left font-medium text-xs"
+                    style={{
+                      color:
+                        trade.position_side === "short"
+                          ? "var(--accent-danger)"
+                          : "var(--accent-success)",
+                    }}
+                  >
+                    {trade.position_side === "short" ? "SHORT" : "LONG"}
+                  </div>
                   <div
                     className="w-16 px-2 py-1"
                     style={{ color: "var(--text-muted)" }}

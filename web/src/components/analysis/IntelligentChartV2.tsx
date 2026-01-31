@@ -122,36 +122,35 @@ function createTradeMarkers(
 
   for (const trade of trades) {
     const isSelected = trade.id === selectedTradeId;
+    const isShort = trade.position_side === "short";
     const entryTs = Math.floor(new Date(trade.entry_time).getTime() / 1000);
     const exitTs = Math.floor(new Date(trade.exit_time).getTime() / 1000);
 
     const entryTime = findNearestCandleTime(entryTs);
     const exitTime = findNearestCandleTime(exitTs);
 
+    // Entry marker: Long entries are green (bullish), Short entries are red (bearish)
     if (entryTime !== null) {
       markers.push({
         time: entryTime,
-        position: "belowBar",
-        color: isSelected
-          ? "#fbbf24"
-          : trade.side === "long"
-            ? "#22c55e"
-            : "#ef4444",
-        shape: isSelected ? "circle" : "arrowUp",
+        position: isShort ? "aboveBar" : "belowBar",
+        color: isSelected ? "#fbbf24" : isShort ? "#ef4444" : "#22c55e",
+        shape: isSelected ? "circle" : isShort ? "arrowDown" : "arrowUp",
         size: isSelected ? 3 : 1,
         text: isSelected
-          ? `★ ENTRY $${trade.entry_price.toFixed(2)}`
-          : `Entry $${trade.entry_price.toFixed(2)}`,
+          ? `★ ${isShort ? "SHORT" : "LONG"} $${trade.entry_price.toFixed(2)}`
+          : `${isShort ? "Short" : "Long"} $${trade.entry_price.toFixed(2)}`,
         id: `entry-${trade.id}`,
       });
     }
 
+    // Exit marker: Color based on P&L, position based on trade direction
     if (exitTime !== null) {
       markers.push({
         time: exitTime,
-        position: "aboveBar",
+        position: isShort ? "belowBar" : "aboveBar",
         color: isSelected ? "#fbbf24" : trade.pnl >= 0 ? "#22c55e" : "#ef4444",
-        shape: isSelected ? "circle" : "arrowDown",
+        shape: isSelected ? "circle" : isShort ? "arrowUp" : "arrowDown",
         size: isSelected ? 3 : 1,
         text: isSelected
           ? `★ EXIT ${trade.pnl >= 0 ? "+" : ""}$${trade.pnl.toFixed(0)}`
