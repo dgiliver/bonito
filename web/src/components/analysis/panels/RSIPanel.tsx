@@ -98,6 +98,7 @@ export interface RSIPanelConfig {
 export interface RSIPanelProps {
   height: number;
   config?: RSIPanelConfig;
+  showTimeScale?: boolean; // Whether to show time scale (for bottom-most panel)
   className?: string;
 }
 
@@ -115,7 +116,10 @@ const DEFAULT_CONFIG: RSIPanelConfig = {
 const RSI_COLOR = "#8b5cf6"; // Purple
 
 export const RSIPanel = forwardRef<RSIPanelRef, RSIPanelProps>(
-  function RSIPanel({ height, config, className = "" }, ref) {
+  function RSIPanel(
+    { height, config, showTimeScale = false, className = "" },
+    ref,
+  ) {
     const panelRef = useRef<PanelChartPanelRef>(null);
     const [currentValue, setCurrentValue] = useState<number | null>(null);
 
@@ -147,6 +151,7 @@ export const RSIPanel = forwardRef<RSIPanelRef, RSIPanelProps>(
         color: "rgba(139, 92, 246, 0.25)", // Visible gradient from 70 line downward
       },
       backgroundColor: "rgba(139, 92, 246, 0.02)",
+      showTimeScale, // Show time scale on bottom-most panel
     };
 
     const calculateAndUpdate = useCallback(

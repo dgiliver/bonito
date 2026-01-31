@@ -114,6 +114,7 @@ export interface StochasticLegendData {
 export interface StochasticPanelProps {
   height: number;
   config?: StochasticPanelConfig;
+  showTimeScale?: boolean; // Whether to show time scale (for bottom-most panel)
   className?: string;
 }
 
@@ -304,7 +305,7 @@ export const StochasticPanel = forwardRef<
   StochasticPanelRef,
   StochasticPanelProps
 >(function StochasticPanel(
-  { height, config = DEFAULT_CONFIG, className = "" },
+  { height, config = DEFAULT_CONFIG, showTimeScale = false, className = "" },
   ref,
 ) {
   const containerRef = useRef<HTMLDivElement>(null);
@@ -319,6 +320,13 @@ export const StochasticPanel = forwardRef<
       panelRef.current = null;
     };
   }, [height, config]);
+
+  // Set time scale visibility after initialization
+  useEffect(() => {
+    if (containerRef.current && panelRef.current) {
+      panelRef.current.setTimeScaleVisible(showTimeScale);
+    }
+  }, [showTimeScale]);
 
   const calculateAndUpdate = useCallback(
     (

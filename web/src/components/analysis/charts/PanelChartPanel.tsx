@@ -61,6 +61,7 @@ export interface PanelChartConfig extends ChartPanelConfig {
   thresholdLines?: ThresholdLine[];
   thresholdZone?: ThresholdZone;
   backgroundColor?: string;
+  showTimeScale?: boolean; // Whether to show the time scale (dates) at bottom - only for bottom-most panel
 }
 
 export interface PanelLegendData {
@@ -130,9 +131,9 @@ class PanelChartPanelImpl extends BaseChartPanel {
       minimumWidth: 60, // Match price chart for alignment
     });
 
-    // Hide time scale on panel charts (synced with price chart)
+    // Hide time scale on panel charts unless this is the bottom panel
     this.chart.timeScale().applyOptions({
-      visible: false,
+      visible: this.panelConfig.showTimeScale ?? false,
     });
 
     // Create threshold zone if configured (e.g., RSI 30-70 zone)

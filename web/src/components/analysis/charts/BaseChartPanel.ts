@@ -241,6 +241,17 @@ export abstract class BaseChartPanel {
   }
 
   /**
+   * Set time scale (dates at bottom) visibility
+   * Used to show dates only on the bottom-most panel
+   */
+  setTimeScaleVisible(visible: boolean): void {
+    if (!this.chart) return;
+    this.chart.timeScale().applyOptions({
+      visible,
+    });
+  }
+
+  /**
    * Set horizontal line label visibility (the value shown on the right side of the chart)
    * Used to hide the label when this panel is not the active panel
    */

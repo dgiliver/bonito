@@ -66,3 +66,7 @@ web/node_modules/
 web/.next/
 web/out/
 web/.env.local
+
+# Claude Code
+.claude/settings.local.json
+CLAUDE.local.md

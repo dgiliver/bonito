@@ -156,10 +156,19 @@ export const ChartContainer = forwardRef<
     return calculateHeights(height, activePanels.length);
   }, [height, activePanels.length]);
 
-  // Check which panels are active
+  // Check which panels are active and determine which is the bottom-most
+  // The time scale (dates) should only show on the bottom-most panel
   const hasRSI = activePanels.some((p) => p.type === "rsi");
   const hasMACD = activePanels.some((p) => p.type === "macd");
   const hasStoch = activePanels.some((p) => p.type === "stoch");
+
+  // Determine which panel should show the time scale (always the bottom-most)
+  // Panel render order: Price -> RSI -> MACD -> Stochastic
+  const hasPanelsBelow = hasRSI || hasMACD || hasStoch;
+  const priceShowTimeScale = !hasPanelsBelow; // Price shows time scale only if no panels below
+  const rsiShowTimeScale = hasRSI && !hasMACD && !hasStoch; // RSI shows if it's the last panel
+  const macdShowTimeScale = hasMACD && !hasStoch; // MACD shows if Stoch is not active
+  const stochShowTimeScale = hasStoch; // Stoch always shows if active (it's always last)
 
   // Update price chart crosshair mode when snapToPrice changes
   useEffect(() => {
@@ -580,6 +589,7 @@ export const ChartContainer = forwardRef<
         ref={priceChartRef}
         height={priceHeight}
         showVolume={showVolume}
+        showTimeScale={priceShowTimeScale}
       />
 
       {/* RSI Panel */}
@@ -588,6 +598,7 @@ export const ChartContainer = forwardRef<
           ref={rsiPanelRef}
           height={panelHeight}
           config={activePanels.find((p) => p.type === "rsi")?.config}
+          showTimeScale={rsiShowTimeScale}
         />
       )}
 
@@ -597,6 +608,7 @@ export const ChartContainer = forwardRef<
           ref={macdPanelRef}
           height={panelHeight}
           config={activePanels.find((p) => p.type === "macd")?.config}
+          showTimeScale={macdShowTimeScale}
         />
       )}
 
@@ -606,6 +618,7 @@ export const ChartContainer = forwardRef<
           ref={stochPanelRef}
           height={panelHeight}
           config={activePanels.find((p) => p.type === "stoch")?.config}
+          showTimeScale={stochShowTimeScale}
         />
       )}
     </div>

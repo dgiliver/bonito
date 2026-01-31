@@ -112,6 +112,7 @@ export interface MACDLegendData {
 export interface MACDPanelProps {
   height: number;
   config?: MACDPanelConfig;
+  showTimeScale?: boolean; // Whether to show time scale (for bottom-most panel)
   className?: string;
 }
 
@@ -304,7 +305,10 @@ class MACDPanelImpl extends BaseChartPanel {
 }
 
 export const MACDPanel = forwardRef<MACDPanelRef, MACDPanelProps>(
-  function MACDPanel({ height, config = DEFAULT_CONFIG, className = "" }, ref) {
+  function MACDPanel(
+    { height, config = DEFAULT_CONFIG, showTimeScale = false, className = "" },
+    ref,
+  ) {
     const containerRef = useRef<HTMLDivElement>(null);
     const panelRef = useRef<MACDPanelImpl | null>(null);
 
@@ -317,6 +321,13 @@ export const MACDPanel = forwardRef<MACDPanelRef, MACDPanelProps>(
         panelRef.current = null;
       };
     }, [height, config]);
+
+    // Set time scale visibility after initialization
+    useEffect(() => {
+      if (containerRef.current && panelRef.current) {
+        panelRef.current.setTimeScaleVisible(showTimeScale);
+      }
+    }, [showTimeScale]);
 
     const calculateAndUpdate = useCallback(
       (candleData: { time: Time; close: number }[]) => {

@@ -87,6 +87,7 @@ export interface PriceChartPanelRef {
   removeOverlay: (name: string) => void;
   setCrosshairMode: (mode: CrosshairMode) => void;
   setHorzLineLabelVisible: (visible: boolean) => void;
+  setTimeScaleVisible: (visible: boolean) => void;
 }
 
 // PriceChartPanelImpl - Class implementation
@@ -382,13 +383,17 @@ class PriceChartPanelImpl extends BaseChartPanel {
 interface PriceChartPanelProps {
   height: number;
   showVolume?: boolean;
+  showTimeScale?: boolean; // Whether to show the time scale (dates) at bottom
   className?: string;
 }
 
 export const PriceChartPanel = forwardRef<
   PriceChartPanelRef,
   PriceChartPanelProps
->(function PriceChartPanel({ height, showVolume = true, className = "" }, ref) {
+>(function PriceChartPanel(
+  { height, showVolume = true, showTimeScale = true, className = "" },
+  ref,
+) {
   const containerRef = useRef<HTMLDivElement>(null);
   const panelRef = useRef<PriceChartPanelImpl | null>(null);
   const [initialized, setInitialized] = useState(false);
@@ -401,8 +406,12 @@ export const PriceChartPanel = forwardRef<
     const panel = new PriceChartPanelImpl({ height }, showVolume);
     panelRef.current = panel;
 
-    // Initialize with container
-    panel.initialize(containerRef.current);
+    // Initialize with container, passing time scale visibility option
+    panel.initialize(containerRef.current, {
+      timeScale: {
+        visible: showTimeScale,
+      },
+    });
     setInitialized(true);
 
     return () => {
@@ -410,7 +419,14 @@ export const PriceChartPanel = forwardRef<
       panelRef.current = null;
       setInitialized(false);
     };
-  }, [showVolume]); // Don't include height - resize handles that
+  }, [showVolume]); // Don't include showTimeScale - use separate effect to update it
+
+  // Update time scale visibility without recreating the chart
+  useEffect(() => {
+    if (panelRef.current && initialized) {
+      panelRef.current.setTimeScaleVisible(showTimeScale);
+    }
+  }, [showTimeScale, initialized]);
 
   // Handle height changes via resize
   useEffect(() => {
@@ -477,6 +493,9 @@ export const PriceChartPanel = forwardRef<
       },
       setHorzLineLabelVisible: (visible: boolean) => {
         panelRef.current?.setHorzLineLabelVisible(visible);
+      },
+      setTimeScaleVisible: (visible: boolean) => {
+        panelRef.current?.setTimeScaleVisible(visible);
       },
     }),
     [initialized],
