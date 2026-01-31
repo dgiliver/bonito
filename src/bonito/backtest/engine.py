@@ -51,8 +51,11 @@ class BacktestEngine:
         # Compute indicators
         indicators = compute_indicators(data, strategy.indicators)
 
-        # Generate signals
-        entry_signals = self._evaluate_rules(strategy.entry_rules, indicators)
+        # Generate signals by side
+        long_entry_signals = self._evaluate_rules_by_side(strategy.entry_rules, indicators, "long")
+        short_entry_signals = self._evaluate_rules_by_side(
+            strategy.entry_rules, indicators, "short"
+        )
         exit_signals = (
             self._evaluate_rules(strategy.exit_rules, indicators)
             if strategy.exit_rules
@@ -64,7 +67,8 @@ class BacktestEngine:
             strategy=strategy,
             data=data,
             indicators=indicators,
-            entry_signals=entry_signals,
+            long_entry_signals=long_entry_signals,
+            short_entry_signals=short_entry_signals,
             exit_signals=exit_signals,
         )
 
@@ -115,6 +119,26 @@ class BacktestEngine:
         for rule in rules:
             rule_result = self._evaluate_single_rule(rule, indicators)
             any_rule_triggered |= rule_result
+
+        return any_rule_triggered
+
+    def _evaluate_rules_by_side(
+        self,
+        rules: list[Rule],
+        indicators: dict[str, np.ndarray],
+        side: str,
+    ) -> np.ndarray:
+        """Evaluate rules for a specific side (long or short).
+
+        Returns a boolean array - True where ANY rule with matching side is satisfied.
+        """
+        n = len(next(iter(indicators.values())))
+        any_rule_triggered = np.zeros(n, dtype=bool)
+
+        for rule in rules:
+            if rule.side == side:
+                rule_result = self._evaluate_single_rule(rule, indicators)
+                any_rule_triggered |= rule_result
 
         return any_rule_triggered
 
@@ -194,10 +218,11 @@ class BacktestEngine:
         strategy: StrategyConfig,
         data: BarData,
         indicators: dict[str, np.ndarray],
-        entry_signals: np.ndarray,
+        long_entry_signals: np.ndarray,
+        short_entry_signals: np.ndarray,
         exit_signals: np.ndarray,
     ) -> tuple[list[Trade], list[float]]:
-        """Run the simulation loop."""
+        """Run the simulation loop with support for long and short positions."""
         trades: list[Trade] = []
         equity_curve: list[float] = []
 
@@ -207,28 +232,44 @@ class BacktestEngine:
         closes = data.close
         opens = data.open
         highs = data.high
+        lows = data.low
         timestamps = data.timestamps
 
         # Pre-compute ATR if needed for trailing ATR stops
         atr_values: np.ndarray | None = None
-        if strategy.stop_loss and strategy.stop_loss.type.value == "trailing_atr":
+        if strategy.stop_loss and strategy.stop_loss.type.value in ("trailing_atr", "atr"):
             atr_values = self._compute_atr(data, strategy.stop_loss.atr_period)
 
         for i in range(1, len(data)):  # Start at 1 to use previous bar for signals
             current_equity = cash
             if position:
-                current_equity += position["quantity"] * closes[i]
+                # Mark-to-market: calculate unrealized P&L
+                if position["side"] == "long":
+                    current_equity += position["quantity"] * closes[i]
+                else:  # short
+                    # For shorts: profit = (entry - current) * qty, plus we have entry proceeds
+                    unrealized_pnl = (position["entry_price"] - closes[i]) * position["quantity"]
+                    current_equity += (
+                        position["entry_price"] * position["quantity"] + unrealized_pnl
+                    )
             equity_curve.append(current_equity)
 
             # Check exit conditions if in position
             if position:
                 should_exit = False
                 exit_reason = "signal"
+                is_short = position["side"] == "short"
 
-                # Update trailing stop state (high water mark, current stop)
+                # Update trailing stop state
                 if strategy.stop_loss:
                     position = self._update_trailing_stop(
-                        position, strategy.stop_loss, highs[i], closes[i], atr_values, i
+                        position,
+                        strategy.stop_loss,
+                        highs[i],
+                        lows[i],
+                        closes[i],
+                        atr_values,
+                        i,
                     )
 
                 # Check exit signal
@@ -236,14 +277,30 @@ class BacktestEngine:
                     should_exit = True
                     exit_reason = "signal"
 
+                # Check opposite side entry as exit trigger
+                if not should_exit and (
+                    (is_short and long_entry_signals[i - 1])
+                    or (not is_short and short_entry_signals[i - 1])
+                ):
+                    should_exit = True
+                    exit_reason = "opposite_signal"
+
                 # Check stop loss (fixed or trailing)
                 if strategy.stop_loss and not should_exit:
                     stop_price = self._get_current_stop_price(
                         position, strategy.stop_loss, atr_values, i
                     )
-                    if stop_price is not None and closes[i] <= stop_price:
-                        should_exit = True
-                        exit_reason = "stop_loss"
+                    if stop_price is not None:
+                        if is_short:
+                            # Short stop: triggers when price RISES above stop
+                            if closes[i] >= stop_price:
+                                should_exit = True
+                                exit_reason = "stop_loss"
+                        else:
+                            # Long stop: triggers when price FALLS below stop
+                            if closes[i] <= stop_price:
+                                should_exit = True
+                                exit_reason = "stop_loss"
 
                 # Check take profit
                 if (
@@ -251,21 +308,36 @@ class BacktestEngine:
                     and not should_exit
                     and strategy.take_profit.type.value == "percent"
                 ):
-                    tp_price = position["entry_price"] * (1 + strategy.take_profit.value)
-                    if closes[i] >= tp_price:
-                        should_exit = True
-                        exit_reason = "take_profit"
+                    if is_short:
+                        # Short TP: triggers when price FALLS below target
+                        tp_price = position["entry_price"] * (1 - strategy.take_profit.value)
+                        if closes[i] <= tp_price:
+                            should_exit = True
+                            exit_reason = "take_profit"
+                    else:
+                        # Long TP: triggers when price RISES above target
+                        tp_price = position["entry_price"] * (1 + strategy.take_profit.value)
+                        if closes[i] >= tp_price:
+                            should_exit = True
+                            exit_reason = "take_profit"
 
                 if should_exit:
                     # Exit at open of current bar (signal was on previous bar)
-                    exit_price = opens[i] * (1 - self.config.slippage)
-                    pnl = (exit_price - position["entry_price"]) * position["quantity"]
+                    if is_short:
+                        # Short exit: buying back shares (price goes up = bad)
+                        exit_price = opens[i] * (1 + self.config.slippage)
+                        pnl = (position["entry_price"] - exit_price) * position["quantity"]
+                    else:
+                        # Long exit: selling shares
+                        exit_price = opens[i] * (1 - self.config.slippage)
+                        pnl = (exit_price - position["entry_price"]) * position["quantity"]
+
                     pnl -= exit_price * position["quantity"] * self.config.commission
 
                     trades.append(
                         Trade(
                             symbol=strategy.symbols[0],
-                            side=OrderSide.BUY,
+                            side=OrderSide.SELL if is_short else OrderSide.BUY,
                             entry_time=position["entry_time"],
                             entry_price=position["entry_price"],
                             exit_time=timestamps[i],
@@ -274,52 +346,77 @@ class BacktestEngine:
                             pnl=pnl,
                             pnl_percent=pnl / (position["entry_price"] * position["quantity"]),
                             exit_reason=exit_reason,
+                            position_side=position["side"],
                         )
                     )
 
-                    cash += exit_price * position["quantity"]
-                    cash += pnl
+                    # Return cash
+                    if is_short:
+                        # Short close: we pay exit_price * qty to buy back, plus/minus P&L
+                        cash += position["entry_price"] * position["quantity"] + pnl
+                    else:
+                        cash += exit_price * position["quantity"] + pnl
+
                     position = None
 
             # Check entry conditions if not in position
-            if position is None and entry_signals[i - 1]:
-                # Calculate position size
-                entry_price = opens[i] * (1 + self.config.slippage)
+            if position is None:
+                entry_side = None
+                if long_entry_signals[i - 1]:
+                    entry_side = "long"
+                elif short_entry_signals[i - 1]:
+                    entry_side = "short"
 
-                if strategy.position_size.type.value == "percent_equity":
-                    # Reserve cash for commission when using percent_equity
-                    # Use 99.5% of target to ensure we have buffer for commission + float errors
-                    pct = min(strategy.position_size.value, 99.5) / 100
-                    position_value = current_equity * pct
-                elif strategy.position_size.type.value == "fixed_value":
-                    position_value = strategy.position_size.value
-                else:  # fixed_quantity
-                    position_value = strategy.position_size.value * opens[i]
+                if entry_side:
+                    # Calculate position size
+                    if entry_side == "long":
+                        entry_price = opens[i] * (1 + self.config.slippage)
+                    else:
+                        entry_price = opens[i] * (1 - self.config.slippage)
 
-                quantity = position_value / entry_price
-                commission = entry_price * quantity * self.config.commission
-                total_cost = position_value + commission
+                    if strategy.position_size.type.value == "percent_equity":
+                        pct = min(strategy.position_size.value, 99.5) / 100
+                        position_value = current_equity * pct
+                    elif strategy.position_size.type.value == "fixed_value":
+                        position_value = strategy.position_size.value
+                    else:  # fixed_quantity
+                        position_value = strategy.position_size.value * opens[i]
 
-                if cash >= total_cost:
-                    position = {
-                        "entry_time": timestamps[i],
-                        "entry_price": entry_price,
-                        "quantity": quantity,
-                        # Trailing stop state
-                        "highest_price": entry_price,  # Start tracking from entry
-                        "breakeven_triggered": False,  # For breakeven stops
-                    }
-                    cash -= entry_price * quantity + commission
+                    quantity = position_value / entry_price
+                    commission = entry_price * quantity * self.config.commission
+                    total_cost = position_value + commission
+
+                    if cash >= total_cost:
+                        position = {
+                            "entry_time": timestamps[i],
+                            "entry_price": entry_price,
+                            "quantity": quantity,
+                            "side": entry_side,
+                            # Trailing stop state
+                            "highest_price": entry_price,  # For long trailing stops
+                            "lowest_price": entry_price,  # For short trailing stops
+                            "breakeven_triggered": False,
+                        }
+                        if entry_side == "long":
+                            cash -= entry_price * quantity + commission
+                        else:
+                            # Short: we receive proceeds but set aside for later buyback
+                            cash -= commission  # Only pay commission upfront
 
         # Close any open position at end
         if position:
+            is_short = position["side"] == "short"
             exit_price = closes[-1]
-            pnl = (exit_price - position["entry_price"]) * position["quantity"]
+
+            if is_short:
+                pnl = (position["entry_price"] - exit_price) * position["quantity"]
+            else:
+                pnl = (exit_price - position["entry_price"]) * position["quantity"]
 
             trades.append(
                 Trade(
                     symbol=strategy.symbols[0],
-                    side=OrderSide.BUY,
+                    side=OrderSide.SELL if is_short else OrderSide.BUY,
                     entry_time=position["entry_time"],
                     entry_price=position["entry_price"],
                     exit_time=timestamps[-1],
@@ -328,10 +425,14 @@ class BacktestEngine:
                     pnl=pnl,
                     pnl_percent=pnl / (position["entry_price"] * position["quantity"]),
                     exit_reason="end_of_data",
+                    position_side=position["side"],
                 )
             )
 
-            cash += exit_price * position["quantity"] + pnl
+            if is_short:
+                cash += position["entry_price"] * position["quantity"] + pnl
+            else:
+                cash += exit_price * position["quantity"] + pnl
             equity_curve.append(cash)
 
         return trades, equity_curve
@@ -364,28 +465,42 @@ class BacktestEngine:
         position: dict[str, Any],
         stop_config: "StopLossConfig",
         current_high: float,
+        current_low: float,
         current_close: float,
         atr_values: np.ndarray | None,
         bar_index: int,
     ) -> dict[str, Any]:
         """Update trailing stop state for the current bar.
 
-        Updates highest_price for trailing stops, and breakeven_triggered for breakeven stops.
+        For long positions: tracks highest_price (stop trails below high)
+        For short positions: tracks lowest_price (stop trails above low)
         """
         stop_type = stop_config.type.value
+        is_short = position.get("side") == "short"
 
         if stop_type in ("trailing_percent", "trailing_atr"):
-            # Update high water mark (ratchet effect - never moves down)
-            new_high = max(position["highest_price"], current_high)
-            position["highest_price"] = new_high
+            if is_short:
+                # For shorts: track low water mark (stop trails ABOVE the low)
+                new_low = min(position.get("lowest_price", current_low), current_low)
+                position["lowest_price"] = new_low
+            else:
+                # For longs: track high water mark (stop trails BELOW the high)
+                new_high = max(position["highest_price"], current_high)
+                position["highest_price"] = new_high
 
-        elif stop_type == "breakeven":
+        elif stop_type == "breakeven" and not position["breakeven_triggered"]:
             # Check if profit threshold reached to trigger breakeven
-            if not position["breakeven_triggered"]:
-                entry_price = position["entry_price"]
-                trigger_pct = stop_config.trigger_percent or 0.05
-                trigger_price = entry_price * (1 + trigger_pct)
+            entry_price = position["entry_price"]
+            trigger_pct = stop_config.trigger_percent or 0.05
 
+            if is_short:
+                # Short profit: price must DROP below entry
+                trigger_price = entry_price * (1 - trigger_pct)
+                if current_close <= trigger_price:
+                    position["breakeven_triggered"] = True
+            else:
+                # Long profit: price must RISE above entry
+                trigger_price = entry_price * (1 + trigger_pct)
                 if current_close >= trigger_price:
                     position["breakeven_triggered"] = True
 
@@ -398,32 +513,53 @@ class BacktestEngine:
         atr_values: np.ndarray | None,
         bar_index: int,
     ) -> float | None:
-        """Calculate the current stop price based on stop type."""
+        """Calculate the current stop price based on stop type.
+
+        For long positions: stop is BELOW entry/trailing price (triggers on price drop)
+        For short positions: stop is ABOVE entry/trailing price (triggers on price rise)
+        """
         stop_type = stop_config.type.value
         entry_price = position["entry_price"]
+        is_short = position.get("side") == "short"
 
         if stop_type == "percent":
             # Fixed percent stop
-            return entry_price * (1 - stop_config.value)
+            if is_short:
+                return entry_price * (1 + stop_config.value)  # Stop ABOVE for shorts
+            return entry_price * (1 - stop_config.value)  # Stop BELOW for longs
 
         elif stop_type == "trailing_percent":
-            # Trailing percent stop - trails below high water mark
-            highest_price = position["highest_price"]
-            return highest_price * (1 - stop_config.value)
+            if is_short:
+                # Trailing stop trails ABOVE the low water mark for shorts
+                lowest_price = position.get("lowest_price", entry_price)
+                return lowest_price * (1 + stop_config.value)
+            else:
+                # Trailing stop trails BELOW the high water mark for longs
+                highest_price = position["highest_price"]
+                return highest_price * (1 - stop_config.value)
 
         elif stop_type == "trailing_atr":
-            # Trailing ATR stop - trails ATR multiple below high water mark
             if atr_values is None:
                 return None
-            highest_price = position["highest_price"]
             atr = atr_values[bar_index]
-            return highest_price - (stop_config.value * atr)
+            if is_short:
+                # Trailing ATR stop - trails ATR multiple ABOVE low water mark for shorts
+                lowest_price = position.get("lowest_price", entry_price)
+                return lowest_price + (stop_config.value * atr)
+            else:
+                # Trailing ATR stop - trails ATR multiple BELOW high water mark for longs
+                highest_price = position["highest_price"]
+                return highest_price - (stop_config.value * atr)
 
         elif stop_type == "breakeven":
             # Breakeven stop - only active after trigger
             if position["breakeven_triggered"]:
-                # Stop at entry price (breakeven)
-                return entry_price + stop_config.value  # value can add buffer
+                if is_short:
+                    # Stop at entry price minus buffer (for shorts, we want price below entry)
+                    return entry_price - stop_config.value
+                else:
+                    # Stop at entry price plus buffer (for longs)
+                    return entry_price + stop_config.value
             return None  # Not triggered yet, no stop
 
         elif stop_type == "atr":
@@ -431,7 +567,9 @@ class BacktestEngine:
             if atr_values is None:
                 return None
             atr = atr_values[bar_index]
-            return entry_price - (stop_config.value * atr)
+            if is_short:
+                return entry_price + (stop_config.value * atr)  # Stop ABOVE for shorts
+            return entry_price - (stop_config.value * atr)  # Stop BELOW for longs
 
         elif stop_type == "fixed":
             # Fixed price stop

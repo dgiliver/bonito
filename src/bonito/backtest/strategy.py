@@ -176,10 +176,20 @@ class RuleCondition(BaseModel):
 
 
 class Rule(BaseModel):
-    """A rule combining multiple conditions."""
+    """A rule combining multiple conditions.
+
+    For short selling, set side="short" on entry rules. The backtest engine will:
+    - Open a short position (profit when price falls)
+    - Invert stop loss direction (triggers on price RISE)
+    - Invert trailing stop tracking (tracks LOW price instead of high)
+    """
 
     conditions: list[RuleCondition] = Field(..., min_length=1)
     logic: Literal["AND", "OR"] = Field(default="AND")
+    side: Literal["long", "short"] = Field(
+        default="long",
+        description="Position side: 'long' (buy low, sell high) or 'short' (sell high, buy low)",
+    )
 
 
 class PositionSizeType(str, Enum):
@@ -319,7 +329,8 @@ class StrategyConfig(BaseModel):
         lines.extend(["", "Entry Rules:"])
         for i, rule in enumerate(self.entry_rules, 1):
             conds = [f"{c.left} {c.comparison.value} {c.right}" for c in rule.conditions]
-            lines.append(f"  Rule {i}: {f' {rule.logic} '.join(conds)}")
+            side_str = f" [{rule.side.upper()}]" if rule.side == "short" else ""
+            lines.append(f"  Rule {i}{side_str}: {f' {rule.logic} '.join(conds)}")
 
         if self.exit_rules:
             lines.extend(["", "Exit Rules:"])

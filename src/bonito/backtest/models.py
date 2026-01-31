@@ -17,7 +17,7 @@ class Trade(BaseModel):
     """A completed trade."""
 
     symbol: str
-    side: OrderSide
+    side: OrderSide  # BUY for long entry, SELL for short entry
     entry_time: datetime
     entry_price: float
     exit_time: datetime
@@ -26,6 +26,10 @@ class Trade(BaseModel):
     pnl: float
     pnl_percent: float
     exit_reason: str = Field(default="signal", description="Why the trade was closed")
+    position_side: str = Field(
+        default="long",
+        description="Position type: 'long' (profit when price rises) or 'short' (profit when price falls)",
+    )
 
 
 class BacktestConfig(BaseModel):
@@ -98,7 +102,7 @@ class BacktestResult(BaseModel):
         m = self.metrics
         return f"""
 Backtest Results: {self.strategy_name}
-{'=' * 50}
+{"=" * 50}
 Period: {self.start_date.date()} to {self.end_date.date()}
 Initial Capital: ${self.initial_capital:,.2f}
 Final Capital: ${self.final_capital:,.2f}
