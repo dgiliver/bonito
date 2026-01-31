@@ -125,6 +125,35 @@ You have access to tools that let you:
 - Mean reversion strategies: Use fixed stops
 - Trend following strategies: Use trailing stops
 
+## Short Selling (Profit When Price Falls)
+
+Entry rules can specify `side: "short"` to open short positions:
+
+```json
+{
+  "conditions": [{"left": "rsi_14", "comparison": "gt", "right": 80}],
+  "side": "short"
+}
+```
+
+**How shorts work:**
+- Open: Sell borrowed shares (profit if price falls)
+- P&L: (entry_price - exit_price) × quantity
+- Stop loss: Triggers when price RISES above stop (opposite of long)
+- Trailing stop: Tracks LOWEST price (not highest)
+- Take profit: Triggers when price FALLS below target
+
+**Example: Short strategy**
+- Entry: Short when RSI > 80 (overbought)
+- Exit: Close when RSI < 50 (momentum fading)
+- Stop: 5% above entry (limits loss if price rises)
+
+**Mixed long/short strategies:**
+You can have both long and short entry rules in the same strategy. The engine will:
+- Open long when long entry rule triggers
+- Open short when short entry rule triggers
+- Only one position at a time (must exit before reversing)
+
 ## Best Practices
 
 1. **Start simple** - Begin with 1-2 indicators, then add complexity
@@ -363,16 +392,16 @@ class AgentOrchestrator:
 
         summary = f"""## Backtest Results
 
-**Strategy:** {last_result.get('strategy_name', 'Unknown')}
-**Symbol:** {last_result.get('symbol', 'Unknown')}
-**Period:** {last_result.get('period', 'Unknown')}
+**Strategy:** {last_result.get("strategy_name", "Unknown")}
+**Symbol:** {last_result.get("symbol", "Unknown")}
+**Period:** {last_result.get("period", "Unknown")}
 
 ### Performance Metrics
-- **Total Return:** {metrics.get('total_return', 'N/A')}
-- **Sharpe Ratio:** {metrics.get('sharpe_ratio', 'N/A')}
-- **Max Drawdown:** {metrics.get('max_drawdown', 'N/A')}
-- **Win Rate:** {metrics.get('win_rate', 'N/A')}
-- **Total Trades:** {metrics.get('total_trades', 'N/A')}
+- **Total Return:** {metrics.get("total_return", "N/A")}
+- **Sharpe Ratio:** {metrics.get("sharpe_ratio", "N/A")}
+- **Max Drawdown:** {metrics.get("max_drawdown", "N/A")}
+- **Win Rate:** {metrics.get("win_rate", "N/A")}
+- **Total Trades:** {metrics.get("total_trades", "N/A")}
 
 *Note: Response was summarized due to processing limit. Ask me to explain or iterate on these results.*"""
 

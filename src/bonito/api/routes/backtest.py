@@ -131,11 +131,13 @@ async def run_backtest(request: BacktestRequest) -> dict[str, Any]:
                 "entry_time": t.entry_time.isoformat(),
                 "exit_time": t.exit_time.isoformat(),
                 "side": t.side.value,
+                "position_side": t.position_side,  # "long" or "short"
                 "quantity": t.quantity,
                 "entry_price": round(t.entry_price, 2),
                 "exit_price": round(t.exit_price, 2),
                 "pnl": round(t.pnl, 2),
                 "return_pct": f"{t.pnl_percent * 100:.2f}%",
+                "exit_reason": t.exit_reason,  # "signal", "stop_loss", "take_profit", etc.
             }
             for t in result.trades  # All trades (frontend handles virtualization)
         ],
