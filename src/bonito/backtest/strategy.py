@@ -157,6 +157,11 @@ class Comparison(str, Enum):
     EQ = "eq"
     CROSSES_ABOVE = "crosses_above"
     CROSSES_BELOW = "crosses_below"
+    # Rolling lookback operators (F022)
+    WAS_ABOVE = "was_above"  # True if condition was met in lookback period
+    WAS_BELOW = "was_below"  # True if condition was met in lookback period
+    CROSSED_ABOVE_WITHIN = "crossed_above_within"  # Crossover in lookback period
+    CROSSED_BELOW_WITHIN = "crossed_below_within"  # Crossunder in lookback period
 
 
 class RuleCondition(BaseModel):
@@ -166,12 +171,19 @@ class RuleCondition(BaseModel):
         - RSI < 30
         - SMA_20 crosses_above SMA_50
         - close > SMA_200
+        - rsi was_below 30 (with lookback=5)
+        - close >= rolling_max_20 (breakout)
     """
 
     left: str = Field(..., description="Left operand (indicator name or 'close', 'open', etc.)")
     comparison: Comparison
     right: str | float = Field(
         ..., description="Right operand (indicator name, price field, or numeric value)"
+    )
+    lookback: int | None = Field(
+        default=None,
+        description="Lookback period for was_above/was_below/crossed_*_within operators",
+        ge=1,
     )
 
 

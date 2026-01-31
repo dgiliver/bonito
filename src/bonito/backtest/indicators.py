@@ -276,15 +276,55 @@ def compute_indicators(
             results[f"{config.name}_d"] = d
 
         else:
-            # Handle pandas-ta indicators (string type)
-            if df is None:
-                df = _bardata_to_dataframe(data)
-
+            # Handle rolling indicators and pandas-ta indicators (string type)
             indicator_name = str(indicator_type).lower()
-            pandas_ta_results = _compute_pandas_ta_indicator(
-                df, indicator_name, config.name, config.params
-            )
-            results.update(pandas_ta_results)
+
+            # Rolling lookback indicators (F022)
+            if indicator_name == "rolling_max":
+                series_name = config.params.get("series", "close")
+                period = config.params.get("period", 20)
+                source = results.get(series_name, data.close)
+                results[config.name] = rolling_max(source, period)
+
+            elif indicator_name == "rolling_min":
+                series_name = config.params.get("series", "close")
+                period = config.params.get("period", 20)
+                source = results.get(series_name, data.close)
+                results[config.name] = rolling_min(source, period)
+
+            elif indicator_name == "rolling_mean":
+                series_name = config.params.get("series", "close")
+                period = config.params.get("period", 20)
+                source = results.get(series_name, data.close)
+                results[config.name] = rolling_mean(source, period)
+
+            elif indicator_name == "rolling_std":
+                series_name = config.params.get("series", "close")
+                period = config.params.get("period", 20)
+                source = results.get(series_name, data.close)
+                results[config.name] = rolling_std(source, period)
+
+            elif indicator_name == "zscore":
+                series_name = config.params.get("series", "close")
+                period = config.params.get("period", 20)
+                source = results.get(series_name, data.close)
+                results[config.name] = zscore(source, period)
+
+            elif indicator_name == "percentile":
+                series_name = config.params.get("series", "close")
+                period = config.params.get("period", 20)
+                source = results.get(series_name, data.close)
+                results[config.name] = percentile_rank(source, period)
+
+            else:
+                # Handle pandas-ta indicators
+                if df is None:
+                    df = _bardata_to_dataframe(data)
+
+                pandas_ta_results = _compute_pandas_ta_indicator(
+                    df, indicator_name, config.name, config.params
+                )
+                results.update(pandas_ta_results)
 
     return results
 
@@ -419,3 +459,157 @@ def stochastic(
     d = sma(k, d_period)
 
     return k, d
+
+
+# =============================================================================
+# Rolling Lookback Indicators (F022)
+# =============================================================================
+
+
+def rolling_max(values: np.ndarray, period: int) -> np.ndarray:
+    """Rolling maximum over N periods.
+
+    Returns the highest value in the lookback window for each bar.
+    Useful for breakout detection (close >= rolling_max).
+    """
+    result = np.full_like(values, np.nan, dtype=np.float64)
+    for i in range(period - 1, len(values)):
+        result[i] = np.nanmax(values[i - period + 1 : i + 1])
+    return result
+
+
+def rolling_min(values: np.ndarray, period: int) -> np.ndarray:
+    """Rolling minimum over N periods.
+
+    Returns the lowest value in the lookback window for each bar.
+    Useful for breakdown detection (close <= rolling_min).
+    """
+    result = np.full_like(values, np.nan, dtype=np.float64)
+    for i in range(period - 1, len(values)):
+        result[i] = np.nanmin(values[i - period + 1 : i + 1])
+    return result
+
+
+def rolling_mean(values: np.ndarray, period: int) -> np.ndarray:
+    """Rolling mean over N periods.
+
+    Equivalent to SMA but can be applied to any series (not just price).
+    """
+    return sma(values, period)
+
+
+def rolling_std(values: np.ndarray, period: int) -> np.ndarray:
+    """Rolling standard deviation over N periods."""
+    result = np.full_like(values, np.nan, dtype=np.float64)
+    for i in range(period - 1, len(values)):
+        result[i] = np.nanstd(values[i - period + 1 : i + 1])
+    return result
+
+
+def zscore(values: np.ndarray, period: int) -> np.ndarray:
+    """Z-score: (value - mean) / std over N periods.
+
+    Returns how many standard deviations the current value is from the mean.
+    Useful for mean reversion (zscore > 2 → overbought).
+    """
+    mean = rolling_mean(values, period)
+    std = rolling_std(values, period)
+
+    # Avoid division by zero
+    with np.errstate(divide="ignore", invalid="ignore"):
+        result = (values - mean) / std
+        result = np.where(std == 0, 0, result)
+
+    return result
+
+
+def percentile_rank(values: np.ndarray, period: int) -> np.ndarray:
+    """Percentile rank: current value's percentile within lookback period.
+
+    Returns 0-100 indicating where the current value ranks in the period.
+    100 = highest in period, 0 = lowest in period.
+    Useful for extremes (percentile > 90 → near highs).
+    """
+    result = np.full_like(values, np.nan, dtype=np.float64)
+    for i in range(period - 1, len(values)):
+        window = values[i - period + 1 : i + 1]
+        # Count values less than current
+        count_below = np.nansum(window < values[i])
+        count_equal = np.nansum(window == values[i])
+        # Percentile using midpoint of equal values
+        result[i] = 100 * (count_below + 0.5 * count_equal) / period
+    return result
+
+
+def was_above(left: np.ndarray, right: np.ndarray | float, lookback: int) -> np.ndarray:
+    """Check if left was above right at any point in lookback period.
+
+    Returns boolean array where True means the condition was met
+    at some point in the last N bars (including current).
+    """
+    if isinstance(right, int | float):
+        right = np.full_like(left, right)
+
+    result = np.zeros(len(left), dtype=bool)
+    for i in range(lookback - 1, len(left)):
+        window_left = left[i - lookback + 1 : i + 1]
+        window_right = right[i - lookback + 1 : i + 1]
+        result[i] = np.any(window_left > window_right)
+    return result
+
+
+def was_below(left: np.ndarray, right: np.ndarray | float, lookback: int) -> np.ndarray:
+    """Check if left was below right at any point in lookback period.
+
+    Returns boolean array where True means the condition was met
+    at some point in the last N bars (including current).
+    """
+    if isinstance(right, int | float):
+        right = np.full_like(left, right)
+
+    result = np.zeros(len(left), dtype=bool)
+    for i in range(lookback - 1, len(left)):
+        window_left = left[i - lookback + 1 : i + 1]
+        window_right = right[i - lookback + 1 : i + 1]
+        result[i] = np.any(window_left < window_right)
+    return result
+
+
+def crossed_above_within(left: np.ndarray, right: np.ndarray | float, lookback: int) -> np.ndarray:
+    """Check if left crossed above right at any point in lookback period.
+
+    A crossover occurs when left goes from below right to above right.
+    """
+    if isinstance(right, int | float):
+        right = np.full_like(left, right)
+
+    result = np.zeros(len(left), dtype=bool)
+    # Start from index 1 since we need to check previous bar
+    for i in range(1, len(left)):
+        # Check each bar in the lookback window for a crossover
+        window_start = max(1, i - lookback + 1)
+        for j in range(window_start, i + 1):
+            if left[j - 1] <= right[j - 1] and left[j] > right[j]:
+                result[i] = True
+                break
+    return result
+
+
+def crossed_below_within(left: np.ndarray, right: np.ndarray | float, lookback: int) -> np.ndarray:
+    """Check if left crossed below right at any point in lookback period.
+
+    A crossunder occurs when left goes from above right to below right.
+    """
+    if isinstance(right, int | float):
+        right = np.full_like(left, right)
+
+    result = np.zeros(len(left), dtype=bool)
+    # Start from index 1 since we need to check previous bar
+    for i in range(1, len(left)):
+        # Check each bar in the lookback window for a crossunder
+        window_start = max(1, i - lookback + 1)
+        for j in range(window_start, i + 1):
+            if left[j - 1] >= right[j - 1] and left[j] < right[j]:
+                result[i] = True
+                break
+    return result

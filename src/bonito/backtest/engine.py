@@ -5,7 +5,13 @@ from typing import Any
 
 import numpy as np
 
-from bonito.backtest.indicators import compute_indicators
+from bonito.backtest.indicators import (
+    compute_indicators,
+    crossed_above_within,
+    crossed_below_within,
+    was_above,
+    was_below,
+)
 from bonito.backtest.models import (
     BacktestConfig,
     BacktestResult,
@@ -210,6 +216,19 @@ class BacktestEngine:
             crosses = np.zeros(len(left), dtype=bool)
             crosses[1:] = (left[:-1] >= right_arr[:-1]) & (left[1:] < right_arr[1:])
             return crosses
+        # Rolling lookback comparisons (F022)
+        elif condition.comparison == Comparison.WAS_ABOVE:
+            lookback = condition.lookback or 5
+            return was_above(left, right, lookback)
+        elif condition.comparison == Comparison.WAS_BELOW:
+            lookback = condition.lookback or 5
+            return was_below(left, right, lookback)
+        elif condition.comparison == Comparison.CROSSED_ABOVE_WITHIN:
+            lookback = condition.lookback or 5
+            return crossed_above_within(left, right, lookback)
+        elif condition.comparison == Comparison.CROSSED_BELOW_WITHIN:
+            lookback = condition.lookback or 5
+            return crossed_below_within(left, right, lookback)
         else:
             raise ValueError(f"Unknown comparison: {condition.comparison}")
 
