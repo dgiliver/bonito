@@ -1,0 +1,56 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(make test*)",
+      "Bash(make lint)",
+      "Bash(make format)",
+      "Bash(make typecheck)",
+      "Bash(make pre-commit)",
+      "Bash(pytest *)",
+      "Bash(ruff *)",
+      "Bash(git status)",
+      "Bash(git diff*)",
+      "Bash(git log*)",
+      "Bash(git branch*)",
+      "Bash(git add *)",
+      "Bash(git commit *)",
+      "Bash(cd web && npm *)",
+      "Bash(curl http://localhost:*)",
+      "Bash(bonito *)",
+      "Read",
+      "Glob",
+      "Grep"
+    ],
+    "deny": [
+      "Bash(rm -rf /)",
+      "Bash(git push --force)",
+      "Bash(git reset --hard)",
+      "Edit(.env*)",
+      "Write(.env*)"
+    ]
+  },
+  "hooks": {
+    "PostToolUse": [
+      {
+        "matcher": "Edit|Write",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "file_path=$(cat | jq -r '.tool_input.file_path // empty'); if [[ \"$file_path\" == *.py ]]; then ruff format \"$file_path\" 2>/dev/null; ruff check --fix \"$file_path\" 2>/dev/null; fi"
+          }
+        ]
+      }
+    ],
+    "PreToolUse": [
+      {
+        "matcher": "Edit|Write",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "file_path=$(cat | jq -r '.tool_input.file_path // empty'); if [[ \"$file_path\" == *.env* ]]; then echo 'Blocked: Cannot edit .env files' >&2; exit 2; fi; exit 0"
+          }
+        ]
+      }
+    ]
+  }
+}
