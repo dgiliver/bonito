@@ -983,7 +983,12 @@ Examples:
                     period = params.get("period", 14)
                     name = f"RSI({period})"
                 elif ind_type == "macd":
-                    name = "MACD"
+                    fast = params.get("fastPeriod", 12)
+                    slow = params.get("slowPeriod", 26)
+                    signal = params.get("signalPeriod", 9)
+                    name = f"MACD({fast},{slow},{signal})"
+                    # Ensure params include MACD-specific fields for frontend
+                    params = {"fastPeriod": fast, "slowPeriod": slow, "signalPeriod": signal}
                 elif ind_type == "bbands":
                     period = params.get("period", 20)
                     name = f"BB({period})"
