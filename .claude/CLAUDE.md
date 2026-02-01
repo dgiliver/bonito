@@ -290,3 +290,48 @@ Panels must render in user add order via `activePanels.map()`:
 2. Use ui-explorer agent           # Detailed exploration
 3. Use chart-validator agent       # Comprehensive validation
 ```
+
+### Documentation Updates
+```
+1. Use doc-writer agent            # Follow doc patterns
+2. /doc-cleanup --audit            # Check for staleness
+3. /doc-cleanup --consolidate      # Merge redundant docs
+```
+
+## MCP Plugins to Consider
+
+For enhancing Bonito's capabilities, consider these MCP integrations:
+
+### High Priority (Immediate Value)
+| Plugin | Purpose | Why |
+|--------|---------|-----|
+| **Alpaca MCP** | Paper/live trading | Bridges backtest → live execution |
+| **Alpha Vantage MCP** | Real-time market data | Better than Yahoo Finance for live data |
+| **Financial Datasets MCP** | Fundamentals | Income statements, balance sheets for factor strategies |
+
+### Medium Priority (Future Enhancement)
+| Plugin | Purpose | Why |
+|--------|---------|-----|
+| **Memory MCP** | Persistent knowledge | Remember user preferences, past strategies |
+| **GitHub MCP** | Issue/PR integration | Track feature requests from within Claude |
+| **PostgreSQL MCP** | Production database | When moving beyond DuckDB |
+
+### Integration Pattern
+```python
+# MCP tools follow same protocol as Bonito tools
+class AlpacaMCPTool(Tool):
+    name = "alpaca_place_order"
+    description = "Place a paper/live trade via Alpaca"
+    parameters = {...}
+
+    async def execute(self, symbol: str, qty: int, side: str) -> ToolResult:
+        # MCP handles the actual API call
+        return await mcp_client.call("alpaca", "place_order", {...})
+```
+
+### State-of-the-Art Setup Recommendations
+1. **Git worktrees** - Each Claude session in isolated checkout
+2. **Subagents for research** - Spawn explore agents for codebase search
+3. **Planning mode** - For any feature >3 files changed
+4. **Claude Opus 4.5** - For complex architectural decisions
+5. **Parallel tool calls** - Group independent operations

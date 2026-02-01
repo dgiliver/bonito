@@ -1,82 +1,102 @@
-# AI-Native Quant Platform Architecture
+# Bonito Architecture
+
+> AI-native algorithmic trading platform — backtesting and deployment built for agents, not scripts.
+
+**Version:** 0.9.1
+**Last Updated:** February 2026
+
+---
 
 ## Core Philosophy
 
-This platform inverts the traditional quant workflow. Instead of:
-```
-Human writes code → Platform runs backtest → Human interprets → Human rewrites
-```
+Traditional quant platforms assume you write deterministic strategies, run slow backtests, and manually iterate. Bonito inverts this:
 
-We build:
 ```
-Agent proposes strategy → Tools execute backtest → Agent interprets → Agent refines → Human approves
+Traditional:  Human writes code → Platform runs backtest → Human interprets → Human rewrites
+Bonito:       Agent proposes strategy → Tools execute backtest → Agent interprets → Agent refines → Human approves
 ```
 
 The human becomes a **supervisor** rather than an **implementer**.
 
 ---
 
-## System Architecture
+## System Overview
 
 ```
 ┌─────────────────────────────────────────────────────────────────────────────┐
-│                              USER INTERFACE                                  │
-│                    (CLI for MVP, Web UI for v1.0)                           │
-└─────────────────────────────────────────────────────────────────────────────┘
-                                      │
-                                      ▼
+│                              USER INTERFACES                                 │
+├─────────────────────────────────────────────────────────────────────────────┤
+│   ┌─────────────┐      ┌─────────────────────────────────────────────────┐  │
+│   │    CLI      │      │              Next.js 16 Web UI                  │  │
+│   │  (Typer)    │      │   Chat │ Strategies │ Charts │ Trade Analysis  │  │
+│   └──────┬──────┘      └────────────────────┬────────────────────────────┘  │
+│          │                                   │                               │
+│          │         ┌─────────────────────────┤                               │
+│          │         │                         │ SSE Streaming                 │
+│          ▼         ▼                         ▼                               │
+│   ┌─────────────────────────────────────────────────────────────────────┐   │
+│   │                        FastAPI Server                                │   │
+│   │   /api/chat  │  /api/strategies  │  /api/backtest  │  /api/data    │   │
+│   └─────────────────────────────────────┬───────────────────────────────┘   │
+└─────────────────────────────────────────┼────────────────────────────────────┘
+                                          │
+                                          ▼
 ┌─────────────────────────────────────────────────────────────────────────────┐
-│                           ORCHESTRATOR LAYER                                 │
-│  ┌─────────────────┐  ┌─────────────────┐  ┌─────────────────────────────┐  │
-│  │  Agent Runtime  │  │  Session State  │  │  Conversation History       │  │
-│  │  (LLM + Tools)  │  │  (Portfolio,    │  │  (Decisions, Rationale,     │  │
-│  │                 │  │   Strategies)   │  │   Traces)                   │  │
-│  └─────────────────┘  └─────────────────┘  └─────────────────────────────┘  │
-└─────────────────────────────────────────────────────────────────────────────┘
-                                      │
-                         ┌────────────┼────────────┐
-                         ▼            ▼            ▼
+│                              AGENT LAYER                                     │
+├─────────────────────────────────────────────────────────────────────────────┤
+│   ┌─────────────────────────────────────────────────────────────────────┐   │
+│   │                    AI Orchestrator (ReAct Loop)                      │   │
+│   │   • Parse user intent                                                │   │
+│   │   • Select appropriate tools                                         │   │
+│   │   • Execute tool calls                                               │   │
+│   │   • Control chart visualization                                      │   │
+│   │   • Iterate or respond                                               │   │
+│   └──────────────────────────────────┬──────────────────────────────────┘   │
+│                                      │                                       │
+│              ┌───────────────────────┼───────────────────────┐              │
+│              ▼                       ▼                       ▼              │
+│   ┌─────────────────┐     ┌─────────────────┐     ┌─────────────────┐      │
+│   │  Strategy Tools │     │  Backtest Tools │     │  Chart Tools    │      │
+│   │  • create/save  │     │  • run/analyze  │     │  • add_indicator│      │
+│   │  • list/load    │     │  • compare      │     │  • spotlight    │      │
+│   │  • plugin_run   │     │  • metrics      │     │  • annotate     │      │
+│   └─────────────────┘     └─────────────────┘     └─────────────────┘      │
+│                                      │                                       │
+└──────────────────────────────────────┼───────────────────────────────────────┘
+                                       │
+                                       ▼
 ┌─────────────────────────────────────────────────────────────────────────────┐
-│                              TOOL LAYER                                      │
+│                              ENGINE LAYER                                    │
+├─────────────────────────────────────────────────────────────────────────────┤
+│   ┌────────────────────────────────────────────────────────────────────┐    │
+│   │                    Vectorized Backtest Engine                       │    │
+│   │                                                                     │    │
+│   │   Strategy DSL ─► Indicator Calc ─► Signal Gen ─► Simulation       │    │
+│   │       (JSON)        (NumPy)         (Rules)       (Vectorized)     │    │
+│   │                                                                     │    │
+│   │   Features: Long/Short, Trailing Stops, Rolling Lookbacks          │    │
+│   │   Outputs: Trades, Equity Curve, Performance Metrics               │    │
+│   └────────────────────────────────────────────────────────────────────┘    │
 │                                                                              │
-│  ┌──────────────┐  ┌──────────────┐  ┌──────────────┐  ┌──────────────┐    │
-│  │  Backtest    │  │  Market Data │  │  Execution   │  │  Analysis    │    │
-│  │  Engine      │  │  Service     │  │  Simulator   │  │  Tools       │    │
-│  │              │  │              │  │              │  │              │    │
-│  │ • run()      │  │ • get_bars() │  │ • place()    │  │ • metrics()  │    │
-│  │ • validate() │  │ • stream()   │  │ • cancel()   │  │ • explain()  │    │
-│  │ • explain()  │  │ • symbols()  │  │ • status()   │  │ • compare()  │    │
-│  └──────────────┘  └──────────────┘  └──────────────┘  └──────────────┘    │
-│                                                                              │
-└─────────────────────────────────────────────────────────────────────────────┘
-                                      │
-                                      ▼
+│   ┌────────────────────┐    ┌────────────────────┐    ┌─────────────────┐   │
+│   │  pandas-ta Library │    │   Strategy DSL     │    │  Plugin System  │   │
+│   │  60+ indicators    │    │   Entry/Exit Rules │    │  Custom Python  │   │
+│   │  SMA, RSI, MACD,   │    │   Position Sizing  │    │  strategies     │   │
+│   │  ADX, VWAP, etc.   │    │   Trailing Stops   │    │  Auto-discovery │   │
+│   └────────────────────┘    └────────────────────┘    └─────────────────┘   │
+└──────────────────────────────────────┬───────────────────────────────────────┘
+                                       │
+                                       ▼
 ┌─────────────────────────────────────────────────────────────────────────────┐
-│                              CORE LAYER                                      │
-│                                                                              │
-│  ┌──────────────────────┐  ┌──────────────────────┐  ┌──────────────────┐  │
-│  │  Strategy Runtime    │  │  Event Engine        │  │  Portfolio       │  │
-│  │                      │  │                      │  │  State           │  │
-│  │  • Code sandbox      │  │  • Bar processing    │  │  • Positions     │  │
-│  │  • Signal generation │  │  • Order matching    │  │  • Cash          │  │
-│  │  • State management  │  │  • Fill simulation   │  │  • History       │  │
-│  └──────────────────────┘  └──────────────────────┘  └──────────────────┘  │
-│                                                                              │
-└─────────────────────────────────────────────────────────────────────────────┘
-                                      │
-                                      ▼
-┌─────────────────────────────────────────────────────────────────────────────┐
-│                           PERSISTENCE LAYER                                  │
-│                                                                              │
-│  ┌──────────────────┐  ┌──────────────────┐  ┌──────────────────────────┐  │
-│  │  Market Data     │  │  Strategy Store  │  │  Trace Store             │  │
-│  │  (DuckDB)        │  │  (SQLite)        │  │  (SQLite + JSON)         │  │
-│  │                  │  │                  │  │                          │  │
-│  │  • OHLCV bars    │  │  • Code versions │  │  • Backtest results      │  │
-│  │  • Tick data     │  │  • Parameters    │  │  • Agent decisions       │  │
-│  │  • Fundamentals  │  │  • Metadata      │  │  • Performance logs      │  │
-│  └──────────────────┘  └──────────────────┘  └──────────────────────────┘  │
-│                                                                              │
+│                              DATA LAYER                                      │
+├─────────────────────────────────────────────────────────────────────────────┤
+│   ┌────────────────────┐    ┌────────────────────┐    ┌─────────────────┐   │
+│   │   DuckDB           │    │   Strategy Store   │    │  Yahoo Finance  │   │
+│   │   (Market Data)    │    │   (JSON Files)     │    │  (Data Source)  │   │
+│   │                    │    │                    │    │                 │   │
+│   │   OHLCV bars       │    │   strategies/      │    │  Free API       │   │
+│   │   Multi-timeframe  │    │   *.json           │    │  Daily data     │   │
+│   └────────────────────┘    └────────────────────┘    └─────────────────┘   │
 └─────────────────────────────────────────────────────────────────────────────┘
 ```
 
@@ -84,216 +104,164 @@ The human becomes a **supervisor** rather than an **implementer**.
 
 ## Key Design Decisions
 
-### 1. Strategy Representation
+### 1. Strategy as Data (Not Code)
 
-**NOT** arbitrary Python code. Instead, a **constrained DSL** with escape hatches.
+Strategies are JSON-serializable configurations, NOT arbitrary Python:
 
-```python
-# Example Strategy Definition (not arbitrary code)
-class StrategyConfig:
-    name: str
-    symbols: list[str]
-    timeframe: str  # "1m", "5m", "1h", "1d"
-
-    # Indicators are pre-defined, parameterized
-    indicators: list[IndicatorConfig]
-
-    # Entry/exit rules use a mini-DSL
-    entry_rules: list[Rule]
-    exit_rules: list[Rule]
-
-    # Risk parameters
-    position_size: PositionSizer
-    stop_loss: StopLossConfig | None
-    take_profit: TakeProfitConfig | None
+```json
+{
+  "name": "momentum_rsi",
+  "symbols": ["SPY"],
+  "timeframe": "1d",
+  "indicators": [
+    {"type": "rsi", "name": "rsi_14", "params": {"period": 14}},
+    {"type": "sma", "name": "sma_50", "params": {"period": 50}}
+  ],
+  "entry_rules": [{
+    "side": "long",
+    "conditions": [
+      {"left": "close", "comparison": "crosses_above", "right": "sma_50"},
+      {"left": "rsi_14", "comparison": "lt", "right": 70}
+    ]
+  }],
+  "exit_rules": [...],
+  "stop_loss": {"type": "trailing_percent", "value": 0.05}
+}
 ```
 
-Why? Because:
-- LLMs can reliably generate structured configs
-- Validation is straightforward
-- No security sandbox needed
-- Deterministic execution
-- Easy to explain/audit
+**Why?**
+- ✅ LLMs can reliably generate valid configs
+- ✅ Easy to validate with Pydantic
+- ✅ No security sandbox needed
+- ✅ Deterministic execution
+- ✅ Easy to audit and explain
 
-**Escape hatch**: Custom Python functions can be registered for advanced users, but the agent doesn't generate these.
+**Escape hatch:** Plugin interface for advanced users who need full Python.
 
-### 2. Backtesting Engine
+### 2. Vectorized Backtesting
 
-**Vectorized-first, event-capable.**
+All indicator calculations use NumPy arrays (not bar-by-bar loops):
+- Sub-second execution for typical strategies
+- No arbitrary code execution
+- Full auditability of results
 
-For MVP:
-- Vectorized pandas/numpy for simple strategies (fast: <1s)
-- Pre-computed indicators
-- Simple fill model (next-bar open)
+### 3. Agent-Chart Synthesis
 
-Post-MVP:
-- Event-driven mode for complex strategies
-- Realistic slippage/fill models
-- Multi-asset portfolio simulation
+The agent controls the chart visualization through intents:
+- `AnalysisContext` is single source of truth
+- Agent sends `ChartIntent` commands (add_indicator, spotlight, annotate)
+- Bidirectional: agent sees what user views, controls display
 
-### 3. Tool Protocol
+### 4. Tool Protocol (MCP-style)
 
-Each tool follows a standard interface:
+Every tool follows a standard interface:
 
 ```python
-@dataclass
-class ToolResult:
-    success: bool
-    data: dict | None
-    error: str | None
-    trace_id: str  # For debugging/audit
-
 class Tool(ABC):
     @property
-    @abstractmethod
     def name(self) -> str: ...
-
     @property
-    @abstractmethod
     def description(self) -> str: ...
-
     @property
-    @abstractmethod
     def parameters(self) -> dict: ...  # JSON Schema
 
-    @abstractmethod
     async def execute(self, **kwargs) -> ToolResult: ...
-```
-
-### 4. Agent Architecture
-
-**ReAct-style agent** with:
-- Explicit reasoning traces (logged)
-- Tool selection
-- Result interpretation
-- Iterative refinement
-
-```
-Loop:
-  1. Think: What should I do next?
-  2. Act: Call a tool
-  3. Observe: Interpret results
-  4. Decide: Continue refining or return to user
 ```
 
 ---
 
-## Data Flow: Strategy Development Cycle
+## Current Capabilities (v0.9.1)
 
-```
-┌─────────────┐
-│ User Query  │  "Create a momentum strategy for SPY"
-└──────┬──────┘
-       │
-       ▼
-┌─────────────────────────────────────────────┐
-│ Agent: Plan                                  │
-│ 1. Define strategy structure                 │
-│ 2. Configure indicators (RSI, SMA)           │
-│ 3. Set entry/exit rules                      │
-│ 4. Run backtest                              │
-│ 5. Analyze results                           │
-│ 6. Refine if needed                          │
-└──────┬──────────────────────────────────────┘
-       │
-       ▼
-┌─────────────────────────────────────────────┐
-│ Agent: Generate Strategy Config              │
-│                                              │
-│ {                                            │
-│   "name": "spy_momentum_v1",                 │
-│   "symbols": ["SPY"],                        │
-│   "timeframe": "1d",                         │
-│   "indicators": [                            │
-│     {"type": "RSI", "period": 14},           │
-│     {"type": "SMA", "period": 50}            │
-│   ],                                         │
-│   "entry_rules": [...],                      │
-│   "exit_rules": [...]                        │
-│ }                                            │
-└──────┬──────────────────────────────────────┘
-       │
-       ▼
-┌─────────────────────────────────────────────┐
-│ Tool: backtest.run(strategy_config)          │
-│                                              │
-│ Returns:                                     │
-│ {                                            │
-│   "sharpe": 1.2,                             │
-│   "max_drawdown": -0.15,                     │
-│   "total_return": 0.45,                      │
-│   "win_rate": 0.58,                          │
-│   "trades": [...],                           │
-│   "equity_curve": [...]                      │
-│ }                                            │
-└──────┬──────────────────────────────────────┘
-       │
-       ▼
-┌─────────────────────────────────────────────┐
-│ Agent: Analyze & Decide                      │
-│                                              │
-│ "Sharpe of 1.2 is decent, but max drawdown   │
-│ of 15% is high. Let me add a volatility      │
-│ filter to avoid entries during high-vol      │
-│ periods..."                                  │
-│                                              │
-│ → Modify strategy config                     │
-│ → Re-run backtest                            │
-│ → Repeat until satisfactory                  │
-└──────┬──────────────────────────────────────┘
-       │
-       ▼
-┌─────────────────────────────────────────────┐
-│ Agent: Present Results to User               │
-│                                              │
-│ "Here's your momentum strategy. After 3      │
-│ iterations, I achieved:                      │
-│ - Sharpe: 1.5                                │
-│ - Max DD: 10%                                │
-│ - 127 trades over 5 years                    │
-│                                              │
-│ Key decisions:                               │
-│ - Added ATR filter (iteration 2)             │
-│ - Widened stop loss (iteration 3)            │
-│                                              │
-│ Want me to deploy to paper trading?"         │
-└─────────────────────────────────────────────┘
-```
+| Component | Status | Details |
+|-----------|--------|---------|
+| **Data Ingestion** | ✅ Complete | Yahoo Finance, DuckDB storage |
+| **Timeframes** | ✅ Complete | 1m, 5m, 15m, 1h, 4h, 1d |
+| **Indicators** | ✅ Complete | 60+ via pandas-ta |
+| **Strategy DSL** | ✅ Complete | JSON-based, entry/exit rules, long/short |
+| **Short Selling** | ✅ Complete | Full support with correct P&L |
+| **Trailing Stops** | ✅ Complete | Percent and ATR-based |
+| **Rolling Lookbacks** | ✅ Complete | rolling_max, rolling_min expressions |
+| **Plugin System** | ✅ Complete | Custom Python strategies |
+| **Backtest Engine** | ✅ Complete | Vectorized, sub-second |
+| **AI Agent** | ✅ Complete | Claude, ReAct loop, tool calling |
+| **CLI** | ✅ Complete | ingest, backtest, chat commands |
+| **REST API** | ✅ Complete | FastAPI with SSE streaming |
+| **Web UI** | ✅ Complete | Chart, indicators, trade markers |
+| **Multi-panel Charts** | ✅ Complete | RSI, MACD, Stochastic panels |
+| **Docker** | ✅ Complete | Dockerfile + docker-compose |
+
+---
+
+## Architecture Components
+
+### Backtest Engine
+
+- Vectorized NumPy operations for speed
+- Signal generation from rule evaluation
+- Position state tracking (long/short)
+- Trailing stop calculation per bar
+- Slippage and commission modeling
+
+### Indicator System
+
+Leverages pandas-ta for 60+ indicators:
+- Trend: SMA, EMA, MACD, ADX, SuperTrend
+- Momentum: RSI, Stochastic, CCI, ROC
+- Volatility: ATR, Bollinger Bands, Keltner
+- Volume: OBV, VWAP, MFI
+
+### Chart System
+
+Multi-panel synchronized charts using lightweight-charts:
+- Price chart with candlesticks and volume
+- Indicator panels (RSI, MACD, Stochastic)
+- Trade markers with directional coloring
+- Crosshair sync across all panels
+- Dynamic panel ordering (user add order)
+
+---
+
+## Planned Evolution
+
+### Near-term (v1.0)
+- Authentication (Supabase)
+- Real-time data (WebSocket feeds)
+- Drawing tools (trendlines, annotations)
+- Production deployment
+
+### Future
+- Paper trading (Alpaca integration)
+- Multi-asset portfolios
+- Walk-forward optimization
+- Crypto support
+
+---
+
+## Performance Targets
+
+| Operation | Current | Target |
+|-----------|---------|--------|
+| Simple backtest (1 symbol, 4 years) | <1s | <500ms |
+| Complex backtest (10 indicators) | <2s | <1s |
+| Chart render with panels | <500ms | <200ms |
+| Agent response (first token) | ~1s | <500ms |
 
 ---
 
 ## Security Model
 
-### Strategy Execution Sandbox
+### Current (Development)
+- No authentication
+- Local-only access
+- Strategy configs are JSON (no code execution)
 
-Even with a constrained DSL, we sandbox execution:
-
-1. **No network access** during backtest
-2. **No file system access**
-3. **CPU/memory limits** per backtest
-4. **Timeout enforcement**
-5. **Pre-approved indicator/function allowlist**
-
-For MVP: Use `RestrictedPython` or simple AST validation
-Post-MVP: Consider WASM sandbox or subprocess isolation
-
----
-
-## Scalability Considerations (Post-MVP)
-
-1. **Backtest parallelization**: Run multiple parameter combinations simultaneously
-2. **Data partitioning**: Shard market data by symbol/date
-3. **Agent queue**: Multiple users, queued agent sessions
-4. **Caching**: Indicator pre-computation, result caching
+### Planned (Production)
+- OAuth via Supabase
+- API key authentication
+- Row-level security
+- Rate limiting
+- Sandboxed plugin execution
 
 ---
 
-## External Integrations (Post-MVP)
-
-| Integration | Purpose | Priority |
-|------------|---------|----------|
-| Alpaca | Paper/live trading | High |
-| Polygon.io | Market data | High |
-| Interactive Brokers | Live trading | Medium |
-| OpenBB | Alternative data | Medium |
-| Weights & Biases | Experiment tracking | Low |
+*This document reflects architecture as of v0.9.1. Updated February 2026.*
