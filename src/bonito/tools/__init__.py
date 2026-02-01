@@ -3,6 +3,7 @@
 from bonito.tools.backtest_tools import BacktestExplainTool, BacktestRunTool
 from bonito.tools.base import Tool, ToolRegistry, ToolResult
 from bonito.tools.data_tools import GetBarsTool, ListSymbolsTool
+from bonito.tools.plugin_tools import PluginBacktestTool, PluginListTool, PluginParamsTool
 from bonito.tools.strategy_tools import ValidateStrategyTool
 
 __all__ = [
@@ -14,6 +15,9 @@ __all__ = [
     "GetBarsTool",
     "ListSymbolsTool",
     "ValidateStrategyTool",
+    "PluginListTool",
+    "PluginParamsTool",
+    "PluginBacktestTool",
 ]
 
 
@@ -27,5 +31,10 @@ def create_default_registry() -> ToolRegistry:
     registry.register(GetBarsTool())
     registry.register(ListSymbolsTool())
     registry.register(ValidateStrategyTool())
+
+    # Plugin tools (F002)
+    registry.register(PluginListTool())
+    registry.register(PluginParamsTool())
+    registry.register(PluginBacktestTool())
 
     return registry

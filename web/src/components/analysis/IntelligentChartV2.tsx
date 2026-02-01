@@ -216,12 +216,6 @@ export default function IntelligentChartV2() {
         type: ind.type.toLowerCase() as ActivePanel["type"],
         config: ind.params,
       }));
-    console.log(
-      "[DEBUG] activePanels:",
-      panels,
-      "from indicators:",
-      indicators,
-    );
     return panels;
   }, [indicators]);
 
@@ -389,10 +383,7 @@ export default function IntelligentChartV2() {
     for (const intent of intents) {
       if (intent.processed) continue;
 
-      console.log("[DEBUG] Processing intent:", intent);
-
       if (intent.type === "overlay" && intent.indicator) {
-        console.log("[DEBUG] Adding indicator:", intent.indicator);
         dispatch({ type: "ADD_INDICATOR", indicator: intent.indicator });
       } else if (intent.type === "clear") {
         if (intent.clearType === "indicators" || intent.clearType === "all") {
