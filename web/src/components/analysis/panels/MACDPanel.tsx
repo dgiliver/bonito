@@ -16,6 +16,7 @@ import React, {
   useEffect,
   useImperativeHandle,
   useCallback,
+  useState,
 } from "react";
 import { LineSeries, HistogramSeries } from "lightweight-charts";
 import type {
@@ -312,6 +313,14 @@ export const MACDPanel = forwardRef<MACDPanelRef, MACDPanelProps>(
     const containerRef = useRef<HTMLDivElement>(null);
     const panelRef = useRef<MACDPanelImpl | null>(null);
 
+    // State to track current MACD values - prevents data loss on crosshair events
+    // Note: currentValues is used to preserve state during re-renders, not displayed in UI
+    const [_currentValues, setCurrentValues] = useState<{
+      macd: number | null;
+      signal: number | null;
+      histogram: number | null;
+    }>({ macd: null, signal: null, histogram: null });
+
     const indicatorName = `MACD(${config.fastPeriod},${config.slowPeriod},${config.signalPeriod})`;
 
     useEffect(() => {
@@ -365,13 +374,38 @@ export const MACDPanel = forwardRef<MACDPanelRef, MACDPanelProps>(
         },
         calculateAndUpdate,
         setOnCrosshairMove: (callback: CrosshairMoveCallback) => {
-          panelRef.current?.setOnCrosshairMove(callback);
+          // Wrap callback to also update local value display (like RSIPanel)
+          const wrappedCallback: CrosshairMoveCallback = (data, panelId) => {
+            if (data.time && panelRef.current) {
+              const legendData = panelRef.current.getLegendData(data.time);
+              setCurrentValues({
+                macd: legendData.macd,
+                signal: legendData.signal,
+                histogram: legendData.histogram,
+              });
+            } else {
+              setCurrentValues({ macd: null, signal: null, histogram: null });
+            }
+            callback(data, panelId);
+          };
+          panelRef.current?.setOnCrosshairMove(wrappedCallback);
         },
         setOnTimeRangeChange: (callback: TimeRangeChangeCallback) => {
           panelRef.current?.setOnTimeRangeChange(callback);
         },
         syncCrosshair: (data: CrosshairData) => {
           panelRef.current?.syncCrosshair(data);
+          // Update local MACD value display when crosshair syncs from another panel
+          if (data.time && panelRef.current) {
+            const legendData = panelRef.current.getLegendData(data.time);
+            setCurrentValues({
+              macd: legendData.macd,
+              signal: legendData.signal,
+              histogram: legendData.histogram,
+            });
+          } else {
+            setCurrentValues({ macd: null, signal: null, histogram: null });
+          }
         },
         syncTimeRange: (range: any) => {
           panelRef.current?.syncTimeRange(range);
