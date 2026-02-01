@@ -470,7 +470,10 @@ export const ChartContainer = forwardRef<
     );
   }, [hasStoch, handleCrosshairMove]);
 
-  // Update indicator panels when candle data changes
+  // Update indicator panels when candle data changes or panels are added/removed
+  // Note: activePanels.length is included because adding a panel changes panelHeight,
+  // which causes panel components to recreate their charts (empty). We need to
+  // re-populate the data after the charts are recreated.
   useEffect(() => {
     if (candleData.length === 0) return;
 
@@ -502,7 +505,7 @@ export const ChartContainer = forwardRef<
     const timeoutId = setTimeout(updatePanels, 100);
 
     return () => clearTimeout(timeoutId);
-  }, [candleData, hasRSI, hasMACD, hasStoch]);
+  }, [candleData, hasRSI, hasMACD, hasStoch, activePanels.length]);
 
   // Expose methods via ref
   useImperativeHandle(

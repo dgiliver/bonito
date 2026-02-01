@@ -409,11 +409,14 @@ export const StochasticPanel = forwardRef<
     [indicatorName, calculateAndUpdate],
   );
 
+  // Initialize chart when container is ready or when panel impl is recreated
+  // Note: We use height as a proxy for detecting when panelRef.current changes
+  // because the earlier useEffect recreates panelRef.current when height changes
   useEffect(() => {
     if (containerRef.current && panelRef.current) {
       panelRef.current.initialize(containerRef.current);
     }
-  }, []);
+  }, [height, config]);
 
   return (
     <div className={`stochastic-panel relative ${className}`}>
