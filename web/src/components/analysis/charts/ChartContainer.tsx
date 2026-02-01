@@ -156,19 +156,15 @@ export const ChartContainer = forwardRef<
     return calculateHeights(height, activePanels.length);
   }, [height, activePanels.length]);
 
-  // Check which panels are active and determine which is the bottom-most
-  // The time scale (dates) should only show on the bottom-most panel
+  // Check which panels are active (for sync registration and data updates)
   const hasRSI = activePanels.some((p) => p.type === "rsi");
   const hasMACD = activePanels.some((p) => p.type === "macd");
   const hasStoch = activePanels.some((p) => p.type === "stoch");
 
-  // Determine which panel should show the time scale (always the bottom-most)
-  // Panel render order: Price -> RSI -> MACD -> Stochastic
-  const hasPanelsBelow = hasRSI || hasMACD || hasStoch;
-  const priceShowTimeScale = !hasPanelsBelow; // Price shows time scale only if no panels below
-  const rsiShowTimeScale = hasRSI && !hasMACD && !hasStoch; // RSI shows if it's the last panel
-  const macdShowTimeScale = hasMACD && !hasStoch; // MACD shows if Stoch is not active
-  const stochShowTimeScale = hasStoch; // Stoch always shows if active (it's always last)
+  // Time scale only shows on bottom-most panel
+  // Panels render in the order they appear in activePanels array
+  const hasPanelsBelow = activePanels.length > 0;
+  const priceShowTimeScale = !hasPanelsBelow;
 
   // Update price chart crosshair mode when snapToPrice changes
   useEffect(() => {
@@ -592,35 +588,46 @@ export const ChartContainer = forwardRef<
         showTimeScale={priceShowTimeScale}
       />
 
-      {/* RSI Panel */}
-      {hasRSI && (
-        <RSIPanel
-          ref={rsiPanelRef}
-          height={panelHeight}
-          config={activePanels.find((p) => p.type === "rsi")?.config}
-          showTimeScale={rsiShowTimeScale}
-        />
-      )}
+      {/* Indicator Panels - rendered in the order they appear in activePanels array */}
+      {activePanels.map((panel, index) => {
+        const isLastPanel = index === activePanels.length - 1;
+        const showTimeScale = isLastPanel;
 
-      {/* MACD Panel */}
-      {hasMACD && (
-        <MACDPanel
-          ref={macdPanelRef}
-          height={panelHeight}
-          config={activePanels.find((p) => p.type === "macd")?.config}
-          showTimeScale={macdShowTimeScale}
-        />
-      )}
-
-      {/* Stochastic Panel */}
-      {hasStoch && (
-        <StochasticPanel
-          ref={stochPanelRef}
-          height={panelHeight}
-          config={activePanels.find((p) => p.type === "stoch")?.config}
-          showTimeScale={stochShowTimeScale}
-        />
-      )}
+        switch (panel.type) {
+          case "rsi":
+            return (
+              <RSIPanel
+                key="rsi"
+                ref={rsiPanelRef}
+                height={panelHeight}
+                config={panel.config}
+                showTimeScale={showTimeScale}
+              />
+            );
+          case "macd":
+            return (
+              <MACDPanel
+                key="macd"
+                ref={macdPanelRef}
+                height={panelHeight}
+                config={panel.config}
+                showTimeScale={showTimeScale}
+              />
+            );
+          case "stoch":
+            return (
+              <StochasticPanel
+                key="stoch"
+                ref={stochPanelRef}
+                height={panelHeight}
+                config={panel.config}
+                showTimeScale={showTimeScale}
+              />
+            );
+          default:
+            return null;
+        }
+      })}
     </div>
   );
 });
