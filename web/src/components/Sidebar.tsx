@@ -10,9 +10,10 @@ import {
   PanelLeft,
   CandlestickChart,
   Sparkles,
+  Bot,
 } from "lucide-react";
 
-type View = "chat" | "analysis" | "strategies" | "chart" | "data";
+type View = "chat" | "analysis" | "strategies" | "chart" | "data" | "trading";
 
 interface SidebarProps {
   currentView: View;
@@ -39,6 +40,12 @@ const navItems = [
     label: "Strategies",
     icon: TrendingUp,
     description: "Backtest",
+  },
+  {
+    id: "trading" as const,
+    label: "Trading",
+    icon: Bot,
+    description: "Live bots",
   },
   {
     id: "chart" as const,

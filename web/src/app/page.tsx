@@ -6,6 +6,8 @@ import Sidebar from "@/components/Sidebar";
 import Chat, { Message } from "@/components/Chat";
 import Strategies from "@/components/Strategies";
 import Data from "@/components/Data";
+import { BotDashboard } from "@/components/trading";
+import { TradingProvider } from "@/contexts/TradingContext";
 
 // Dynamically import chart components to avoid SSR issues with lightweight-charts
 const AdvancedChart = dynamic(
@@ -45,7 +47,7 @@ const AnalysisView = dynamic(
   },
 );
 
-type View = "chat" | "analysis" | "strategies" | "chart" | "data";
+type View = "chat" | "analysis" | "strategies" | "chart" | "data" | "trading";
 
 export default function Home() {
   const [currentView, setCurrentView] = useState<View>("analysis");
@@ -95,6 +97,11 @@ export default function Home() {
           </div>
         )}
         {currentView === "data" && <Data />}
+        {currentView === "trading" && (
+          <TradingProvider>
+            <BotDashboard />
+          </TradingProvider>
+        )}
       </main>
     </div>
   );

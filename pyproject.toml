@@ -34,6 +34,12 @@ dependencies = [
     # Utilities
     "httpx>=0.26.0",
     "python-dotenv>=1.0.0",
+
+    # Security
+    "cryptography>=42.0.0",
+
+    # Trading APIs
+    "alpaca-py>=0.29.0",
 ]
 
 [project.optional-dependencies]

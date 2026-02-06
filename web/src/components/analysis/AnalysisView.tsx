@@ -7,6 +7,8 @@ import {
   ChartContextPayload,
   BacktestResult,
 } from "@/contexts/AnalysisContext";
+import { TradingProvider, useTrading } from "@/contexts/TradingContext";
+import { DeploymentModal, AccountLinkingModal } from "@/components/trading";
 import { streamChat, ChatEvent } from "@/lib/api";
 import {
   Send,
@@ -24,6 +26,7 @@ import {
   Trash2,
   RotateCcw,
   List,
+  Rocket,
 } from "lucide-react";
 import ReactMarkdown from "react-markdown";
 import dynamic from "next/dynamic";
@@ -64,11 +67,24 @@ interface Message {
 
 function ChatPanel() {
   const { state, getChartContext, dispatch, addAgentIntent } = useAnalysis();
+  const {
+    openDeploymentModal,
+    state: tradingState,
+    linkAccount,
+  } = useTrading();
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const [sessionId, setSessionId] = useState<string | null>(null);
   const [collapsed, setCollapsed] = useState(false);
+  const [showLinkAccountModal, setShowLinkAccountModal] = useState(false);
+
+  // Check if strategy can be deployed
+  const canDeploy =
+    state.strategy &&
+    state.backtest.result &&
+    state.backtest.result.performance.total_return > 0 &&
+    tradingState.account.linked;
 
   // Auto-resize textarea
   const handleInputChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
@@ -597,6 +613,48 @@ function ChatPanel() {
               </button>
             )}
 
+            {/* Deploy to Bot - show if strategy has positive backtest and account is linked */}
+            {canDeploy && state.strategy && (
+              <button
+                onClick={() => {
+                  openDeploymentModal({
+                    strategy_name: state.strategy!.name,
+                    strategy_config: { ...state.strategy! },
+                  });
+                }}
+                disabled={isLoading}
+                className="flex items-center gap-1.5 px-2 py-1 rounded text-xs transition-colors"
+                style={{
+                  background: "var(--accent-primary)",
+                  color: "var(--bg-primary)",
+                  opacity: isLoading ? 0.5 : 1,
+                }}
+              >
+                <Rocket size={12} />
+                Deploy to Bot
+              </button>
+            )}
+
+            {/* Link Account prompt - show if strategy exists but no account linked */}
+            {state.strategy &&
+              state.backtest.result &&
+              !tradingState.account.linked && (
+                <button
+                  onClick={() => setShowLinkAccountModal(true)}
+                  disabled={isLoading}
+                  className="flex items-center gap-1.5 px-2 py-1 rounded text-xs transition-colors"
+                  style={{
+                    background: "var(--accent-primary)",
+                    color: "var(--bg-primary)",
+                    opacity: isLoading ? 0.5 : 1,
+                  }}
+                  title="Link Alpaca account to deploy bots"
+                >
+                  <Rocket size={12} />
+                  Link Account to Deploy
+                </button>
+              )}
+
             {/* View Trades - show if there's a backtest */}
             {state.backtest.result &&
               state.backtest.result.trades.length > 0 && (
@@ -669,6 +727,13 @@ function ChatPanel() {
           </div>
         )}
       </div>
+
+      {/* Account Linking Modal */}
+      <AccountLinkingModal
+        isOpen={showLinkAccountModal}
+        onClose={() => setShowLinkAccountModal(false)}
+        onLink={linkAccount}
+      />
     </div>
   );
 }
@@ -920,8 +985,11 @@ function AnalysisContent() {
 
 export default function AnalysisView() {
   return (
-    <AnalysisProvider>
-      <AnalysisContent />
-    </AnalysisProvider>
+    <TradingProvider>
+      <AnalysisProvider>
+        <AnalysisContent />
+        <DeploymentModal />
+      </AnalysisProvider>
+    </TradingProvider>
   );
 }

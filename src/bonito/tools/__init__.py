@@ -5,6 +5,15 @@ from bonito.tools.base import Tool, ToolRegistry, ToolResult
 from bonito.tools.data_tools import GetBarsTool, ListSymbolsTool
 from bonito.tools.plugin_tools import PluginBacktestTool, PluginListTool, PluginParamsTool
 from bonito.tools.strategy_tools import ValidateStrategyTool
+from bonito.tools.trading_tools import (
+    BotStatusTool,
+    DeployBotTool,
+    ListBotsTool,
+    ModifyBotTool,
+    PauseBotTool,
+    ResumeBotTool,
+    StopBotTool,
+)
 
 __all__ = [
     "Tool",
@@ -18,6 +27,13 @@ __all__ = [
     "PluginListTool",
     "PluginParamsTool",
     "PluginBacktestTool",
+    "DeployBotTool",
+    "ListBotsTool",
+    "BotStatusTool",
+    "PauseBotTool",
+    "ResumeBotTool",
+    "StopBotTool",
+    "ModifyBotTool",
 ]
 
 
@@ -36,5 +52,14 @@ def create_default_registry() -> ToolRegistry:
     registry.register(PluginListTool())
     registry.register(PluginParamsTool())
     registry.register(PluginBacktestTool())
+
+    # Trading tools (Phase 4)
+    registry.register(DeployBotTool())
+    registry.register(ListBotsTool())
+    registry.register(BotStatusTool())
+    registry.register(PauseBotTool())
+    registry.register(ResumeBotTool())
+    registry.register(StopBotTool())
+    registry.register(ModifyBotTool())
 
     return registry

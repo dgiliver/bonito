@@ -7,7 +7,7 @@ from dotenv import load_dotenv
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from bonito.api.routes import backtest, chart, chat, data, strategies
+from bonito.api.routes import backtest, chart, chat, data, strategies, trading
 
 # Load environment variables from .env file
 load_dotenv()
@@ -45,6 +45,7 @@ app.include_router(strategies.router, prefix="/api/strategies", tags=["strategie
 app.include_router(data.router, prefix="/api/data", tags=["data"])
 app.include_router(backtest.router, prefix="/api/backtest", tags=["backtest"])
 app.include_router(chart.router, prefix="/api", tags=["chart"])
+app.include_router(trading.router)
 
 
 @app.get("/")

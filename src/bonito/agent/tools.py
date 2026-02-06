@@ -21,6 +21,15 @@ from bonito.backtest.strategy import (
 )
 from bonito.data.store import MarketDataStore
 from bonito.tools.base import Tool, ToolRegistry, ToolResult
+from bonito.tools.trading_tools import (
+    BotStatusTool,
+    DeployBotTool,
+    ListBotsTool,
+    ModifyBotTool,
+    PauseBotTool,
+    ResumeBotTool,
+    StopBotTool,
+)
 
 
 class CreateStrategyTool(Tool):
@@ -1188,5 +1197,14 @@ def get_agent_tools() -> tuple[ToolRegistry, dict[str, StrategyConfig], dict[str
     registry.register(LoadStrategyTool(strategy_store))
     registry.register(ListSavedStrategiesTool())
     registry.register(ChartControlTool())  # NEW: Chart control for agent
+
+    # Trading tools for bot management
+    registry.register(DeployBotTool())
+    registry.register(ListBotsTool())
+    registry.register(BotStatusTool())
+    registry.register(PauseBotTool())
+    registry.register(ResumeBotTool())
+    registry.register(StopBotTool())
+    registry.register(ModifyBotTool())
 
     return registry, strategy_store, result_store
