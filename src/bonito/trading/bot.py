@@ -34,6 +34,9 @@ class TradingBot:
         self._total_trades: int = 0
         self._realized_pnl: float = 0.0
 
+        # Trailing stop tracking: symbol -> highest price since entry (longs) or lowest (shorts)
+        self._trailing_highs: dict[str, float] = {}
+
         # Initialize executor and monitor
         self._executor = OrderExecutor(broker, config.trading_config)
         self._monitor = PositionMonitor(broker)
@@ -184,7 +187,7 @@ class TradingBot:
             # Import Alpaca data client here to avoid circular imports
             from alpaca.data.historical import StockHistoricalDataClient
             from alpaca.data.requests import StockBarsRequest
-            from alpaca.data.timeframe import TimeFrame
+            from alpaca.data.timeframe import TimeFrame, TimeFrameUnit
 
             # Determine how many bars we need based on indicator requirements
             max_period = self._get_max_indicator_period()
@@ -194,10 +197,10 @@ class TradingBot:
             # Map timeframe
             timeframe_map = {
                 "1m": TimeFrame.Minute,
-                "5m": TimeFrame(5, TimeFrame.Unit.Minute),
-                "15m": TimeFrame(15, TimeFrame.Unit.Minute),
+                "5m": TimeFrame(5, TimeFrameUnit.Minute),
+                "15m": TimeFrame(15, TimeFrameUnit.Minute),
                 "1h": TimeFrame.Hour,
-                "4h": TimeFrame(4, TimeFrame.Unit.Hour),
+                "4h": TimeFrame(4, TimeFrameUnit.Hour),
                 "1d": TimeFrame.Day,
             }
             alpaca_timeframe = timeframe_map.get(self._strategy.timeframe, TimeFrame.Day)
@@ -403,6 +406,9 @@ class TradingBot:
             await self._executor.close_position(position.symbol)
             logger.info(f"Bot {self.id}: Exited position in {position.symbol}: {exit_reason}")
 
+            # Clear trailing stop tracking
+            self._trailing_highs.pop(position.symbol, None)
+
             # Record P&L
             pnl = position.unrealized_pnl
             self._monitor.record_trade_pnl(pnl)
@@ -604,14 +610,20 @@ class TradingBot:
                 return current_price <= stop_price
 
         elif stop_type == "trailing_percent":
-            # For trailing stops in live trading, we'd need to track the high/low
-            # For now, use a simple fixed stop (this would need enhancement)
-            logger.warning("Trailing stops not fully implemented for live trading yet")
+            symbol = position.symbol
             if is_short:
-                stop_price = entry_price * (1 + stop_config.value)
+                # Track lowest price since entry
+                tracked = self._trailing_highs.get(symbol, entry_price)
+                tracked = min(tracked, current_price)
+                self._trailing_highs[symbol] = tracked
+                stop_price = tracked * (1 + stop_config.value)
                 return current_price >= stop_price
             else:
-                stop_price = entry_price * (1 - stop_config.value)
+                # Track highest price since entry
+                tracked = self._trailing_highs.get(symbol, entry_price)
+                tracked = max(tracked, current_price)
+                self._trailing_highs[symbol] = tracked
+                stop_price = tracked * (1 - stop_config.value)
                 return current_price <= stop_price
 
         # Add other stop types as needed

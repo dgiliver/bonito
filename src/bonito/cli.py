@@ -21,6 +21,10 @@ app = typer.Typer(
 data_app = typer.Typer(help="Data management commands")
 app.add_typer(data_app, name="data")
 
+# Subcommand group for research operations
+research_app = typer.Typer(help="Autonomous strategy research")
+app.add_typer(research_app, name="research")
+
 console = Console()
 
 
@@ -105,7 +109,7 @@ async def _chat_loop(model: str, verbose: bool) -> None:
                 if isinstance(event, ToolCallEvent):
                     if verbose:
                         console.print(
-                            f"[yellow]→ {event.tool_name}[/yellow] " f"[dim]{event.arguments}[/dim]"
+                            f"[yellow]→ {event.tool_name}[/yellow] [dim]{event.arguments}[/dim]"
                         )
                     else:
                         console.print(f"[yellow]→ {event.tool_name}[/yellow]")
@@ -462,6 +466,39 @@ def backtest(
         with open(output_path, "w") as f:
             json.dump(result_data, f, indent=2, default=str)
         console.print(f"\n[dim]Results saved to {output_path}[/dim]")
+
+
+@research_app.command("run")
+def research_run(
+    symbol: str = typer.Option("SPY", "--symbol", "-s", help="Symbol to research"),
+    iterations: int = typer.Option(1000, "--iterations", "-n", help="Max mutation iterations"),
+    seed: str = typer.Option(None, "--seed", help="Path to seed strategy JSON"),
+    output_dir: str = typer.Option(None, "--output-dir", "-o", help="Output directory"),
+    start: str = typer.Option("2020-01-01", "--start", help="Data start date (YYYY-MM-DD)"),
+    end: str = typer.Option("2025-03-20", "--end", "-e", help="Data end date (YYYY-MM-DD)"),
+) -> None:
+    """Run autonomous strategy research (Karpathy-style mutation loop)."""
+    from pathlib import Path
+
+    from bonito.research.autoresearch_trading import run
+
+    console.print(
+        Panel.fit(
+            f"[bold blue]Autonomous Strategy Research[/bold blue]\n"
+            f"Symbol: {symbol} | Iterations: {iterations}\n"
+            f"Data: {start} to {end}",
+            border_style="blue",
+        )
+    )
+
+    run(
+        symbol=symbol.upper(),
+        iterations=iterations,
+        seed_path=Path(seed) if seed else None,
+        output_dir=Path(output_dir) if output_dir else None,
+        start_date=start,
+        end_date=end,
+    )
 
 
 if __name__ == "__main__":

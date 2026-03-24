@@ -1,0 +1,82 @@
+name: Deploy Bonito Bot
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'src/bonito/trading/**'
+      - 'scripts/run_bot.py'
+      - 'strategies/deployed_strategy.json'
+      - 'deploy/**'
+  workflow_dispatch:
+    inputs:
+      strategy_file:
+        description: 'Strategy JSON file to deploy (relative path)'
+        required: false
+        default: 'strategies/deployed_strategy.json'
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: pip install -e ".[dev]"
+      - run: pytest tests/ -x -q --ignore=tests/test_data_store.py
+
+  deploy:
+    needs: test
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/main'
+    steps:
+      - name: Deploy to EC2
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.EC2_HOST }}
+          username: ${{ secrets.EC2_USER }}
+          key: ${{ secrets.EC2_SSH_KEY }}
+          script: |
+            cd /home/ec2-user/bonito || git clone https://github.com/${{ github.repository }}.git /home/ec2-user/bonito
+            cd /home/ec2-user/bonito
+            git fetch origin main
+            git checkout main
+            git pull origin main
+
+            # Setup venv if needed
+            if [ ! -d .venv ]; then
+              python3.12 -m venv .venv
+            fi
+            source .venv/bin/activate
+            pip install -e ".[trading]" --quiet
+
+            # Generate startup script from template (no secrets in repo)
+            STRATEGY="${{ github.event.inputs.strategy_file || 'strategies/deployed_strategy.json' }}"
+            cat > start_bot.sh << 'STARTUP_EOF'
+            #!/bin/bash
+            set -euo pipefail
+            cd /home/ec2-user/bonito
+            source .venv/bin/activate
+            export PYTHONPATH="/home/ec2-user/bonito/src:$PYTHONPATH"
+            eval $(python3 -c "
+            import boto3, json
+            client = boto3.client('secretsmanager', region_name='us-east-1')
+            secret = json.loads(client.get_secret_value(SecretId='bonito_paper')['SecretString'])
+            for k, v in secret.items():
+                print(f'export {k}=\"{v}\"')
+            ")
+            STARTUP_EOF
+            echo "exec python3 scripts/run_bot.py --strategy $STRATEGY --mode paper" >> start_bot.sh
+            chmod +x start_bot.sh
+
+            # Install/update systemd service
+            sudo cp deploy/bonito-bot.service /etc/systemd/system/
+            sudo systemctl daemon-reload
+            sudo systemctl enable bonito-bot
+            sudo systemctl restart bonito-bot
+
+            # Verify
+            sleep 5
+            sudo systemctl status bonito-bot --no-pager || true
+            echo "Deploy complete: $(date)"

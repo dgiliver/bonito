@@ -336,7 +336,8 @@ class StrategyConfig(BaseModel):
         ]
 
         for ind in self.indicators:
-            lines.append(f"  - {ind.name}: {ind.type.value}({ind.params})")
+            ind_type = ind.type.value if hasattr(ind.type, "value") else str(ind.type)
+            lines.append(f"  - {ind.name}: {ind_type}({ind.params})")
 
         lines.extend(["", "Entry Rules:"])
         for i, rule in enumerate(self.entry_rules, 1):
