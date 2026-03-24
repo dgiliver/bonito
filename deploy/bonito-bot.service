@@ -1,0 +1,16 @@
+[Unit]
+Description=Bonito Trading Bot
+After=network.target
+
+[Service]
+Type=simple
+User=ec2-user
+WorkingDirectory=/home/ec2-user/bonito
+ExecStart=/home/ec2-user/bonito/start_bot.sh
+Restart=always
+RestartSec=30
+StandardOutput=append:/home/ec2-user/bonito/bonito_bot.log
+StandardError=append:/home/ec2-user/bonito/bonito_bot.log
+
+[Install]
+WantedBy=multi-user.target

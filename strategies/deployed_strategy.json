@@ -1,0 +1,87 @@
+{
+  "name": "ema_cross_rsi_optimized",
+  "description": "Optimized EMA crossover with RSI filter - RSI<65, 2% stop loss, 10% take profit",
+  "version": "1.0",
+  "symbols": [
+    "SPY"
+  ],
+  "timeframe": "1d",
+  "indicators": [
+    {
+      "type": "ema",
+      "name": "ema_fast",
+      "params": {
+        "period": 10
+      }
+    },
+    {
+      "type": "ema",
+      "name": "ema_slow",
+      "params": {
+        "period": 26
+      }
+    },
+    {
+      "type": "rsi",
+      "name": "rsi_14",
+      "params": {
+        "period": 14
+      }
+    }
+  ],
+  "entry_rules": [
+    {
+      "conditions": [
+        {
+          "left": "ema_fast",
+          "comparison": "gt",
+          "right": "ema_slow",
+          "lookback": null
+        },
+        {
+          "left": "close",
+          "comparison": "gt",
+          "right": "ema_slow",
+          "lookback": null
+        },
+        {
+          "left": "rsi_14",
+          "comparison": "lt",
+          "right": 68.0,
+          "lookback": null
+        }
+      ],
+      "logic": "AND",
+      "side": "long"
+    }
+  ],
+  "exit_rules": [
+    {
+      "conditions": [
+        {
+          "left": "ema_fast",
+          "comparison": "crosses_below",
+          "right": "ema_slow",
+          "lookback": null
+        }
+      ],
+      "logic": "AND",
+      "side": "long"
+    }
+  ],
+  "position_size": {
+    "type": "percent_equity",
+    "value": 98.0
+  },
+  "max_positions": 1,
+  "stop_loss": {
+    "type": "trailing_percent",
+    "value": 0.016,
+    "atr_period": 14,
+    "trigger_percent": null
+  },
+  "take_profit": {
+    "type": "percent",
+    "value": 0.1
+  }
+}

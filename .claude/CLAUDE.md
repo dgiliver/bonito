@@ -9,6 +9,8 @@
 make api              # Start API server (port 8000)
 make web              # Start frontend (port 3000)
 make chat             # CLI agent chat
+make research         # Run autonomous strategy research (SPY, 1000 iterations)
+make ingest-universe  # Ingest 12-symbol universe into DuckDB
 make test             # Run all tests
 make test-fast        # Skip slow tests
 make lint             # Run ruff linter
@@ -30,6 +32,7 @@ src/bonito/
 ├── agent/          # LLM agent (Claude integration, orchestrator, tools)
 ├── backtest/       # Vectorized backtest engine, indicators, strategy DSL
 ├── data/           # DuckDB market data storage
+├── research/       # Autonomous strategy research (Karpathy-style mutation loop)
 ├── tools/          # Agent tools (backtest, data, strategy, chart control)
 ├── api/            # FastAPI REST API with SSE streaming
 └── cli.py          # Typer CLI
@@ -112,6 +115,7 @@ Test files:
 | `src/bonito/backtest/engine.py` | Vectorized backtest execution |
 | `src/bonito/backtest/indicators.py` | All technical indicators (SMA, RSI, MACD, pandas-ta) |
 | `src/bonito/backtest/strategy.py` | Strategy DSL Pydantic models |
+| `src/bonito/research/autoresearch_trading.py` | Karpathy-style autonomous strategy mutation loop |
 | `src/bonito/tools/` | All agent tools |
 | `web/src/components/analysis/` | Chart components, indicator panels |
 | `web/src/contexts/AnalysisContext.tsx` | Chart state management |
@@ -161,12 +165,14 @@ Bonito uses a comprehensive swarm architecture for development:
 | `/panel-test` | Comprehensive indicator panel testing |
 | `/add-indicator` | Streamlined indicator addition workflow |
 | `/verify-ui` | Quick visual verification after changes |
+| `/playwright-test` | Three-agent headless testing (validation, edge-case, stress) |
 | `/backtest` | Run and analyze backtests |
 | `/tdd` | Test-Driven Development cycle |
 | `/ralph` | Autonomous development loops |
 | `/commit` | Proper git commit formatting |
 | `/review` | Code review before commit |
 | `/explore-ui` | Start servers and explore UI |
+| `/autoresearch` | Karpathy-style autonomous iteration loop (any metric) |
 
 ### Ralph Wiggum Loops
 For autonomous iterative development:
@@ -286,9 +292,11 @@ Panels must render in user add order via `activePanels.map()`:
 
 ### Visual Verification After Changes
 ```
-1. /verify-ui                      # Quick check
-2. Use ui-explorer agent           # Detailed exploration
-3. Use chart-validator agent       # Comprehensive validation
+1. /verify-ui                      # Quick manual check
+2. /playwright-test                # Full 3-agent headless sweep (validation + edge + stress)
+3. /playwright-test validation     # Just correctness checks
+4. /playwright-test edge           # Just boundary conditions
+5. /playwright-test stress         # Just performance profiling
 ```
 
 ### Documentation Updates
@@ -333,5 +341,69 @@ class AlpacaMCPTool(Tool):
 1. **Git worktrees** - Each Claude session in isolated checkout
 2. **Subagents for research** - Spawn explore agents for codebase search
 3. **Planning mode** - For any feature >3 files changed
-4. **Claude Opus 4.5** - For complex architectural decisions
+4. **Claude Opus 4.6** - For complex architectural decisions
 5. **Parallel tool calls** - Group independent operations
+
+## Workflow Orchestration
+
+### 1. Plan Mode Default
+- Enter plan mode for ANY non-trivial task (3+ steps or architectural decisions)
+- If something goes sideways, STOP and re-plan immediately — don't keep pushing
+- Use plan mode for verification steps, not just building
+- Write detailed specs upfront to reduce ambiguity
+
+### 2. Subagent Strategy
+- Use subagents liberally to keep main context window clean
+- Offload research, exploration, and parallel analysis to subagents
+- For complex problems, throw more compute at it via subagents
+- One task per subagent for focused execution
+
+### 3. Self-Improvement Loop
+- After ANY correction from the user: update `tasks/lessons.md` with the pattern
+- Write rules for yourself that prevent the same mistake
+- Ruthlessly iterate on these lessons until mistake rate drops
+- Review lessons at session start for relevant project
+
+### 4. Verification Before Done
+- Never mark a task complete without proving it works
+- Diff behavior between main and your changes when relevant
+- Ask yourself: "Would a staff engineer approve this?"
+- Run tests, check logs, demonstrate correctness
+- Use Python LSP (`pylsp`) for go-to-definition, find-references, hover, and diagnostics before refactoring
+
+### 5. Demand Elegance (Balanced)
+- For non-trivial changes: pause and ask "is there a more elegant way?"
+- If a fix feels hacky: "Knowing everything I know now, implement the elegant solution"
+- Skip this for simple, obvious fixes — don't over-engineer
+- Challenge your own work before presenting it
+
+### 6. Autonomous Bug Fixing
+- When given a bug report: just fix it. Don't ask for hand-holding
+- Point at logs, errors, failing tests — then resolve them
+- Zero context switching required from the user
+- Go fix failing CI tests without being told how
+
+## Task Management
+
+1. **Plan First**: Write plan to `tasks/todo.md` with checkable items
+2. **Verify Plan**: Check in before starting implementation
+3. **Track Progress**: Mark items complete as you go
+4. **Explain Changes**: High-level summary at each step
+5. **Document Results**: Add review section to `tasks/todo.md`
+6. **Capture Lessons**: Update `tasks/lessons.md` after corrections
+
+## Core Principles
+
+- **Simplicity First**: Make every change as simple as possible. Impact minimal code.
+- **No Laziness**: Find root causes. No temporary fixes. Senior developer standards.
+- **Minimal Impact**: Changes should only touch what's necessary. Avoid introducing bugs.
+- **LSP-Informed Refactoring**: Before renaming, moving, or refactoring Python code, use the Python LSP to find all references and dependents. Don't guess — verify via `findReferences` and `goToDefinition`.
+
+## Python LSP Integration
+
+Python Language Server (`pylsp`) is configured globally for all Bonito sessions. Use LSP operations to:
+- **Find references** before renaming or removing functions/classes
+- **Go to definition** to understand call chains before modifying
+- **Get diagnostics** to catch type errors and undefined names
+- **Hover** for quick type information on complex expressions
+- This replaces guesswork with certainty when refactoring across `src/bonito/`

@@ -1,6 +1,11 @@
 # Makefile for Bonito development
 # Usage: make <target>
 
+# Auto-detect venv python, fall back to system python
+VENV_DIR := $(shell cd "$(CURDIR)" && while [ "$$PWD" != "/" ]; do [ -f "$$PWD/.venv/bin/python" ] && echo "$$PWD/.venv" && break; cd ..; done)
+PYTHON := $(if $(VENV_DIR),$(VENV_DIR)/bin/python,python)
+export PYTHONPATH := $(CURDIR)/src:$(PYTHONPATH)
+
 .PHONY: help install install-dev test lint format typecheck pre-commit clean api web docker-build docker-up docker-down
 
 # Default target
@@ -87,7 +92,7 @@ api:
 
 # CLI Chat
 chat:
-	python -m bonito.cli chat -v
+	$(PYTHON) -m bonito.cli chat -v
 
 # Frontend
 web:
@@ -108,3 +113,10 @@ docker-down:
 
 docker-logs:
 	docker-compose logs -f api
+
+# Research
+research:
+	$(PYTHON) -m bonito.cli research run --symbol SPY --iterations 1000
+
+ingest-universe:
+	$(PYTHON) -m bonito.cli ingest SPY QQQ IWM AAPL MSFT GOOGL TSLA NFLX NVDA AMD MU PLTR --start 2020-01-01 --end 2025-03-20

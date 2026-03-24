@@ -69,7 +69,7 @@ class BacktestEngine:
         )
 
         # Run simulation
-        trades, equity_curve = self._simulate(
+        trades, equity_curve, position_held = self._simulate(
             strategy=strategy,
             data=data,
             indicators=indicators,
@@ -83,6 +83,7 @@ class BacktestEngine:
             trades=trades,
             equity_curve=equity_curve,
             initial_capital=self.config.initial_capital,
+            position_held=position_held,
         )
 
         # Calculate drawdown curve
@@ -240,10 +241,16 @@ class BacktestEngine:
         long_entry_signals: np.ndarray,
         short_entry_signals: np.ndarray,
         exit_signals: np.ndarray,
-    ) -> tuple[list[Trade], list[float]]:
-        """Run the simulation loop with support for long and short positions."""
+    ) -> tuple[list[Trade], list[float], list[bool]]:
+        """Run the simulation loop with support for long and short positions.
+
+        Returns:
+            Tuple of (trades, equity_curve, position_held) where position_held
+            is a boolean list indicating whether a position was held on each bar.
+        """
         trades: list[Trade] = []
         equity_curve: list[float] = []
+        position_held: list[bool] = []
 
         cash = self.config.initial_capital
         position: dict[str, Any] | None = None  # Current position
@@ -272,6 +279,7 @@ class BacktestEngine:
                         position["entry_price"] * position["quantity"] + unrealized_pnl
                     )
             equity_curve.append(current_equity)
+            position_held.append(position is not None)
 
             # Check exit conditions if in position
             if position:
@@ -453,8 +461,9 @@ class BacktestEngine:
             else:
                 cash += exit_price * position["quantity"] + pnl
             equity_curve.append(cash)
+            position_held.append(True)
 
-        return trades, equity_curve
+        return trades, equity_curve, position_held
 
     def _compute_atr(self, data: BarData, period: int) -> np.ndarray:
         """Compute Average True Range for trailing ATR stops."""
@@ -601,6 +610,7 @@ class BacktestEngine:
         trades: list[Trade],
         equity_curve: list[float],
         initial_capital: float,
+        position_held: list[bool] | None = None,
     ) -> PerformanceMetrics:
         """Calculate performance metrics."""
         if not trades:
@@ -634,16 +644,25 @@ class BacktestEngine:
         # Daily returns
         daily_returns = np.diff(equity) / equity[:-1]
 
+        # For Sharpe/Sortino, use only returns from days where a position was held.
+        # Including flat (no-position) days artificially inflates Sharpe by adding
+        # zero-variance days that reduce std without reducing mean.
+        if position_held is not None and len(position_held) > 1:
+            held_mask = np.array(position_held[1:])  # align with diff offset
+            active_returns = daily_returns[held_mask]
+        else:
+            active_returns = daily_returns
+
         # Sharpe ratio (assuming 0% risk-free rate)
-        if len(daily_returns) > 0 and np.std(daily_returns) > 0:
-            sharpe_ratio = np.mean(daily_returns) / np.std(daily_returns) * np.sqrt(252)
+        if len(active_returns) > 1 and np.std(active_returns) > 0:
+            sharpe_ratio = np.mean(active_returns) / np.std(active_returns) * np.sqrt(252)
         else:
             sharpe_ratio = 0.0
 
         # Sortino ratio
-        negative_returns = daily_returns[daily_returns < 0]
+        negative_returns = active_returns[active_returns < 0]
         if len(negative_returns) > 0 and np.std(negative_returns) > 0:
-            sortino_ratio = np.mean(daily_returns) / np.std(negative_returns) * np.sqrt(252)
+            sortino_ratio = np.mean(active_returns) / np.std(negative_returns) * np.sqrt(252)
         else:
             sortino_ratio = 0.0
 
