@@ -32,28 +32,48 @@ jobs:
     runs-on: ubuntu-latest
     if: github.ref == 'refs/heads/main'
     steps:
-      - name: Deploy to EC2
+      - uses: actions/checkout@v4
+
+      - name: Setup SSH key
+        run: |
+          mkdir -p ~/.ssh
+          echo "${{ secrets.EC2_SSH_KEY }}" > ~/.ssh/deploy_key
+          chmod 600 ~/.ssh/deploy_key
+          ssh-keyscan -H ${{ secrets.EC2_HOST }} >> ~/.ssh/known_hosts 2>/dev/null
+
+      - name: Sync code to EC2
+        run: |
+          rsync -avz --delete \
+            --exclude='.git' \
+            --exclude='__pycache__' \
+            --exclude='.venv' \
+            --exclude='node_modules' \
+            --exclude='research_output' \
+            --exclude='.env*' \
+            --exclude='*.pem' \
+            --exclude='*.key' \
+            -e "ssh -i ~/.ssh/deploy_key -o StrictHostKeyChecking=no" \
+            ./ ${{ secrets.EC2_USER }}@${{ secrets.EC2_HOST }}:/home/${{ secrets.EC2_USER }}/bonito/
+
+      - name: Setup and start bot on EC2
         uses: appleboy/ssh-action@v1.0.3
         with:
           host: ${{ secrets.EC2_HOST }}
           username: ${{ secrets.EC2_USER }}
           key: ${{ secrets.EC2_SSH_KEY }}
           script: |
+            set -e
+
             # Install Python 3.12 if not available
             if ! command -v python3.12 &> /dev/null; then
               echo "Installing Python 3.12..."
               sudo dnf install -y python3.12 python3.12-pip 2>/dev/null || \
               sudo yum install -y python3.12 python3.12-pip 2>/dev/null || \
-              sudo amazon-linux-extras install -y python3.12 2>/dev/null || \
               { echo "ERROR: Could not install Python 3.12"; exit 1; }
             fi
             echo "Python version: $(python3.12 --version)"
 
-            cd /home/ec2-user/bonito || git clone https://github.com/${{ github.repository }}.git /home/ec2-user/bonito
             cd /home/ec2-user/bonito
-            git fetch origin main
-            git checkout main
-            git pull origin main
 
             # Setup venv if needed
             if [ ! -d .venv ]; then
@@ -62,23 +82,9 @@ jobs:
             source .venv/bin/activate
             pip install -e "." boto3 --quiet
 
-            # Generate startup script from template (no secrets in repo)
-            STRATEGY="${{ github.event.inputs.strategy_file || 'strategies/deployed_strategy.json' }}"
-            cat > start_bot.sh << 'STARTUP_EOF'
-            #!/bin/bash
-            set -euo pipefail
-            cd /home/ec2-user/bonito
-            source .venv/bin/activate
-            export PYTHONPATH="/home/ec2-user/bonito/src:$PYTHONPATH"
-            eval $(python3 -c "
-            import boto3, json
-            client = boto3.client('secretsmanager', region_name='us-east-1')
-            secret = json.loads(client.get_secret_value(SecretId='bonito_paper')['SecretString'])
-            for k, v in secret.items():
-                print(f'export {k}=\"{v}\"')
-            ")
-            STARTUP_EOF
-            echo "exec python3 scripts/run_bot.py --strategy $STRATEGY --mode paper" >> start_bot.sh
+            # Use the startup template (already synced via rsync)
+            # Template fetches secrets from AWS Secrets Manager at runtime
+            cp deploy/start_bot.sh.template start_bot.sh
             chmod +x start_bot.sh
 
             # Install/update systemd service
