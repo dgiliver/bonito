@@ -813,10 +813,16 @@ def live_backtest_universe(
     universe = _load_universe(universe_path)
     strategy = universe.load_strategy()
     store = _get_store()
-    engine = BacktestEngine(BacktestConfig(initial_capital=universe.risk.starting_cash_usd))
 
     start_dt = datetime.strptime(start, "%Y-%m-%d")
     end_dt = datetime.strptime(end, "%Y-%m-%d") if end else _dt.now(_UTC).replace(tzinfo=None)
+    engine = BacktestEngine(
+        BacktestConfig(
+            start_date=start_dt,
+            end_date=end_dt,
+            initial_capital=universe.risk.starting_cash_usd,
+        )
+    )
 
     table = Table(title=f"Universe Backtest: {strategy.name} ({start} → {end or 'today'})")
     for col in ("Symbol", "Trades", "Win %", "Return %", "Sharpe", "Max DD %"):
