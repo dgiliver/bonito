@@ -78,4 +78,7 @@ Phase 1 complete. Built and verified:
 Blockers for Phase 2:
 - Yahoo Finance hosts not in this environment's network allowlist — needed
   for `bonito live refresh` and `backtest-universe` on real data.
-- TE = T1 Energy Inc. assumed (Robinhood's "TE"); confirm with user.
+  Re-verified 2026-06-09: query1/query2.finance.yahoo.com still 403
+  ("Host not in allowlist"); Stooq/Alpha Vantage/Tiingo/Nasdaq also blocked.
+- ~~TE = T1 Energy Inc. assumed~~ — confirmed by user 2026-06-09: TE is
+  T1 Energy Inc.
