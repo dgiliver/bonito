@@ -25,6 +25,10 @@ app.add_typer(data_app, name="data")
 research_app = typer.Typer(help="Autonomous strategy research")
 app.add_typer(research_app, name="research")
 
+# Subcommand group for live trading (Robinhood option-A pipeline)
+live_app = typer.Typer(help="Live/paper trading on the configured universe")
+app.add_typer(live_app, name="live")
+
 console = Console()
 
 
@@ -499,6 +503,301 @@ def research_run(
         start_date=start,
         end_date=end,
     )
+
+
+# --- Live trading commands (Robinhood option-A pipeline) ---
+
+
+def _load_universe(universe_path: str):
+    from pathlib import Path
+
+    from bonito.trading.live_runner import UniverseConfig
+
+    return UniverseConfig.load(Path(universe_path))
+
+
+def _load_ledger(universe):
+    from bonito.trading.paper import PaperLedger
+
+    return PaperLedger.load_or_create(starting_cash=universe.risk.starting_cash_usd)
+
+
+@live_app.command("refresh")
+def live_refresh(
+    universe_path: str = typer.Option("config/universe.json", "--universe", "-u"),
+) -> None:
+    """Ingest fresh daily bars for every universe symbol."""
+    from bonito.trading.live_runner import refresh_data
+
+    universe = _load_universe(universe_path)
+    results = refresh_data(universe, _get_store())
+
+    table = Table(title="Data Refresh")
+    table.add_column("Symbol")
+    table.add_column("Bars", justify="right")
+    failed = []
+    for symbol, count in results.items():
+        table.add_row(symbol, str(count) if count >= 0 else "[red]FAILED[/red]")
+        if count < 0:
+            failed.append(symbol)
+    console.print(table)
+    if failed:
+        console.print(f"[red]Failed: {', '.join(failed)}[/red]")
+        raise typer.Exit(1)
+
+
+@live_app.command("signals")
+def live_signals(
+    universe_path: str = typer.Option("config/universe.json", "--universe", "-u"),
+) -> None:
+    """Generate trade intents (no execution). Writes livetrade/intents/*.json."""
+    from bonito.trading.live_runner import generate_intents, save_intents
+    from bonito.trading.paper import DEFAULT_LEDGER_PATH
+
+    universe = _load_universe(universe_path)
+    ledger = _load_ledger(universe)
+    intents, prices = generate_intents(universe, _get_store(), ledger)
+    ledger.save()  # persist high-water-mark updates
+
+    if not intents:
+        console.print("[dim]No trade intents today.[/dim]")
+        return
+
+    path = save_intents(intents)
+    table = Table(title=f"Trade Intents ({universe.mode})")
+    for col in ("Side", "Symbol", "Size", "Signal Px", "Reason"):
+        table.add_column(col)
+    for i in intents:
+        size = f"${i.dollar_amount:.2f}" if i.dollar_amount else f"{i.quantity:.4f} sh"
+        table.add_row(i.side.upper(), i.symbol, size, f"${i.signal_price:.2f}", i.reason)
+    console.print(table)
+    console.print(f"[dim]Saved to {path} | ledger: {DEFAULT_LEDGER_PATH}[/dim]")
+
+
+@live_app.command("run")
+def live_run(
+    universe_path: str = typer.Option("config/universe.json", "--universe", "-u"),
+    refresh: bool = typer.Option(True, "--refresh/--no-refresh", help="Refresh data first"),
+) -> None:
+    """Full daily cycle: refresh data, generate intents, fill in paper mode.
+
+    In live mode this stops after writing intents — real orders are placed
+    by the Claude session via the Robinhood MCP, never by this CLI.
+    """
+    from bonito.trading.live_runner import (
+        execute_paper,
+        generate_intents,
+        refresh_data,
+        save_intents,
+    )
+
+    universe = _load_universe(universe_path)
+    store = _get_store()
+
+    if refresh:
+        results = refresh_data(universe, store)
+        ok = sum(1 for c in results.values() if c >= 0)
+        console.print(f"Refreshed {ok}/{len(results)} symbols")
+
+    ledger = _load_ledger(universe)
+    intents, prices = generate_intents(universe, store, ledger)
+
+    if intents:
+        path = save_intents(intents)
+        console.print(f"[bold]{len(intents)} intent(s)[/bold] → {path}")
+        for i in intents:
+            size = f"${i.dollar_amount:.2f}" if i.dollar_amount else f"{i.quantity:.4f} sh"
+            console.print(f"  {i.side.upper()} {i.symbol} {size} — {i.reason}")
+    else:
+        console.print("[dim]No trade intents today.[/dim]")
+
+    if universe.mode == "paper":
+        fills, errors = execute_paper(ledger, intents, prices)
+        for e in errors:
+            console.print(f"[red]Rejected: {e}[/red]")
+        console.print(f"Paper fills: {len(fills)}")
+    else:
+        console.print(
+            "[yellow]Live mode: intents written, execute via Robinhood MCP "
+            "then record fills with `bonito live record-fill`.[/yellow]"
+        )
+
+    ledger.save()
+    _print_status(ledger, prices)
+
+
+@live_app.command("check-stops")
+def live_check_stops(
+    prices_json: str = typer.Argument(
+        ..., help='Current prices as JSON, e.g. \'{"TSLA": 412.5, "NVDA": 180.2}\''
+    ),
+    universe_path: str = typer.Option("config/universe.json", "--universe", "-u"),
+    execute: bool = typer.Option(
+        False, "--execute", help="Fill triggered exits in the paper ledger at given prices"
+    ),
+) -> None:
+    """Intraday stop-loss/take-profit sweep against supplied prices."""
+    import json as _json
+
+    from bonito.trading.live_runner import check_stops, execute_paper, save_intents
+
+    universe = _load_universe(universe_path)
+    ledger = _load_ledger(universe)
+    prices = {k.upper(): float(v) for k, v in _json.loads(prices_json).items()}
+
+    intents = check_stops(universe, ledger, prices)
+    if not intents:
+        console.print("[dim]No stops triggered.[/dim]")
+        ledger.save()  # persist high-water-mark updates
+        return
+
+    path = save_intents(intents)
+    for i in intents:
+        console.print(f"[bold red]EXIT {i.symbol}[/bold red] @ ${i.signal_price:.2f} — {i.reason}")
+    console.print(f"[dim]Saved to {path}[/dim]")
+
+    if execute and universe.mode == "paper":
+        fills, errors = execute_paper(ledger, intents, prices)
+        for e in errors:
+            console.print(f"[red]Rejected: {e}[/red]")
+        console.print(f"Paper fills: {len(fills)}")
+
+    ledger.save()
+
+
+@live_app.command("status")
+def live_status(
+    universe_path: str = typer.Option("config/universe.json", "--universe", "-u"),
+    prices_json: str = typer.Option(
+        None, "--prices", help="Optional current prices JSON for mark-to-market"
+    ),
+) -> None:
+    """Show paper ledger status: cash, positions, P&L."""
+    import json as _json
+
+    universe = _load_universe(universe_path)
+    ledger = _load_ledger(universe)
+    prices = (
+        {k.upper(): float(v) for k, v in _json.loads(prices_json).items()} if prices_json else {}
+    )
+    _print_status(ledger, prices)
+
+
+def _print_status(ledger, prices: dict[str, float]) -> None:
+    s = ledger.summary(prices)
+    console.print(
+        Panel.fit(
+            f"[bold]Equity: ${s['equity']:.2f}[/bold] ({s['total_return_pct']:+.2f}%)\n"
+            f"Cash: ${s['cash']:.2f} | Realized P&L: ${s['realized_pnl']:+.2f} | "
+            f"Unrealized: ${s['unrealized_pnl']:+.2f} | Fills: {s['total_fills']}",
+            title="Paper Account",
+            border_style="green" if s["total_return_pct"] >= 0 else "red",
+        )
+    )
+    if s["open_positions"]:
+        table = Table(title="Open Positions")
+        for col in ("Symbol", "Qty", "Entry", "Current", "Value", "P&L"):
+            table.add_column(col, justify="right")
+        for p in s["open_positions"]:
+            table.add_row(
+                p["symbol"],
+                f"{p['quantity']:.4f}",
+                f"${p['entry_price']:.2f}",
+                f"${p['current_price']:.2f}",
+                f"${p['market_value']:.2f}",
+                f"${p['unrealized_pnl']:+.2f}",
+            )
+        console.print(table)
+
+
+@live_app.command("record-fill")
+def live_record_fill(
+    symbol: str = typer.Argument(...),
+    side: str = typer.Argument(..., help="buy or sell"),
+    price: float = typer.Argument(..., help="Actual fill price from Robinhood"),
+    dollar_amount: float = typer.Option(None, "--dollars", help="Notional for buys"),
+    reason: str = typer.Option("live fill", "--reason"),
+    universe_path: str = typer.Option("config/universe.json", "--universe", "-u"),
+) -> None:
+    """Record a real Robinhood fill into the ledger (live mode bookkeeping)."""
+    from datetime import UTC as _UTC
+    from datetime import datetime as _dt
+
+    from bonito.trading.live_runner import execute_paper
+    from bonito.trading.signals import TradeIntent
+
+    universe = _load_universe(universe_path)
+    ledger = _load_ledger(universe)
+    symbol = symbol.upper()
+
+    if side == "buy" and not dollar_amount:
+        console.print("[red]Buys require --dollars[/red]")
+        raise typer.Exit(1)
+
+    quantity = ledger.positions[symbol].quantity if side == "sell" else None
+    intent = TradeIntent(
+        symbol=symbol,
+        side=side,  # type: ignore[arg-type]
+        dollar_amount=dollar_amount,
+        quantity=quantity,
+        reason=reason,
+        signal_price=price,
+        signal_date=_dt.now(_UTC),
+        strategy_name="live",
+    )
+    fills, errors = execute_paper(ledger, [intent], {symbol: price})
+    for e in errors:
+        console.print(f"[red]{e}[/red]")
+        raise typer.Exit(1)
+    ledger.save()
+    console.print(f"Recorded {side.upper()} {symbol} @ ${price:.2f}")
+
+
+@live_app.command("backtest-universe")
+def live_backtest_universe(
+    universe_path: str = typer.Option("config/universe.json", "--universe", "-u"),
+    start: str = typer.Option("2022-01-01", "--start"),
+    end: str = typer.Option(None, "--end", help="Default: today"),
+) -> None:
+    """Backtest the deployed strategy across every universe symbol."""
+    from datetime import UTC as _UTC
+    from datetime import datetime as _dt
+
+    from bonito.backtest.engine import BacktestEngine
+    from bonito.backtest.models import BacktestConfig
+
+    universe = _load_universe(universe_path)
+    strategy = universe.load_strategy()
+    store = _get_store()
+    engine = BacktestEngine(BacktestConfig(initial_capital=universe.risk.starting_cash_usd))
+
+    start_dt = datetime.strptime(start, "%Y-%m-%d")
+    end_dt = (
+        datetime.strptime(end, "%Y-%m-%d") if end else _dt.now(_UTC).replace(tzinfo=None)
+    )
+
+    table = Table(title=f"Universe Backtest: {strategy.name} ({start} → {end or 'today'})")
+    for col in ("Symbol", "Trades", "Win %", "Return %", "Sharpe", "Max DD %"):
+        table.add_column(col, justify="right")
+
+    for symbol in universe.symbols:
+        data = store.get_bars(symbol, start_dt, end_dt, universe.data.timeframe)
+        if data is None or len(data) < 50:
+            table.add_row(symbol, "[dim]no data[/dim]", "-", "-", "-", "-")
+            continue
+        per_symbol = strategy.model_copy(update={"symbols": [symbol]})
+        result = engine.run(per_symbol, data)
+        m = result.metrics
+        table.add_row(
+            symbol,
+            str(m.total_trades),
+            f"{m.win_rate * 100:.0f}",
+            f"{m.total_return * 100:+.1f}",
+            f"{m.sharpe_ratio:.2f}",
+            f"{m.max_drawdown * 100:.1f}",
+        )
+
+    console.print(table)
 
 
 if __name__ == "__main__":

@@ -9,9 +9,10 @@ from typing import Literal
 import numpy as np
 
 from bonito.backtest.indicators import compute_indicators
-from bonito.backtest.strategy import Comparison, StrategyConfig
+from bonito.backtest.strategy import StrategyConfig
 from bonito.data.models import BarData
 
+from . import signals
 from .broker import Broker
 from .executor import OrderExecutor
 from .models import BotConfig, DeployedBot, Order, Position
@@ -420,30 +421,8 @@ class TradingBot:
         indicators: dict[str, np.ndarray],
         bar_idx: int,
     ) -> bool:
-        """Evaluate a single rule for the latest bar.
-
-        This is adapted from the backtest engine's vectorized evaluation,
-        but operates on a single bar index.
-
-        Args:
-            rule: Rule to evaluate
-            indicators: Computed indicators
-            bar_idx: Index of the bar to evaluate
-
-        Returns:
-            True if the rule is satisfied
-        """
-        # Evaluate each condition
-        condition_results = []
-        for condition in rule.conditions:
-            result = self._evaluate_condition_for_bar(condition, indicators, bar_idx)
-            condition_results.append(result)
-
-        # Combine with logic operator
-        if rule.logic == "AND":
-            return all(condition_results)
-        else:  # OR
-            return any(condition_results)
+        """Evaluate a single rule for the latest bar (delegates to signals module)."""
+        return signals.evaluate_rule_for_bar(rule, indicators, bar_idx)
 
     def _evaluate_condition_for_bar(
         self,
@@ -451,133 +430,8 @@ class TradingBot:
         indicators: dict[str, np.ndarray],
         bar_idx: int,
     ) -> bool:
-        """Evaluate a single condition for a specific bar.
-
-        Args:
-            condition: RuleCondition to evaluate
-            indicators: Computed indicators
-            bar_idx: Index of the bar
-
-        Returns:
-            True if condition is met
-        """
-        # Get left operand value
-        left_array = indicators.get(condition.left)
-        if left_array is None:
-            logger.warning(f"Unknown indicator: {condition.left}")
-            return False
-
-        # Check for NaN
-        if np.isnan(left_array[bar_idx]):
-            return False
-
-        left_val = left_array[bar_idx]
-
-        # Get right operand value
-        if isinstance(condition.right, int | float):
-            right_val = float(condition.right)
-        else:
-            right_array = indicators.get(condition.right)
-            if right_array is None:
-                # Try to parse as float
-                try:
-                    right_val = float(condition.right)
-                except ValueError:
-                    logger.warning(f"Unknown indicator: {condition.right}")
-                    return False
-            else:
-                if np.isnan(right_array[bar_idx]):
-                    return False
-                right_val = right_array[bar_idx]
-
-        # Apply comparison
-        if condition.comparison == Comparison.GT:
-            return left_val > right_val
-        elif condition.comparison == Comparison.GTE:
-            return left_val >= right_val
-        elif condition.comparison == Comparison.LT:
-            return left_val < right_val
-        elif condition.comparison == Comparison.LTE:
-            return left_val <= right_val
-        elif condition.comparison == Comparison.EQ:
-            return np.isclose(left_val, right_val)
-        elif condition.comparison == Comparison.CROSSES_ABOVE:
-            # Crossover: need previous bar
-            if bar_idx < 1:
-                return False
-            prev_left = left_array[bar_idx - 1]
-            prev_right = (
-                right_val if isinstance(condition.right, int | float) else right_array[bar_idx - 1]
-            )  # type: ignore
-            return prev_left <= prev_right and left_val > right_val
-        elif condition.comparison == Comparison.CROSSES_BELOW:
-            # Crossunder: need previous bar
-            if bar_idx < 1:
-                return False
-            prev_left = left_array[bar_idx - 1]
-            prev_right = (
-                right_val if isinstance(condition.right, int | float) else right_array[bar_idx - 1]
-            )  # type: ignore
-            return prev_left >= prev_right and left_val < right_val
-        elif condition.comparison == Comparison.WAS_ABOVE:
-            # Check if condition was true in lookback period
-            lookback = condition.lookback or 5
-            start_idx = max(0, bar_idx - lookback + 1)
-            window = left_array[start_idx : bar_idx + 1]
-            if isinstance(condition.right, int | float):
-                return np.any(window > right_val)
-            else:
-                right_window = right_array[start_idx : bar_idx + 1]  # type: ignore
-                return np.any(window > right_window)
-        elif condition.comparison == Comparison.WAS_BELOW:
-            # Check if condition was true in lookback period
-            lookback = condition.lookback or 5
-            start_idx = max(0, bar_idx - lookback + 1)
-            window = left_array[start_idx : bar_idx + 1]
-            if isinstance(condition.right, int | float):
-                return np.any(window < right_val)
-            else:
-                right_window = right_array[start_idx : bar_idx + 1]  # type: ignore
-                return np.any(window < right_window)
-        elif condition.comparison == Comparison.CROSSED_ABOVE_WITHIN:
-            # Check for crossover in lookback period
-            lookback = condition.lookback or 5
-            start_idx = max(1, bar_idx - lookback + 1)
-            for i in range(start_idx, bar_idx + 1):
-                if i < 1:
-                    continue
-                prev_left = left_array[i - 1]
-                curr_left = left_array[i]
-                if isinstance(condition.right, int | float):
-                    if prev_left <= right_val and curr_left > right_val:
-                        return True
-                else:
-                    prev_right = right_array[i - 1]  # type: ignore
-                    curr_right = right_array[i]  # type: ignore
-                    if prev_left <= prev_right and curr_left > curr_right:
-                        return True
-            return False
-        elif condition.comparison == Comparison.CROSSED_BELOW_WITHIN:
-            # Check for crossunder in lookback period
-            lookback = condition.lookback or 5
-            start_idx = max(1, bar_idx - lookback + 1)
-            for i in range(start_idx, bar_idx + 1):
-                if i < 1:
-                    continue
-                prev_left = left_array[i - 1]
-                curr_left = left_array[i]
-                if isinstance(condition.right, int | float):
-                    if prev_left >= right_val and curr_left < right_val:
-                        return True
-                else:
-                    prev_right = right_array[i - 1]  # type: ignore
-                    curr_right = right_array[i]  # type: ignore
-                    if prev_left >= prev_right and curr_left < curr_right:
-                        return True
-            return False
-        else:
-            logger.warning(f"Unknown comparison: {condition.comparison}")
-            return False
+        """Evaluate a single condition for a bar (delegates to signals module)."""
+        return signals.evaluate_condition_for_bar(condition, indicators, bar_idx)
 
     def _check_stop_loss(
         self,
@@ -585,49 +439,17 @@ class TradingBot:
         current_price: float,
         stop_config,  # StopLossConfig
     ) -> bool:
-        """Check if stop loss is triggered.
+        """Check if stop loss is triggered (delegates to signals module).
 
-        Args:
-            position: Current position
-            current_price: Current market price
-            stop_config: Stop loss configuration
-
-        Returns:
-            True if stop loss should trigger
+        Maintains the per-symbol trailing extreme in self._trailing_highs.
         """
-        stop_type = stop_config.type.value
-        entry_price = position.entry_price
-        is_short = position.side == "short"
-
-        if stop_type == "percent":
-            if is_short:
-                # Short: stop triggers when price RISES
-                stop_price = entry_price * (1 + stop_config.value)
-                return current_price >= stop_price
-            else:
-                # Long: stop triggers when price FALLS
-                stop_price = entry_price * (1 - stop_config.value)
-                return current_price <= stop_price
-
-        elif stop_type == "trailing_percent":
-            symbol = position.symbol
-            if is_short:
-                # Track lowest price since entry
-                tracked = self._trailing_highs.get(symbol, entry_price)
-                tracked = min(tracked, current_price)
-                self._trailing_highs[symbol] = tracked
-                stop_price = tracked * (1 + stop_config.value)
-                return current_price >= stop_price
-            else:
-                # Track highest price since entry
-                tracked = self._trailing_highs.get(symbol, entry_price)
-                tracked = max(tracked, current_price)
-                self._trailing_highs[symbol] = tracked
-                stop_price = tracked * (1 - stop_config.value)
-                return current_price <= stop_price
-
-        # Add other stop types as needed
-        return False
+        tracked = self._trailing_highs.get(position.symbol, position.entry_price)
+        triggered, new_extreme = signals.stop_loss_triggered(
+            position.side, position.entry_price, current_price, stop_config, tracked
+        )
+        if stop_config.type.value == "trailing_percent":
+            self._trailing_highs[position.symbol] = new_extreme
+        return triggered
 
     def _check_take_profit(
         self,
@@ -635,31 +457,10 @@ class TradingBot:
         current_price: float,
         tp_config,  # TakeProfitConfig
     ) -> bool:
-        """Check if take profit is triggered.
-
-        Args:
-            position: Current position
-            current_price: Current market price
-            tp_config: Take profit configuration
-
-        Returns:
-            True if take profit should trigger
-        """
-        tp_type = tp_config.type.value
-        entry_price = position.entry_price
-        is_short = position.side == "short"
-
-        if tp_type == "percent":
-            if is_short:
-                # Short: profit when price FALLS
-                tp_price = entry_price * (1 - tp_config.value)
-                return current_price <= tp_price
-            else:
-                # Long: profit when price RISES
-                tp_price = entry_price * (1 + tp_config.value)
-                return current_price >= tp_price
-
-        return False
+        """Check if take profit is triggered (delegates to signals module)."""
+        return signals.take_profit_triggered(
+            position.side, position.entry_price, current_price, tp_config
+        )
 
     def get_deployed_bot_state(self) -> DeployedBot:
         """Get the current state as a DeployedBot model."""

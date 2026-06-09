@@ -1,0 +1,156 @@
+"""Tests for the paper trading ledger (bonito.trading.paper)."""
+
+from datetime import UTC, datetime
+
+import pytest
+
+from bonito.trading.paper import PaperLedger
+from bonito.trading.signals import TradeIntent
+
+
+def buy_intent(symbol: str = "TSLA", dollars: float = 30.0) -> TradeIntent:
+    return TradeIntent(
+        symbol=symbol,
+        side="buy",
+        dollar_amount=dollars,
+        reason="test entry",
+        signal_price=100.0,
+        signal_date=datetime.now(UTC),
+        strategy_name="test",
+    )
+
+
+def sell_intent(symbol: str = "TSLA") -> TradeIntent:
+    return TradeIntent(
+        symbol=symbol,
+        side="sell",
+        reason="test exit",
+        signal_price=100.0,
+        signal_date=datetime.now(UTC),
+        strategy_name="test",
+    )
+
+
+class TestBuy:
+    def test_buy_opens_position_and_debits_cash(self):
+        ledger = PaperLedger(cash=150.0, starting_cash=150.0)
+        fill = ledger.apply_buy(buy_intent(dollars=30.0), fill_price=100.0)
+
+        assert ledger.cash == pytest.approx(120.0)
+        assert "TSLA" in ledger.positions
+        pos = ledger.positions["TSLA"]
+        assert pos.quantity == pytest.approx(0.3)
+        assert pos.entry_price == 100.0
+        assert pos.high_water_mark == 100.0
+        assert fill.notional == 30.0
+
+    def test_buy_rejects_insufficient_cash(self):
+        ledger = PaperLedger(cash=10.0, starting_cash=150.0)
+        with pytest.raises(ValueError, match="insufficient cash"):
+            ledger.apply_buy(buy_intent(dollars=30.0), fill_price=100.0)
+
+    def test_buy_rejects_duplicate_position(self):
+        ledger = PaperLedger(cash=150.0, starting_cash=150.0)
+        ledger.apply_buy(buy_intent(dollars=30.0), fill_price=100.0)
+        with pytest.raises(ValueError, match="already open"):
+            ledger.apply_buy(buy_intent(dollars=30.0), fill_price=100.0)
+
+    def test_buy_rejects_zero_price(self):
+        ledger = PaperLedger(cash=150.0, starting_cash=150.0)
+        with pytest.raises(ValueError, match="invalid fill price"):
+            ledger.apply_buy(buy_intent(dollars=30.0), fill_price=0.0)
+
+    def test_buy_rejects_missing_dollar_amount(self):
+        ledger = PaperLedger(cash=150.0, starting_cash=150.0)
+        intent = buy_intent()
+        intent = intent.model_copy(update={"dollar_amount": None})
+        with pytest.raises(ValueError, match="dollar_amount"):
+            ledger.apply_buy(intent, fill_price=100.0)
+
+
+class TestSell:
+    def test_sell_closes_position_with_profit(self):
+        ledger = PaperLedger(cash=150.0, starting_cash=150.0)
+        ledger.apply_buy(buy_intent(dollars=30.0), fill_price=100.0)
+        fill = ledger.apply_sell(sell_intent(), fill_price=110.0)
+
+        assert "TSLA" not in ledger.positions
+        # 0.3 shares * 110 = 33 back
+        assert ledger.cash == pytest.approx(153.0)
+        assert ledger.realized_pnl == pytest.approx(3.0)
+        assert fill.quantity == pytest.approx(0.3)
+
+    def test_sell_records_loss(self):
+        ledger = PaperLedger(cash=150.0, starting_cash=150.0)
+        ledger.apply_buy(buy_intent(dollars=30.0), fill_price=100.0)
+        ledger.apply_sell(sell_intent(), fill_price=90.0)
+
+        assert ledger.cash == pytest.approx(147.0)
+        assert ledger.realized_pnl == pytest.approx(-3.0)
+
+    def test_sell_rejects_unknown_position(self):
+        ledger = PaperLedger(cash=150.0, starting_cash=150.0)
+        with pytest.raises(ValueError, match="no open position"):
+            ledger.apply_sell(sell_intent("NVDA"), fill_price=100.0)
+
+
+class TestEquityAndSummary:
+    def test_equity_marks_to_market(self):
+        ledger = PaperLedger(cash=150.0, starting_cash=150.0)
+        ledger.apply_buy(buy_intent(dollars=30.0), fill_price=100.0)
+        assert ledger.equity({"TSLA": 120.0}) == pytest.approx(120.0 + 0.3 * 120.0)
+
+    def test_equity_falls_back_to_entry_price(self):
+        ledger = PaperLedger(cash=150.0, starting_cash=150.0)
+        ledger.apply_buy(buy_intent(dollars=30.0), fill_price=100.0)
+        assert ledger.equity({}) == pytest.approx(150.0)
+
+    def test_summary_round_trip(self):
+        ledger = PaperLedger(cash=150.0, starting_cash=150.0)
+        ledger.apply_buy(buy_intent(dollars=30.0), fill_price=100.0)
+        s = ledger.summary({"TSLA": 110.0})
+        assert s["cash"] == 120.0
+        assert s["equity"] == pytest.approx(153.0)
+        assert s["unrealized_pnl"] == pytest.approx(3.0)
+        assert s["open_positions"][0]["symbol"] == "TSLA"
+
+
+class TestHighWaterMark:
+    def test_hwm_only_moves_up(self):
+        ledger = PaperLedger(cash=150.0, starting_cash=150.0)
+        ledger.apply_buy(buy_intent(dollars=30.0), fill_price=100.0)
+        ledger.update_high_water_mark("TSLA", 120.0)
+        assert ledger.positions["TSLA"].high_water_mark == 120.0
+        ledger.update_high_water_mark("TSLA", 110.0)
+        assert ledger.positions["TSLA"].high_water_mark == 120.0
+
+    def test_hwm_ignores_unknown_symbol(self):
+        ledger = PaperLedger(cash=150.0, starting_cash=150.0)
+        ledger.update_high_water_mark("NVDA", 120.0)  # no-op, no exception
+
+
+class TestPersistence:
+    def test_save_and_load_round_trip(self, tmp_path):
+        path = tmp_path / "ledger.json"
+        ledger = PaperLedger(cash=150.0, starting_cash=150.0)
+        ledger.apply_buy(buy_intent(dollars=30.0), fill_price=100.0)
+        ledger.save(path)
+
+        loaded = PaperLedger.load(path)
+        assert loaded.cash == pytest.approx(120.0)
+        assert loaded.positions["TSLA"].quantity == pytest.approx(0.3)
+        assert len(loaded.fills) == 1
+        assert loaded.updated_at is not None
+
+    def test_load_or_create_fresh(self, tmp_path):
+        path = tmp_path / "missing.json"
+        ledger = PaperLedger.load_or_create(path, starting_cash=150.0)
+        assert ledger.cash == 150.0
+        assert ledger.positions == {}
+
+    def test_load_or_create_existing(self, tmp_path):
+        path = tmp_path / "ledger.json"
+        ledger = PaperLedger(cash=99.0, starting_cash=150.0)
+        ledger.save(path)
+        loaded = PaperLedger.load_or_create(path, starting_cash=150.0)
+        assert loaded.cash == 99.0

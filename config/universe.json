@@ -1,0 +1,44 @@
+{
+  "name": "robinhood-agentic",
+  "description": "21-symbol watchlist traded on the Robinhood Agentic cash account",
+  "broker": "robinhood",
+  "account_nickname": "Agentic",
+  "mode": "paper",
+  "live_enabled": false,
+  "symbols": [
+    "TSLA",
+    "PLTR",
+    "MU",
+    "SNDK",
+    "DELL",
+    "ORCL",
+    "ARM",
+    "IREN",
+    "NOW",
+    "NVDA",
+    "AMD",
+    "COST",
+    "HOOD",
+    "MSFT",
+    "WDC",
+    "RKLB",
+    "ASTS",
+    "BE",
+    "TE",
+    "TSM",
+    "INTC"
+  ],
+  "strategy_path": "strategies/deployed_strategy.json",
+  "data": {
+    "timeframe": "1d",
+    "start_date": "2022-01-01"
+  },
+  "risk": {
+    "starting_cash_usd": 150.0,
+    "max_position_usd": 30.0,
+    "max_positions": 5,
+    "max_daily_buys": 3,
+    "min_cash_buffer_usd": 5.0,
+    "allow_short": false
+  }
+}

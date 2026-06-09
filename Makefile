@@ -120,3 +120,13 @@ research:
 
 ingest-universe:
 	$(PYTHON) -m bonito.cli ingest SPY QQQ IWM AAPL MSFT GOOGL TSLA NFLX NVDA AMD MU PLTR --start 2020-01-01 --end 2025-03-20
+
+# Live trading (Robinhood universe — see config/universe.json)
+live-run:
+	$(PYTHON) -m bonito.cli live run
+
+live-status:
+	$(PYTHON) -m bonito.cli live status
+
+live-backtest:
+	$(PYTHON) -m bonito.cli live backtest-universe
