@@ -26,7 +26,11 @@
     "BE",
     "TE",
     "TSM",
-    "INTC"
+    "INTC",
+    "ASML",
+    "AVGO",
+    "MRVL",
+    "LLY"
   ],
   "strategy_path": "strategies/deployed_strategy.json",
   "data": {
