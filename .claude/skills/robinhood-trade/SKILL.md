@@ -29,6 +29,15 @@ git pull origin <current-branch>   # pick up latest ledger state
 
 ## Daily cycle
 
+0. **Reconcile (MANDATORY in live mode, before anything else)**:
+   - `get_equity_positions` for the Agentic account → build
+     `{"SYMBOL": quantity}` JSON (or `{}` if flat).
+   - `.venv/bin/bonito live reconcile '<positions_json>'`
+   - Non-zero exit = drift (e.g. a prior session crashed between placing an
+     order and recording the fill). **HARD STOP — do not trade.** Pull the
+     truth from `get_equity_orders` (placed_agent=agentic), repair the
+     ledger with `bonito live record-fill` using actual fill prices, re-run
+     reconcile until green, and report what happened to the user.
 1. **Refresh data**: `.venv/bin/bonito live refresh`
    - If Yahoo is blocked ("Host not in allowlist"), STOP and tell the user
      to add `query1.finance.yahoo.com` / `query2.finance.yahoo.com` to the
@@ -59,7 +68,8 @@ git pull origin <current-branch>   # pick up latest ledger state
 
 For each sweep (every ~15 min during 9:30–16:00 ET via /loop):
 
-1. Read open positions from `livetrade/paper_ledger.json`. None → done.
+1. Read open positions from the mode's ledger (`livetrade/paper_ledger.json`
+   or `livetrade/live_ledger.json`). None → done.
 2. Get current prices: `get_equity_quotes` for those symbols.
 3. `.venv/bin/bonito live check-stops '{"TSLA": 412.5, ...}'`
    - Paper mode: add `--execute` to fill exits in the ledger.

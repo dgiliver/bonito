@@ -311,3 +311,59 @@ def _open_position(
         entry_date=AS_OF,
         high_water_mark=hwm if hwm is not None else entry_price,
     )
+
+
+class TestReconcile:
+    def _ledger_with(self, symbol="AAA", qty=0.5):
+        ledger = PaperLedger(cash=100.0, starting_cash=150.0)
+        _open_position(ledger, symbol, quantity=qty, entry_price=100.0)
+        return ledger
+
+    def test_in_sync(self):
+        from bonito.trading.live_runner import reconcile_positions
+
+        report = reconcile_positions(self._ledger_with(), {"AAA": 0.5})
+        assert report.in_sync is True
+        assert "in sync" in report.describe()
+
+    def test_flat_account_matches_empty_ledger(self):
+        from bonito.trading.live_runner import reconcile_positions
+
+        ledger = PaperLedger(cash=150.0, starting_cash=150.0)
+        assert reconcile_positions(ledger, {}).in_sync is True
+
+    def test_broker_position_unknown_to_ledger_is_critical(self):
+        from bonito.trading.live_runner import reconcile_positions
+
+        ledger = PaperLedger(cash=150.0, starting_cash=150.0)
+        report = reconcile_positions(ledger, {"NVDA": 0.2})
+        assert report.in_sync is False
+        assert report.missing_in_ledger == {"NVDA": 0.2}
+        assert "CRITICAL" in report.describe()
+
+    def test_ledger_position_missing_at_broker(self):
+        from bonito.trading.live_runner import reconcile_positions
+
+        report = reconcile_positions(self._ledger_with("AAA"), {})
+        assert report.in_sync is False
+        assert report.missing_at_broker == ["AAA"]
+
+    def test_quantity_mismatch(self):
+        from bonito.trading.live_runner import reconcile_positions
+
+        report = reconcile_positions(self._ledger_with("AAA", qty=0.5), {"AAA": 0.7})
+        assert report.in_sync is False
+        assert report.quantity_mismatch["AAA"] == {"ledger": 0.5, "broker": 0.7}
+
+    def test_tolerance_absorbs_float_noise(self):
+        from bonito.trading.live_runner import reconcile_positions
+
+        report = reconcile_positions(self._ledger_with("AAA", qty=0.5), {"AAA": 0.500009})
+        assert report.in_sync is True
+
+    def test_dust_at_broker_ignored(self):
+        from bonito.trading.live_runner import reconcile_positions
+
+        ledger = PaperLedger(cash=150.0, starting_cash=150.0)
+        report = reconcile_positions(ledger, {"AAA": 0.00000001})
+        assert report.in_sync is True

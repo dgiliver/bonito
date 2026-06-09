@@ -11,13 +11,18 @@ from datetime import UTC, datetime
 from pathlib import Path
 from typing import Literal
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, PrivateAttr
 
 from .signals import TradeIntent
 
 logger = logging.getLogger(__name__)
 
 DEFAULT_LEDGER_PATH = Path("livetrade/paper_ledger.json")
+
+
+def ledger_path_for_mode(mode: str) -> Path:
+    """Paper and live bookkeeping never share a file."""
+    return Path(f"livetrade/{mode}_ledger.json")
 
 
 class PaperFill(BaseModel):
@@ -30,6 +35,7 @@ class PaperFill(BaseModel):
     notional: float
     reason: str
     filled_at: datetime
+    strategy_name: str = ""
 
 
 class PaperPosition(BaseModel):
@@ -41,6 +47,9 @@ class PaperPosition(BaseModel):
     entry_date: datetime
     high_water_mark: float = Field(
         ..., description="Highest price seen since entry (drives trailing stops)"
+    )
+    strategy_name: str = Field(
+        default="", description="Strategy that opened this position (audit trail)"
     )
 
 
@@ -54,10 +63,14 @@ class PaperLedger(BaseModel):
     realized_pnl: float = 0.0
     updated_at: datetime | None = None
 
+    _path: Path | None = PrivateAttr(default=None)
+
     @classmethod
     def load(cls, path: Path = DEFAULT_LEDGER_PATH) -> "PaperLedger":
         """Load ledger from JSON, or raise FileNotFoundError."""
-        return cls.model_validate_json(path.read_text())
+        ledger = cls.model_validate_json(path.read_text())
+        ledger._path = path
+        return ledger
 
     @classmethod
     def load_or_create(
@@ -66,13 +79,16 @@ class PaperLedger(BaseModel):
         """Load ledger, creating a fresh one if the file doesn't exist."""
         if path.exists():
             return cls.load(path)
-        return cls(cash=starting_cash, starting_cash=starting_cash)
+        ledger = cls(cash=starting_cash, starting_cash=starting_cash)
+        ledger._path = path
+        return ledger
 
-    def save(self, path: Path = DEFAULT_LEDGER_PATH) -> None:
-        """Persist ledger to JSON."""
+    def save(self, path: Path | None = None) -> None:
+        """Persist ledger to JSON (defaults to wherever it was loaded from)."""
+        target = path or self._path or DEFAULT_LEDGER_PATH
         self.updated_at = datetime.now(UTC)
-        path.parent.mkdir(parents=True, exist_ok=True)
-        path.write_text(self.model_dump_json(indent=2))
+        target.parent.mkdir(parents=True, exist_ok=True)
+        target.write_text(self.model_dump_json(indent=2))
 
     def equity(self, prices: dict[str, float]) -> float:
         """Total account value at the given prices.
@@ -112,6 +128,7 @@ class PaperLedger(BaseModel):
             entry_price=fill_price,
             entry_date=now,
             high_water_mark=fill_price,
+            strategy_name=intent.strategy_name,
         )
         fill = PaperFill(
             symbol=intent.symbol,
@@ -121,6 +138,7 @@ class PaperLedger(BaseModel):
             notional=intent.dollar_amount,
             reason=intent.reason,
             filled_at=now,
+            strategy_name=intent.strategy_name,
         )
         self.fills.append(fill)
         logger.info(
@@ -157,6 +175,7 @@ class PaperLedger(BaseModel):
             notional=notional,
             reason=intent.reason,
             filled_at=datetime.now(UTC),
+            strategy_name=intent.strategy_name or pos.strategy_name,
         )
         self.fills.append(fill)
         logger.info(

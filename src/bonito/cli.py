@@ -517,9 +517,11 @@ def _load_universe(universe_path: str):
 
 
 def _load_ledger(universe):
-    from bonito.trading.paper import PaperLedger
+    from bonito.trading.paper import PaperLedger, ledger_path_for_mode
 
-    return PaperLedger.load_or_create(starting_cash=universe.risk.starting_cash_usd)
+    return PaperLedger.load_or_create(
+        ledger_path_for_mode(universe.mode), starting_cash=universe.risk.starting_cash_usd
+    )
 
 
 @live_app.command("refresh")
@@ -592,6 +594,12 @@ def live_run(
     )
 
     universe = _load_universe(universe_path)
+    if universe.mode == "live" and not universe.live_enabled:
+        console.print(
+            "[red]mode is 'live' but live_enabled is false in universe.json — refusing.[/red]"
+        )
+        raise typer.Exit(1)
+
     store = _get_store()
 
     if refresh:
@@ -663,6 +671,42 @@ def live_check_stops(
         console.print(f"Paper fills: {len(fills)}")
 
     ledger.save()
+
+
+@live_app.command("reconcile")
+def live_reconcile(
+    positions_json: str = typer.Argument(
+        ...,
+        help='Broker positions as JSON {"SYMBOL": quantity, ...} '
+        "(from Robinhood MCP get_equity_positions; {} if account is flat)",
+    ),
+    universe_path: str = typer.Option("config/universe.json", "--universe", "-u"),
+) -> None:
+    """Verify the ledger matches the broker's actual positions.
+
+    MUST pass before any live-mode trading. Exits non-zero on drift so
+    automated sessions hard-stop instead of trading on bad state.
+    """
+    import json as _json
+
+    from bonito.trading.live_runner import reconcile_positions
+
+    universe = _load_universe(universe_path)
+    ledger = _load_ledger(universe)
+    broker_positions = {k.upper(): float(v) for k, v in _json.loads(positions_json).items()}
+
+    report = reconcile_positions(ledger, broker_positions)
+    if report.in_sync:
+        console.print("[green]✓ Ledger and broker are in sync[/green]")
+        return
+
+    console.print("[bold red]DRIFT DETECTED — do not trade until resolved:[/bold red]")
+    console.print(report.describe())
+    console.print(
+        "[dim]Resolve with `bonito live record-fill` using the actual fill data "
+        "from Robinhood order history (get_equity_orders, placed_agent=agentic).[/dim]"
+    )
+    raise typer.Exit(1)
 
 
 @live_app.command("status")
@@ -772,9 +816,7 @@ def live_backtest_universe(
     engine = BacktestEngine(BacktestConfig(initial_capital=universe.risk.starting_cash_usd))
 
     start_dt = datetime.strptime(start, "%Y-%m-%d")
-    end_dt = (
-        datetime.strptime(end, "%Y-%m-%d") if end else _dt.now(_UTC).replace(tzinfo=None)
-    )
+    end_dt = datetime.strptime(end, "%Y-%m-%d") if end else _dt.now(_UTC).replace(tzinfo=None)
 
     table = Table(title=f"Universe Backtest: {strategy.name} ({start} → {end or 'today'})")
     for col in ("Symbol", "Trades", "Win %", "Return %", "Sharpe", "Max DD %"):

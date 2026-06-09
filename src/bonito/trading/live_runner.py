@@ -300,6 +300,72 @@ def check_stops(
     return intents
 
 
+class ReconcileReport(BaseModel):
+    """Drift between the ledger and the broker's actual positions."""
+
+    in_sync: bool
+    missing_in_ledger: dict[str, float] = Field(
+        default_factory=dict,
+        description="Broker holds these but the ledger doesn't — money floating, CRITICAL",
+    )
+    missing_at_broker: list[str] = Field(
+        default_factory=list,
+        description="Ledger thinks these are open but the broker shows nothing",
+    )
+    quantity_mismatch: dict[str, dict[str, float]] = Field(
+        default_factory=dict,
+        description="Symbol → {ledger, broker} quantities that disagree",
+    )
+
+    def describe(self) -> str:
+        if self.in_sync:
+            return "ledger and broker are in sync"
+        lines = []
+        for sym, qty in self.missing_in_ledger.items():
+            lines.append(f"CRITICAL: broker holds {qty} {sym} unknown to the ledger")
+        for sym in self.missing_at_broker:
+            lines.append(f"{sym}: open in ledger but not held at broker")
+        for sym, d in self.quantity_mismatch.items():
+            lines.append(f"{sym}: ledger={d['ledger']} broker={d['broker']}")
+        return "\n".join(lines)
+
+
+def reconcile_positions(
+    ledger: PaperLedger,
+    broker_positions: dict[str, float],
+    tolerance: float = 1e-4,
+) -> ReconcileReport:
+    """Compare ledger positions against the broker's actual holdings.
+
+    MUST run (and pass) at the start of every live session before any
+    signal generation. A previous session crashing between order placement
+    and record-fill is exactly what this catches — nothing trades until a
+    human (or an explicit record-fill) resolves the drift.
+
+    Args:
+        broker_positions: Symbol → share quantity from the broker
+            (e.g. Robinhood MCP get_equity_positions).
+    """
+    broker = {s.upper(): q for s, q in broker_positions.items() if q > tolerance}
+    report = ReconcileReport(in_sync=True)
+
+    for symbol, qty in broker.items():
+        pos = ledger.positions.get(symbol)
+        if pos is None:
+            report.missing_in_ledger[symbol] = qty
+        elif abs(pos.quantity - qty) > tolerance:
+            report.quantity_mismatch[symbol] = {"ledger": pos.quantity, "broker": qty}
+
+    for symbol in ledger.positions:
+        if symbol not in broker:
+            report.missing_at_broker.append(symbol)
+
+    report.in_sync = not (
+        report.missing_in_ledger or report.missing_at_broker or report.quantity_mismatch
+    )
+    return report
+
+
 def save_intents(intents: list[TradeIntent], directory: Path = Path("livetrade/intents")) -> Path:
     """Write intents to a timestamped JSON file for audit / live handoff."""
     directory.mkdir(parents=True, exist_ok=True)

@@ -154,3 +154,51 @@ class TestPersistence:
         ledger.save(path)
         loaded = PaperLedger.load_or_create(path, starting_cash=150.0)
         assert loaded.cash == 99.0
+
+
+class TestAuditTrail:
+    def test_position_and_fill_tagged_with_strategy(self):
+        ledger = PaperLedger(cash=150.0, starting_cash=150.0)
+        intent = buy_intent().model_copy(update={"strategy_name": "ema_cross"})
+        ledger.apply_buy(intent, fill_price=100.0)
+
+        assert ledger.positions["TSLA"].strategy_name == "ema_cross"
+        assert ledger.fills[0].strategy_name == "ema_cross"
+
+    def test_sell_inherits_strategy_from_position(self):
+        ledger = PaperLedger(cash=150.0, starting_cash=150.0)
+        ledger.apply_buy(
+            buy_intent().model_copy(update={"strategy_name": "ema_cross"}), fill_price=100.0
+        )
+        intent = sell_intent().model_copy(update={"strategy_name": ""})
+        ledger.apply_sell(intent, fill_price=110.0)
+
+        assert ledger.fills[-1].strategy_name == "ema_cross"
+
+    def test_fills_history_is_append_only_across_round_trips(self, tmp_path):
+        path = tmp_path / "ledger.json"
+        ledger = PaperLedger(cash=150.0, starting_cash=150.0)
+        ledger.apply_buy(buy_intent(dollars=30.0), fill_price=100.0)
+        ledger.apply_sell(sell_intent(), fill_price=110.0)
+        ledger.save(path)
+
+        loaded = PaperLedger.load(path)
+        loaded.apply_buy(buy_intent("NVDA", dollars=30.0), fill_price=200.0)
+        loaded.save()  # saves back to the same path it was loaded from
+
+        final = PaperLedger.load(path)
+        assert len(final.fills) == 3  # nothing pruned
+
+    def test_save_remembers_load_path(self, tmp_path):
+        path = tmp_path / "live_ledger.json"
+        ledger = PaperLedger.load_or_create(path, starting_cash=150.0)
+        ledger.apply_buy(buy_intent(dollars=30.0), fill_price=100.0)
+        ledger.save()  # no explicit path
+        assert path.exists()
+        assert PaperLedger.load(path).cash == pytest.approx(120.0)
+
+    def test_ledger_path_for_mode(self):
+        from bonito.trading.paper import ledger_path_for_mode
+
+        assert str(ledger_path_for_mode("paper")).endswith("paper_ledger.json")
+        assert str(ledger_path_for_mode("live")).endswith("live_ledger.json")
