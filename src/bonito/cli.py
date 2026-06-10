@@ -1,6 +1,7 @@
 """Command-line interface for the Bonito agent."""
 
-from datetime import datetime
+from datetime import datetime, timedelta
+from pathlib import Path
 
 import typer
 from rich.console import Console
@@ -620,7 +621,10 @@ def live_run(
         console.print("[dim]No trade intents today.[/dim]")
 
     if universe.mode == "paper":
-        fills, errors = execute_paper(ledger, intents, prices)
+        buy_strategies = {
+            i.symbol: universe.load_strategy_for(i.symbol) for i in intents if i.side == "buy"
+        }
+        fills, errors = execute_paper(ledger, intents, prices, strategies=buy_strategies)
         for e in errors:
             console.print(f"[red]Rejected: {e}[/red]")
         console.print(f"Paper fills: {len(fills)}")
@@ -646,14 +650,29 @@ def live_check_stops(
 ) -> None:
     """Intraday stop-loss/take-profit sweep against supplied prices."""
     import json as _json
+    from datetime import UTC as _UTC
+    from datetime import datetime as _dt
 
     from bonito.trading.live_runner import check_stops, execute_paper, save_intents
+    from bonito.trading.signals import latest_atr
 
     universe = _load_universe(universe_path)
     ledger = _load_ledger(universe)
     prices = {k.upper(): float(v) for k, v in _json.loads(prices_json).items()}
 
-    intents = check_stops(universe, ledger, prices)
+    # ATR-based stops need the current ATR from stored daily bars.
+    atrs: dict[str, float] = {}
+    store = _get_store()
+    start = datetime.strptime(universe.data.start_date, "%Y-%m-%d")
+    now = _dt.now(_UTC).replace(tzinfo=None)
+    for symbol, pos in ledger.positions.items():
+        strat = pos.pinned_strategy() or universe.load_strategy_for(symbol)
+        if strat.stop_loss and strat.stop_loss.type.value in ("atr", "trailing_atr"):
+            data = store.get_bars(symbol, start, now, universe.data.timeframe)
+            if data is not None and len(data) >= 2:
+                atrs[symbol] = latest_atr(data, strat.stop_loss.atr_period)
+
+    intents = check_stops(universe, ledger, prices, atrs=atrs)
     if not intents:
         console.print("[dim]No stops triggered.[/dim]")
         ledger.save()  # persist high-water-mark updates
@@ -729,6 +748,14 @@ def live_status(
 
 def _print_status(ledger, prices: dict[str, float]) -> None:
     s = ledger.summary(prices)
+    if s["halted"]:
+        console.print(
+            Panel.fit(
+                f"[bold red]KILL SWITCH ACTIVE[/bold red]\n{s['halt_reason']}\n"
+                "No new entries until `bonito live resume`.",
+                border_style="red",
+            )
+        )
     console.print(
         Panel.fit(
             f"[bold]Equity: ${s['equity']:.2f}[/bold] ({s['total_return_pct']:+.2f}%)\n"
@@ -789,7 +816,8 @@ def live_record_fill(
         signal_date=_dt.now(_UTC),
         strategy_name="live",
     )
-    fills, errors = execute_paper(ledger, [intent], {symbol: price})
+    strategies = {symbol: universe.load_strategy_for(symbol)} if side == "buy" else None
+    fills, errors = execute_paper(ledger, [intent], {symbol: price}, strategies=strategies)
     for e in errors:
         console.print(f"[red]{e}[/red]")
         raise typer.Exit(1)
@@ -797,25 +825,66 @@ def live_record_fill(
     console.print(f"Recorded {side.upper()} {symbol} @ ${price:.2f}")
 
 
+@live_app.command("resume")
+def live_resume(
+    universe_path: str = typer.Option("config/universe.json", "--universe", "-u"),
+) -> None:
+    """Clear a kill-switch halt (explicit human action).
+
+    The kill switch flattens all positions and blocks new entries when
+    account drawdown breaches risk.max_drawdown_halt. Resuming requires a
+    human to have reviewed what went wrong.
+    """
+    universe = _load_universe(universe_path)
+    ledger = _load_ledger(universe)
+    if not ledger.halted:
+        console.print("[dim]Ledger is not halted.[/dim]")
+        return
+    reason = ledger.halt_reason
+    ledger.resume()
+    ledger.save()
+    console.print(f"[green]Halt cleared[/green] (was: {reason})")
+
+
 @live_app.command("backtest-universe")
 def live_backtest_universe(
     universe_path: str = typer.Option("config/universe.json", "--universe", "-u"),
     start: str = typer.Option("2022-01-01", "--start"),
     end: str = typer.Option(None, "--end", help="Default: today"),
+    holdout: str = typer.Option(
+        "2025-01-01",
+        "--holdout",
+        help="Out-of-sample boundary: verdict is computed on [holdout, end]. "
+        "Pass 'none' to apply the kill filter to the full period instead.",
+    ),
+    strategy_path: str = typer.Option(
+        None,
+        "--strategy",
+        help="Backtest this strategy file for every symbol instead of the "
+        "universe's assigned (per-symbol) strategies",
+    ),
 ) -> None:
-    """Backtest the deployed strategy across every universe symbol."""
+    """Validate strategies across the universe with a kill-filter verdict.
+
+    One full-range simulation per symbol; metrics are then sliced into
+    train ([start, holdout)) and holdout ([holdout, end]) windows so
+    indicator warmup never bleeds into the out-of-sample numbers. The
+    kill filter (trade count, max drawdown, Sharpe ceiling) runs on the
+    holdout window — strategies must work on data they weren't tuned on.
+    """
     from datetime import UTC as _UTC
     from datetime import datetime as _dt
 
     from bonito.backtest.engine import BacktestEngine
     from bonito.backtest.models import BacktestConfig
+    from bonito.trading.validation import kill_verdict, window_metrics
 
     universe = _load_universe(universe_path)
-    strategy = universe.load_strategy()
     store = _get_store()
 
     start_dt = datetime.strptime(start, "%Y-%m-%d")
     end_dt = datetime.strptime(end, "%Y-%m-%d") if end else _dt.now(_UTC).replace(tzinfo=None)
+    holdout_dt = None if holdout.lower() == "none" else datetime.strptime(holdout, "%Y-%m-%d")
     engine = BacktestEngine(
         BacktestConfig(
             start_date=start_dt,
@@ -824,28 +893,110 @@ def live_backtest_universe(
         )
     )
 
-    table = Table(title=f"Universe Backtest: {strategy.name} ({start} → {end or 'today'})")
-    for col in ("Symbol", "Trades", "Win %", "Return %", "Sharpe", "Max DD %"):
+    override = None
+    if strategy_path:
+        import json as _json
+
+        override = _json.loads(Path(strategy_path).read_text())
+
+    # Regime data is shared across symbols — fetch once per reference symbol.
+    regime_cache: dict[tuple[str, int], object] = {}
+
+    def regime_bars(strategy):
+        if strategy.regime_filter is None:
+            return None
+        key = (strategy.regime_filter.symbol.upper(), strategy.regime_filter.sma_period)
+        if key not in regime_cache:
+            from bonito.trading.live_runner import REGIME_WARMUP_DAYS
+
+            regime_start = start_dt - timedelta(days=REGIME_WARMUP_DAYS)
+            bars = store.get_bars(key[0], regime_start, end_dt, universe.data.timeframe)
+            if bars is None or len(bars) < strategy.regime_filter.sma_period:
+                console.print(
+                    f"[red]Regime symbol {key[0]} has insufficient data — "
+                    f"run `bonito live refresh` first.[/red]"
+                )
+                raise typer.Exit(1)
+            regime_cache[key] = bars
+        return regime_cache[key]
+
+    if holdout_dt:
+        title = (
+            f"Universe Validation ({start} → {end or 'today'}, "
+            f"holdout from {holdout}, verdict on holdout)"
+        )
+        columns = (
+            "Symbol",
+            "Strategy",
+            "Trades",
+            "Ret %",
+            "Sharpe",
+            "DD %",
+            "H.Trades",
+            "H.Ret %",
+            "H.Sharpe",
+            "H.DD %",
+            "Verdict",
+        )
+    else:
+        title = f"Universe Validation ({start} → {end or 'today'}, verdict on full period)"
+        columns = ("Symbol", "Strategy", "Trades", "Win %", "Ret %", "Sharpe", "DD %", "Verdict")
+
+    table = Table(title=title)
+    for col in columns:
         table.add_column(col, justify="right")
 
+    from bonito.backtest.strategy import StrategyConfig
+
+    passed = 0
     for symbol in universe.symbols:
+        if override is not None:
+            strategy = StrategyConfig(**override)
+        else:
+            strategy = universe.load_strategy_for(symbol)
         data = store.get_bars(symbol, start_dt, end_dt, universe.data.timeframe)
         if data is None or len(data) < 50:
-            table.add_row(symbol, "[dim]no data[/dim]", "-", "-", "-", "-")
+            table.add_row(symbol, strategy.name, "[dim]no data[/dim]", *[""] * (len(columns) - 3))
             continue
         per_symbol = strategy.model_copy(update={"symbols": [symbol]})
-        result = engine.run(per_symbol, data)
-        m = result.metrics
-        table.add_row(
-            symbol,
-            str(m.total_trades),
-            f"{m.win_rate * 100:.0f}",
-            f"{m.total_return * 100:+.1f}",
-            f"{m.sharpe_ratio:.2f}",
-            f"{m.max_drawdown * 100:.1f}",
-        )
+        result = engine.run(per_symbol, data, regime_data=regime_bars(strategy))
+
+        full = window_metrics(result, start_dt, end_dt)
+        if holdout_dt:
+            hold = window_metrics(result, holdout_dt, end_dt)
+            reasons = kill_verdict(hold)
+            verdict = "[green]PASS[/green]" if not reasons else f"[red]{'; '.join(reasons)}[/red]"
+            passed += not reasons
+            table.add_row(
+                symbol,
+                strategy.name,
+                str(full.trades),
+                f"{full.total_return * 100:+.1f}",
+                f"{full.sharpe:.2f}",
+                f"{full.max_drawdown * 100:.1f}",
+                str(hold.trades),
+                f"{hold.total_return * 100:+.1f}",
+                f"{hold.sharpe:.2f}",
+                f"{hold.max_drawdown * 100:.1f}",
+                verdict,
+            )
+        else:
+            reasons = kill_verdict(full)
+            verdict = "[green]PASS[/green]" if not reasons else f"[red]{'; '.join(reasons)}[/red]"
+            passed += not reasons
+            table.add_row(
+                symbol,
+                strategy.name,
+                str(full.trades),
+                f"{full.win_rate * 100:.0f}",
+                f"{full.total_return * 100:+.1f}",
+                f"{full.sharpe:.2f}",
+                f"{full.max_drawdown * 100:.1f}",
+                verdict,
+            )
 
     console.print(table)
+    console.print(f"[bold]{passed}/{len(universe.symbols)} symbols pass the kill filter[/bold]")
 
 
 if __name__ == "__main__":

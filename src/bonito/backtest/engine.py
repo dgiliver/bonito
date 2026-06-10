@@ -19,7 +19,13 @@ from bonito.backtest.models import (
     PerformanceMetrics,
     Trade,
 )
-from bonito.backtest.strategy import Comparison, Rule, StopLossConfig, StrategyConfig
+from bonito.backtest.strategy import (
+    Comparison,
+    RegimeFilterConfig,
+    Rule,
+    StopLossConfig,
+    StrategyConfig,
+)
 from bonito.data.models import BarData
 
 
@@ -44,12 +50,15 @@ class BacktestEngine:
         self,
         strategy: StrategyConfig,
         data: BarData,
+        regime_data: BarData | None = None,
     ) -> BacktestResult:
         """Run a backtest.
 
         Args:
             strategy: Strategy configuration
             data: Historical bar data
+            regime_data: Bars for the regime-filter reference symbol. Required
+                when strategy.regime_filter is set; ignored otherwise.
 
         Returns:
             BacktestResult with metrics and trade history
@@ -62,6 +71,16 @@ class BacktestEngine:
         short_entry_signals = self._evaluate_rules_by_side(
             strategy.entry_rules, indicators, "short"
         )
+
+        if strategy.regime_filter is not None:
+            if regime_data is None:
+                raise ValueError(
+                    f"Strategy '{strategy.name}' has a regime_filter on "
+                    f"'{strategy.regime_filter.symbol}' but no regime_data was provided"
+                )
+            long_entry_signals &= self._compute_regime_mask(
+                strategy.regime_filter, data, regime_data
+            )
         exit_signals = (
             self._evaluate_rules(strategy.exit_rules, indicators)
             if strategy.exit_rules
@@ -464,6 +483,36 @@ class BacktestEngine:
             position_held.append(True)
 
         return trades, equity_curve, position_held
+
+    def _compute_regime_mask(
+        self,
+        regime: "RegimeFilterConfig",
+        data: BarData,
+        regime_data: BarData,
+    ) -> np.ndarray:
+        """Boolean mask over data's bars: True where the regime is risk-on.
+
+        Risk-on = regime symbol close > SMA(sma_period) on the most recent
+        regime bar at or before each data bar. Bars with no preceding regime
+        bar, or where the SMA is not yet defined, are risk-off. The mask is
+        ANDed into the signal arrays, so the bar N-1 signal / bar N execution
+        convention applies unchanged (no look-ahead).
+        """
+        closes = regime_data.close
+        period = regime.sma_period
+        sma = np.full(len(closes), np.nan)
+        if len(closes) >= period:
+            kernel = np.ones(period) / period
+            sma[period - 1 :] = np.convolve(closes, kernel, mode="valid")
+        risk_on = ~np.isnan(sma) & (closes > sma)
+
+        regime_ts = np.array([t.timestamp() for t in regime_data.timestamps])
+        bar_ts = np.array([t.timestamp() for t in data.timestamps])
+        idx = np.searchsorted(regime_ts, bar_ts, side="right") - 1
+        mask = np.zeros(len(bar_ts), dtype=bool)
+        valid = idx >= 0
+        mask[valid] = risk_on[idx[valid]]
+        return mask
 
     def _compute_atr(self, data: BarData, period: int) -> np.ndarray:
         """Compute Average True Range for trailing ATR stops."""

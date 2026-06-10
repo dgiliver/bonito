@@ -77,9 +77,20 @@ For each sweep (every ~15 min during 9:30–16:00 ET via /loop):
      (same review → place → record-fill flow as the daily cycle).
 4. If any exits fired: commit + push `livetrade/`.
 
+## Kill switch
+
+`bonito live run` flattens everything and HALTS the ledger when account
+drawdown from peak equity reaches `risk.max_drawdown_halt` (25%). While
+halted, exits/stops still process but no entries are generated. Do NOT
+clear it yourself — report to the user; only after their explicit sign-off
+run `bonito live resume`. Entries are also skipped (silently, logged) when
+the strategy's regime filter is risk-off (e.g. SPY below its 200-day SMA);
+that is normal operation, not an error.
+
 ## Hard rules
 
 - NEVER place an order the intents file doesn't contain.
+- NEVER run `bonito live resume` without explicit user sign-off.
 - NEVER trade on the margin account (••••7982); only the Agentic account.
 - NEVER exceed `risk` caps in universe.json; the code enforces them — if a
   number looks wrong, stop and ask, don't override.

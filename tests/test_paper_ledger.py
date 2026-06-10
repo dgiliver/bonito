@@ -202,3 +202,97 @@ class TestAuditTrail:
 
         assert str(ledger_path_for_mode("paper")).endswith("paper_ledger.json")
         assert str(ledger_path_for_mode("live")).endswith("live_ledger.json")
+
+
+class TestStrategyPinning:
+    def make_strategy(self):
+        from bonito.backtest.strategy import StrategyConfig
+
+        return StrategyConfig(
+            name="pinned",
+            symbols=["TSLA"],
+            entry_rules=[
+                {
+                    "conditions": [{"left": "close", "comparison": "gt", "right": 1.0}],
+                    "logic": "AND",
+                    "side": "long",
+                }
+            ],
+            take_profit={"type": "percent", "value": 0.01},
+        )
+
+    def test_buy_pins_strategy_to_position(self):
+        from bonito.trading.validation import strategy_hash
+
+        ledger = PaperLedger(cash=150.0, starting_cash=150.0)
+        strategy = self.make_strategy()
+        ledger.apply_buy(buy_intent(dollars=30.0), fill_price=100.0, strategy=strategy)
+
+        pos = ledger.positions["TSLA"]
+        assert pos.strategy_hash == strategy_hash(strategy)
+        pinned = pos.pinned_strategy()
+        assert pinned is not None
+        assert pinned.take_profit.value == 0.01
+
+    def test_buy_without_strategy_leaves_no_pin(self):
+        ledger = PaperLedger(cash=150.0, starting_cash=150.0)
+        ledger.apply_buy(buy_intent(dollars=30.0), fill_price=100.0)
+        assert ledger.positions["TSLA"].pinned_strategy() is None
+
+    def test_pin_survives_save_load(self, tmp_path):
+        path = tmp_path / "ledger.json"
+        ledger = PaperLedger(cash=150.0, starting_cash=150.0)
+        ledger.apply_buy(buy_intent(dollars=30.0), fill_price=100.0, strategy=self.make_strategy())
+        ledger.save(path)
+
+        loaded = PaperLedger.load(path)
+        pinned = loaded.positions["TSLA"].pinned_strategy()
+        assert pinned is not None
+        assert pinned.name == "pinned"
+
+
+class TestKillSwitchState:
+    def test_note_equity_tracks_peak_and_drawdown(self):
+        ledger = PaperLedger(cash=150.0, starting_cash=150.0)
+        assert ledger.note_equity(150.0) == pytest.approx(0.0)
+        assert ledger.note_equity(200.0) == pytest.approx(0.0)
+        assert ledger.peak_equity == 200.0
+        assert ledger.note_equity(150.0) == pytest.approx(0.25)
+        assert ledger.peak_equity == 200.0  # peak never falls
+
+    def test_halted_ledger_rejects_buys_allows_sells(self):
+        ledger = PaperLedger(cash=150.0, starting_cash=150.0)
+        ledger.apply_buy(buy_intent(dollars=30.0), fill_price=100.0)
+        ledger.halt("test halt")
+
+        with pytest.raises(ValueError, match="halted"):
+            ledger.apply_buy(buy_intent(symbol="NVDA"), fill_price=50.0)
+        ledger.apply_sell(sell_intent(), fill_price=110.0)  # exits always allowed
+        assert "TSLA" not in ledger.positions
+
+    def test_resume_clears_halt(self):
+        ledger = PaperLedger(cash=150.0, starting_cash=150.0)
+        ledger.halt("test")
+        assert ledger.halted
+        ledger.resume()
+        assert not ledger.halted
+        assert ledger.halt_reason == ""
+
+    def test_halt_state_survives_save_load(self, tmp_path):
+        path = tmp_path / "ledger.json"
+        ledger = PaperLedger(cash=150.0, starting_cash=150.0)
+        ledger.note_equity(180.0)
+        ledger.halt("drawdown breach")
+        ledger.save(path)
+
+        loaded = PaperLedger.load(path)
+        assert loaded.halted
+        assert loaded.halt_reason == "drawdown breach"
+        assert loaded.peak_equity == 180.0
+
+    def test_summary_reports_halt(self):
+        ledger = PaperLedger(cash=150.0, starting_cash=150.0)
+        ledger.halt("why")
+        s = ledger.summary()
+        assert s["halted"] is True
+        assert s["halt_reason"] == "why"

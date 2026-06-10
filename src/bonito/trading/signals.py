@@ -16,6 +16,7 @@ from pydantic import BaseModel, Field
 from bonito.backtest.indicators import compute_indicators
 from bonito.backtest.strategy import (
     Comparison,
+    RegimeFilterConfig,
     Rule,
     RuleCondition,
     StopLossConfig,
@@ -162,18 +163,42 @@ def evaluate_rule_for_bar(
     return any(results)
 
 
+def latest_atr(data: BarData, period: int) -> float:
+    """ATR at the most recent bar, mirroring the backtest engine's math.
+
+    True range uses the previous close; the ATR is a simple mean over the
+    last `period` bars (or all bars while fewer exist).
+    """
+    highs = np.asarray(data.highs, dtype=float)
+    lows = np.asarray(data.lows, dtype=float)
+    closes = np.asarray(data.closes, dtype=float)
+
+    tr1 = highs - lows
+    tr2 = np.abs(highs - np.roll(closes, 1))
+    tr3 = np.abs(lows - np.roll(closes, 1))
+    tr = np.maximum(tr1, np.maximum(tr2, tr3))
+    tr[0] = tr1[0]
+
+    window = tr[-period:] if len(tr) >= period else tr
+    return float(np.mean(window))
+
+
 def stop_loss_triggered(
     side: Literal["long", "short"],
     entry_price: float,
     current_price: float,
     stop_config: StopLossConfig,
     tracked_extreme: float | None = None,
+    atr: float | None = None,
 ) -> tuple[bool, float]:
     """Check a stop loss without mutating any state.
 
     Args:
         tracked_extreme: For trailing stops, the highest (long) or lowest
             (short) price seen since entry, BEFORE observing current_price.
+        atr: Current ATR value, required for atr/trailing_atr stop types
+            (compute with latest_atr). Missing ATR means the stop cannot be
+            evaluated — the position is held and a warning logged.
 
     Returns:
         (triggered, new_tracked_extreme) — callers persist the new extreme.
@@ -194,7 +219,37 @@ def stop_loss_triggered(
         extreme = max(extreme, current_price)
         return current_price <= extreme * (1 - stop_config.value), extreme
 
+    if stop_type == "atr":
+        if atr is None:
+            logger.warning("atr stop configured but no ATR value supplied; holding")
+            return False, extreme
+        if is_short:
+            return current_price >= entry_price + stop_config.value * atr, extreme
+        return current_price <= entry_price - stop_config.value * atr, extreme
+
+    if stop_type == "trailing_atr":
+        extreme = min(extreme, current_price) if is_short else max(extreme, current_price)
+        if atr is None:
+            logger.warning("trailing_atr stop configured but no ATR value supplied; holding")
+            return False, extreme
+        if is_short:
+            return current_price >= extreme + stop_config.value * atr, extreme
+        return current_price <= extreme - stop_config.value * atr, extreme
+
     return False, extreme
+
+
+def regime_allows_long(regime: RegimeFilterConfig, regime_data: BarData | None) -> bool:
+    """True when the regime symbol's latest close is above its SMA.
+
+    Missing data or an undefined SMA counts as risk-off — autonomous
+    sessions must never enter on an unverifiable regime.
+    """
+    if regime_data is None or len(regime_data) < regime.sma_period:
+        return False
+    closes = np.asarray(regime_data.closes, dtype=float)
+    sma = float(np.mean(closes[-regime.sma_period :]))
+    return float(closes[-1]) > sma
 
 
 def take_profit_triggered(
@@ -261,8 +316,11 @@ def latest_exit_signal(
             return True, "exit rule matched", extreme
 
     if strategy.stop_loss:
+        atr = None
+        if strategy.stop_loss.type.value in ("atr", "trailing_atr"):
+            atr = latest_atr(data, strategy.stop_loss.atr_period)
         triggered, extreme = stop_loss_triggered(
-            side, entry_price, current_price, strategy.stop_loss, extreme
+            side, entry_price, current_price, strategy.stop_loss, extreme, atr=atr
         )
         if triggered:
             return True, "stop loss triggered", extreme

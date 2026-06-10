@@ -13,7 +13,10 @@ from typing import Literal
 
 from pydantic import BaseModel, Field, PrivateAttr
 
+from bonito.backtest.strategy import StrategyConfig
+
 from .signals import TradeIntent
+from .validation import strategy_hash
 
 logger = logging.getLogger(__name__)
 
@@ -51,6 +54,20 @@ class PaperPosition(BaseModel):
     strategy_name: str = Field(
         default="", description="Strategy that opened this position (audit trail)"
     )
+    strategy_hash: str = Field(
+        default="", description="Content hash of the strategy that opened this position"
+    )
+    strategy_config: dict | None = Field(
+        default=None,
+        description="Pinned strategy snapshot — the position is managed by the exact "
+        "config that opened it until exit, even if the deployed strategy changes",
+    )
+
+    def pinned_strategy(self) -> StrategyConfig | None:
+        """The exact strategy config that opened this position, if pinned."""
+        if self.strategy_config is None:
+            return None
+        return StrategyConfig(**self.strategy_config)
 
 
 class PaperLedger(BaseModel):
@@ -61,6 +78,14 @@ class PaperLedger(BaseModel):
     positions: dict[str, PaperPosition] = Field(default_factory=dict)
     fills: list[PaperFill] = Field(default_factory=list)
     realized_pnl: float = 0.0
+    peak_equity: float | None = Field(
+        default=None, description="Highest marked equity seen (drives the kill switch)"
+    )
+    halted: bool = Field(
+        default=False,
+        description="Kill switch: no new entries until a human runs `bonito live resume`",
+    )
+    halt_reason: str = ""
     updated_at: datetime | None = None
 
     _path: Path | None = PrivateAttr(default=None)
@@ -100,14 +125,26 @@ class PaperLedger(BaseModel):
             value += pos.quantity * prices.get(symbol, pos.entry_price)
         return value
 
-    def apply_buy(self, intent: TradeIntent, fill_price: float) -> PaperFill:
+    def apply_buy(
+        self,
+        intent: TradeIntent,
+        fill_price: float,
+        strategy: StrategyConfig | None = None,
+    ) -> PaperFill:
         """Execute a dollar-based buy at fill_price.
 
+        Args:
+            strategy: When given, pinned to the position — exits use this
+                exact config until the position closes (lock-until-exit).
+
         Raises:
-            ValueError: on insufficient cash, existing position, or bad intent.
+            ValueError: on insufficient cash, existing position, halted
+                ledger, or bad intent.
         """
         if intent.side != "buy":
             raise ValueError(f"apply_buy got a {intent.side} intent")
+        if self.halted:
+            raise ValueError(f"ledger is halted ({self.halt_reason}); no new entries")
         if intent.dollar_amount is None or intent.dollar_amount <= 0:
             raise ValueError("buy intent requires a positive dollar_amount")
         if intent.symbol in self.positions:
@@ -129,6 +166,8 @@ class PaperLedger(BaseModel):
             entry_date=now,
             high_water_mark=fill_price,
             strategy_name=intent.strategy_name,
+            strategy_hash=strategy_hash(strategy) if strategy else "",
+            strategy_config=strategy.model_dump(mode="json") if strategy else None,
         )
         fill = PaperFill(
             symbol=intent.symbol,
@@ -190,6 +229,29 @@ class PaperLedger(BaseModel):
         if pos and price > pos.high_water_mark:
             pos.high_water_mark = price
 
+    def note_equity(self, equity: float) -> float:
+        """Update the peak-equity watermark and return current drawdown.
+
+        Returns:
+            Drawdown from peak as a fraction (0.0 = at peak).
+        """
+        if self.peak_equity is None or equity > self.peak_equity:
+            self.peak_equity = equity
+        if self.peak_equity <= 0:
+            return 0.0
+        return 1 - equity / self.peak_equity
+
+    def halt(self, reason: str) -> None:
+        """Trip the kill switch: block all new entries until resume()."""
+        self.halted = True
+        self.halt_reason = reason
+        logger.error(f"LEDGER HALTED: {reason}")
+
+    def resume(self) -> None:
+        """Clear the kill switch (explicit human action only)."""
+        self.halted = False
+        self.halt_reason = ""
+
     def summary(self, prices: dict[str, float] | None = None) -> dict:
         """Human-readable account snapshot."""
         prices = prices or {}
@@ -220,4 +282,6 @@ class PaperLedger(BaseModel):
             "unrealized_pnl": round(unrealized, 2),
             "open_positions": positions,
             "total_fills": len(self.fills),
+            "halted": self.halted,
+            "halt_reason": self.halt_reason,
         }

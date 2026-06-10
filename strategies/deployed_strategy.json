@@ -1,7 +1,7 @@
 {
-  "name": "ema_cross_rsi_optimized",
-  "description": "Optimized EMA crossover with RSI filter - RSI<65, 2% stop loss, 10% take profit",
-  "version": "1.0",
+  "name": "ema_cross_rsi_atr_regime",
+  "description": "EMA 10/26 cross + RSI<68, 2.0x ATR(14) trailing stop, 10% TP, SPY>SMA200 regime gate",
+  "version": "2.0",
   "symbols": [
     "SPY"
   ],
@@ -75,13 +75,16 @@
   },
   "max_positions": 1,
   "stop_loss": {
-    "type": "trailing_percent",
-    "value": 0.016,
-    "atr_period": 14,
-    "trigger_percent": null
+    "type": "trailing_atr",
+    "value": 2.0,
+    "atr_period": 14
   },
   "take_profit": {
     "type": "percent",
     "value": 0.1
+  },
+  "regime_filter": {
+    "symbol": "SPY",
+    "sma_period": 200
   }
 }

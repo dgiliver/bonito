@@ -267,6 +267,19 @@ class StopLossConfig(BaseModel):
     )
 
 
+class RegimeFilterConfig(BaseModel):
+    """Market-regime gate for long entries.
+
+    Long entries are allowed only while the reference symbol's close is
+    above its SMA(sma_period). Exits, stops, and take-profits are never
+    gated — the filter only blocks NEW long entries during downtrends.
+    Bars where the SMA is not yet defined count as risk-off.
+    """
+
+    symbol: str = Field(default="SPY", description="Reference symbol for the regime check")
+    sma_period: int = Field(default=200, ge=2, description="SMA period on the reference symbol")
+
+
 class TakeProfitType(str, Enum):
     """Take profit types."""
 
@@ -320,6 +333,11 @@ class StrategyConfig(BaseModel):
     stop_loss: StopLossConfig | None = Field(default=None, description="Stop loss configuration")
     take_profit: TakeProfitConfig | None = Field(
         default=None, description="Take profit configuration"
+    )
+    regime_filter: RegimeFilterConfig | None = Field(
+        default=None,
+        description="Optional market-regime gate: long entries only while "
+        "regime symbol close > SMA(sma_period)",
     )
 
     model_config = {"extra": "forbid"}

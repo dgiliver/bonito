@@ -367,3 +367,188 @@ class TestReconcile:
         ledger = PaperLedger(cash=150.0, starting_cash=150.0)
         report = reconcile_positions(ledger, {"AAA": 0.00000001})
         assert report.in_sync is True
+
+
+NEVER_ENTER_STRATEGY = {
+    **ALWAYS_ENTER_STRATEGY,
+    "name": "never_enter",
+    "entry_rules": [
+        {
+            "conditions": [{"left": "close", "comparison": "lt", "right": 0.0}],
+            "logic": "AND",
+            "side": "long",
+        }
+    ],
+}
+
+
+class TestKillSwitch:
+    def test_drawdown_breach_flattens_and_halts(self, universe):
+        store = uptrend_store(universe.symbols)
+        ledger = PaperLedger(cash=0.0, starting_cash=150.0, peak_equity=200.0)
+        # Position worth 0.5 * 129 = 64.50 → 68% drawdown from the 200 peak.
+        # Entry near price with hwm at price so neither stop nor TP fires —
+        # the only exit must come from the kill switch.
+        _open_position(ledger, "AAA", quantity=0.5, entry_price=128.0, hwm=129.0)
+
+        intents, _ = generate_intents(universe, store, ledger, as_of=AS_OF)
+
+        assert ledger.halted
+        assert "drawdown" in ledger.halt_reason
+        sells = [i for i in intents if i.side == "sell"]
+        assert len(sells) == 1
+        assert sells[0].symbol == "AAA"
+        assert "kill switch" in sells[0].reason
+        assert [i for i in intents if i.side == "buy"] == []
+
+    def test_halted_ledger_generates_no_entries(self, universe):
+        store = uptrend_store(universe.symbols)
+        ledger = PaperLedger(cash=150.0, starting_cash=150.0)
+        ledger.halt("manual")
+
+        intents, _ = generate_intents(universe, store, ledger, as_of=AS_OF)
+        assert intents == []
+
+    def test_halted_ledger_still_evaluates_exits(self, universe):
+        store = uptrend_store(universe.symbols)
+        ledger = PaperLedger(cash=0.0, starting_cash=150.0)
+        ledger.halt("manual")
+        _open_position(ledger, "AAA", quantity=0.5, entry_price=200.0)  # deep stop breach
+
+        intents, _ = generate_intents(universe, store, ledger, as_of=AS_OF)
+        sells = [i for i in intents if i.side == "sell"]
+        assert len(sells) == 1
+        assert "stop loss" in sells[0].reason
+
+    def test_disabled_kill_switch_never_halts(self, universe):
+        universe.risk.max_drawdown_halt = None
+        store = uptrend_store(universe.symbols)
+        ledger = PaperLedger(cash=0.0, starting_cash=150.0, peak_equity=10_000.0)
+        _open_position(ledger, "AAA", quantity=0.5, entry_price=128.0, hwm=129.0)
+
+        generate_intents(universe, store, ledger, as_of=AS_OF)
+        assert not ledger.halted
+
+    def test_no_halt_within_threshold(self, universe):
+        store = uptrend_store(universe.symbols)
+        ledger = PaperLedger(cash=150.0, starting_cash=150.0, peak_equity=150.0)
+
+        intents, _ = generate_intents(universe, store, ledger, as_of=AS_OF)
+        assert not ledger.halted
+        assert len([i for i in intents if i.side == "buy"]) == 3
+
+
+class TestPerSymbolStrategies:
+    def test_symbol_override_controls_entries(self, universe, tmp_path):
+        never_path = tmp_path / "never.json"
+        never_path.write_text(json.dumps(NEVER_ENTER_STRATEGY))
+        universe.symbol_strategies = {"AAA": str(never_path)}
+        store = uptrend_store(universe.symbols)
+        ledger = PaperLedger(cash=150.0, starting_cash=150.0)
+
+        intents, _ = generate_intents(universe, store, ledger, as_of=AS_OF)
+        buys = {i.symbol for i in intents if i.side == "buy"}
+        assert "AAA" not in buys
+        assert buys == {"BBB", "CCC", "DDD"}
+
+    def test_pinned_strategy_governs_exit(self, universe):
+        # Position pinned to a 1%-TP strategy; the universe's current
+        # strategy has a 10% TP. Price is +0.8% over entry → only the
+        # pinned config exits.
+        from bonito.backtest.strategy import StrategyConfig
+
+        pinned = StrategyConfig(
+            **{
+                **NEVER_ENTER_STRATEGY,
+                "name": "tight_tp",
+                "take_profit": {"type": "percent", "value": 0.001},
+                "stop_loss": None,
+            }
+        )
+        store = uptrend_store(universe.symbols)
+        ledger = PaperLedger(cash=0.0, starting_cash=150.0)
+        _open_position(ledger, "AAA", quantity=0.3, entry_price=128.0, hwm=129.0)
+        ledger.positions["AAA"].strategy_config = pinned.model_dump(mode="json")
+
+        intents, _ = generate_intents(universe, store, ledger, as_of=AS_OF)
+        sells = [i for i in intents if i.side == "sell"]
+        assert len(sells) == 1
+        assert sells[0].strategy_name == "tight_tp"
+        assert "take profit" in sells[0].reason
+
+    def test_execute_paper_pins_strategy(self, universe):
+        from bonito.trading.live_runner import execute_paper
+
+        store = uptrend_store(universe.symbols)
+        ledger = PaperLedger(cash=150.0, starting_cash=150.0)
+        intents, prices = generate_intents(universe, store, ledger, as_of=AS_OF)
+        strategies = {
+            i.symbol: universe.load_strategy_for(i.symbol) for i in intents if i.side == "buy"
+        }
+
+        fills, errors = execute_paper(ledger, intents, prices, strategies=strategies)
+        assert errors == []
+        for symbol in {i.symbol for i in intents if i.side == "buy"}:
+            assert ledger.positions[symbol].pinned_strategy() is not None
+            assert ledger.positions[symbol].strategy_hash != ""
+
+
+class TestRegimeGate:
+    def regime_universe(self, universe, tmp_path, spy_closes: list[float]) -> FakeStore:
+        strategy = {
+            **ALWAYS_ENTER_STRATEGY,
+            "name": "gated",
+            "regime_filter": {"symbol": "SPY", "sma_period": 5},
+        }
+        path = tmp_path / "gated.json"
+        path.write_text(json.dumps(strategy))
+        universe.strategy_path = str(path)
+        universe._strategy_cache.clear()
+
+        closes = [100.0 + i for i in range(30)]
+        bars = {s: make_bars(s, closes) for s in universe.symbols}
+        bars["SPY"] = make_bars("SPY", spy_closes)
+        return FakeStore(bars)
+
+    def test_risk_on_allows_entries(self, universe, tmp_path):
+        store = self.regime_universe(universe, tmp_path, [100.0 + i for i in range(30)])
+        ledger = PaperLedger(cash=150.0, starting_cash=150.0)
+
+        intents, _ = generate_intents(universe, store, ledger, as_of=AS_OF)
+        assert len([i for i in intents if i.side == "buy"]) == 3
+
+    def test_risk_off_blocks_entries(self, universe, tmp_path):
+        store = self.regime_universe(universe, tmp_path, [130.0 - i for i in range(30)])
+        ledger = PaperLedger(cash=150.0, starting_cash=150.0)
+
+        intents, _ = generate_intents(universe, store, ledger, as_of=AS_OF)
+        assert [i for i in intents if i.side == "buy"] == []
+
+    def test_missing_regime_data_blocks_entries(self, universe, tmp_path):
+        store = self.regime_universe(universe, tmp_path, [100.0 + i for i in range(30)])
+        del store.bars["SPY"]
+        ledger = PaperLedger(cash=150.0, starting_cash=150.0)
+
+        intents, _ = generate_intents(universe, store, ledger, as_of=AS_OF)
+        assert [i for i in intents if i.side == "buy"] == []
+
+    def test_risk_off_never_blocks_exits(self, universe, tmp_path):
+        store = self.regime_universe(universe, tmp_path, [130.0 - i for i in range(30)])
+        ledger = PaperLedger(cash=0.0, starting_cash=150.0)
+        _open_position(ledger, "AAA", quantity=0.5, entry_price=200.0)  # stop breach
+
+        intents, _ = generate_intents(universe, store, ledger, as_of=AS_OF)
+        assert len([i for i in intents if i.side == "sell"]) == 1
+
+    def test_refresh_includes_regime_symbol(self, universe, tmp_path):
+        strategy = {
+            **ALWAYS_ENTER_STRATEGY,
+            "name": "gated",
+            "regime_filter": {"symbol": "SPY", "sma_period": 200},
+        }
+        path = tmp_path / "gated.json"
+        path.write_text(json.dumps(strategy))
+        universe.strategy_path = str(path)
+        universe._strategy_cache.clear()
+
+        assert universe.regime_symbols() == {"SPY"}

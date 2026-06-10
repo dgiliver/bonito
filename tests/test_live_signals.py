@@ -3,6 +3,7 @@
 from datetime import datetime, timedelta
 
 import numpy as np
+import pytest
 
 from bonito.backtest.strategy import (
     Comparison,
@@ -126,16 +127,12 @@ class TestEvaluateCondition:
         assert signals.evaluate_condition_for_bar(cond, indicators, 1) is True
 
     def test_was_above_within_lookback(self):
-        cond = RuleCondition(
-            left="rsi", comparison=Comparison.WAS_ABOVE, right=70.0, lookback=3
-        )
+        cond = RuleCondition(left="rsi", comparison=Comparison.WAS_ABOVE, right=70.0, lookback=3)
         indicators = {"rsi": np.array([50.0, 75.0, 60.0, 55.0])}
         assert signals.evaluate_condition_for_bar(cond, indicators, 3) is True
 
     def test_was_above_outside_lookback(self):
-        cond = RuleCondition(
-            left="rsi", comparison=Comparison.WAS_ABOVE, right=70.0, lookback=2
-        )
+        cond = RuleCondition(left="rsi", comparison=Comparison.WAS_ABOVE, right=70.0, lookback=2)
         indicators = {"rsi": np.array([75.0, 60.0, 55.0, 50.0])}
         assert signals.evaluate_condition_for_bar(cond, indicators, 3) is False
 
@@ -325,3 +322,86 @@ class TestBotParity:
         result = TradingBot._evaluate_rule_for_bar(bot, rule, indicators, 0)
         assert result is True
         assert result == signals.evaluate_rule_for_bar(rule, indicators, 0)
+
+
+class TestLatestAtr:
+    def test_constant_range_bars(self):
+        # Flat closes at 100, highs 101, lows 99 → TR = 2.0 every bar.
+        bars = make_bars([100.0] * 20)
+        assert signals.latest_atr(bars, period=14) == pytest.approx(2.0)
+
+    def test_short_history_uses_all_bars(self):
+        bars = make_bars([100.0] * 5)
+        assert signals.latest_atr(bars, period=14) == pytest.approx(2.0)
+
+
+class TestAtrStops:
+    def trailing(self, value: float = 2.0) -> StopLossConfig:
+        return StopLossConfig(type=StopLossType.TRAILING_ATR, value=value, atr_period=14)
+
+    def test_trailing_atr_triggers_below_band(self):
+        # HWM 110, 2x ATR(2.0) → stop at 106.
+        triggered, extreme = signals.stop_loss_triggered(
+            "long", 100.0, 105.9, self.trailing(), tracked_extreme=110.0, atr=2.0
+        )
+        assert triggered
+        assert extreme == 110.0
+
+    def test_trailing_atr_holds_above_band(self):
+        triggered, _ = signals.stop_loss_triggered(
+            "long", 100.0, 106.1, self.trailing(), tracked_extreme=110.0, atr=2.0
+        )
+        assert not triggered
+
+    def test_trailing_atr_updates_extreme_first(self):
+        # New high 112 becomes the extreme; stop = 112 - 4 = 108 > price? No:
+        # price IS the new extreme, so it can't trigger.
+        triggered, extreme = signals.stop_loss_triggered(
+            "long", 100.0, 112.0, self.trailing(), tracked_extreme=110.0, atr=2.0
+        )
+        assert not triggered
+        assert extreme == 112.0
+
+    def test_missing_atr_holds_but_tracks_extreme(self):
+        triggered, extreme = signals.stop_loss_triggered(
+            "long", 100.0, 50.0, self.trailing(), tracked_extreme=110.0, atr=None
+        )
+        assert not triggered  # cannot evaluate without ATR — hold, don't guess
+        assert extreme == 110.0
+
+    def test_fixed_atr_stop(self):
+        stop = StopLossConfig(type=StopLossType.ATR, value=2.0, atr_period=14)
+        triggered, _ = signals.stop_loss_triggered("long", 100.0, 95.9, stop, atr=2.0)
+        assert triggered
+        held, _ = signals.stop_loss_triggered("long", 100.0, 96.1, stop, atr=2.0)
+        assert not held
+
+    def test_trailing_atr_short_side(self):
+        # Short from 100, low-water 90, 2x ATR(2.0) → stop at 94.
+        triggered, extreme = signals.stop_loss_triggered(
+            "short", 100.0, 94.1, self.trailing(), tracked_extreme=90.0, atr=2.0
+        )
+        assert triggered
+        assert extreme == 90.0
+
+
+class TestRegimeAllowsLong:
+    def regime(self, period: int = 5):
+        from bonito.backtest.strategy import RegimeFilterConfig
+
+        return RegimeFilterConfig(symbol="SPY", sma_period=period)
+
+    def test_uptrend_is_risk_on(self):
+        bars = make_bars([100.0 + i for i in range(10)], symbol="SPY")
+        assert signals.regime_allows_long(self.regime(), bars)
+
+    def test_downtrend_is_risk_off(self):
+        bars = make_bars([110.0 - i for i in range(10)], symbol="SPY")
+        assert not signals.regime_allows_long(self.regime(), bars)
+
+    def test_missing_data_is_risk_off(self):
+        assert not signals.regime_allows_long(self.regime(), None)
+
+    def test_insufficient_history_is_risk_off(self):
+        bars = make_bars([100.0, 101.0], symbol="SPY")
+        assert not signals.regime_allows_long(self.regime(period=5), bars)

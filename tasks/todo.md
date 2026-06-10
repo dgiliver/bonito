@@ -1,3 +1,56 @@
+# Enhancement Build (2026-06-10) — validation harness, regime filter, ATR stops, $5k paper
+
+- [x] `trading/validation.py`: kill-filter thresholds + windowed (train/holdout) metrics + verdict + strategy_hash
+- [x] DSL: `RegimeFilterConfig` (SPY > SMA200 gate) on StrategyConfig
+- [x] Engine: optional `regime_data` param masks long entries
+- [x] signals.py: trailing_atr/atr stop support in live path + `regime_allows_long`
+- [x] paper.py: pin strategy (hash + config snapshot) on positions; ledger peak_equity/halted
+- [x] live_runner.py: per-symbol strategy map, pinned-strategy exits, regime gate on entries, portfolio kill switch
+- [x] CLI: backtest-universe → holdout split + verdict column + regime; `live resume`; status shows HALT
+- [x] universe.json → $5k paper caps; re-seed ledger at $5k
+- [x] Compare variants (baseline / ATR stop / ATR+regime), deploy winner to deployed_strategy.json
+- [x] Tests for all of the above; full suite green (581 passed)
+- [x] Commit + push
+
+## Review (2026-06-10 session)
+
+Network unblocked → Phase 2 executed, then enhancement build:
+
+**Validation harness**: `backtest-universe` now runs one full-range sim per
+symbol, slices equity/trades into train ([start, holdout)) and holdout
+([holdout, end]) windows, and prints a kill-filter verdict computed on the
+holdout (trades ≥ 7/yr scaled to window, DD ≤ 25%, Sharpe ≤ 3.0).
+`--strategy file.json` overrides for variant comparison; `--holdout none`
+reverts to full-period verdicts.
+
+**Variant comparison** (holdout 2025-01-01 → 2026-06-10, medians across 25):
+| variant | pass | med H.Sharpe | med H.DD% | med H.Ret% |
+|---|---|---|---|---|
+| baseline 1.6% trail | 2 | 0.72 | 48.2 | +13.4 |
+| atr2.5 | 2 | 1.13 | 43.0 | +46.5 |
+| **atr2.0+regime (deployed)** | **3** | 0.89 | 42.8 | +19.8 |
+
+Deployed `ema_cross_rsi_atr_regime` v2.0: 2.0×ATR(14) trailing stop +
+SPY>SMA200 regime gate. Trade churn fell ~70% (220→~55 trades/symbol).
+Holdout passers: COST, MSFT, TSM. Near-misses: WDC (only Sharpe 3.82>3.0),
+LLY (DD 27%>25%).
+
+**New safety rails**: positions pin their strategy at entry (hash + full
+config snapshot — exits always use the entering config); portfolio kill
+switch flattens + halts at 25% drawdown from peak equity (clear with
+`bonito live resume`, human-only); regime risk-off blocks entries but never
+exits; missing ATR/regime data = hold/risk-off, never guess.
+
+**Paper account re-seeded at $5,000** (max_position $1000, 5 positions,
+$100 buffer, 25% DD halt). First cycle filled MU/SNDK/DELL at $1k each.
+
+Decision points for Phase 3 (live):
+- Paper trades ALL 25 symbols for system-validation throughput; before
+  flipping live, restrict entries to kill-filter passers (COST/MSFT/TSM as
+  of today) via `symbol_strategies` or a passer allowlist.
+- Backtest costs (0.1% commission default) don't match Robinhood
+  commission-free + spread reality; calibrate against paper fills.
+
 # Robinhood Autonomous Trading — Plan (Option A)
 
 Goal: trade a 21-symbol universe on Robinhood with $150 (Agentic cash account,
