@@ -1,0 +1,110 @@
+# Daily paper-trading cycle — keeps the loop turning without a human.
+#
+# Runs the full Bonito daily cycle (refresh bars → evaluate signals →
+# fill the paper ledger) and commits the updated livetrade/ state back
+# to the branch, so the repo stays the single source of truth and the
+# dashboard / next session always see current positions.
+#
+# NOTE: GitHub only fires `schedule` triggers from the DEFAULT branch.
+# Until this workflow lands on main, trigger it manually with
+# workflow_dispatch (Actions tab → "Daily paper trading cycle" →
+# Run workflow → pick the trading branch).
+#
+# Paper mode only: this job never holds broker credentials and never
+# places real orders. Live trading goes through the Robinhood MCP in a
+# Claude session (see .claude/skills/robinhood-trade/SKILL.md).
+
+name: Daily paper trading cycle
+
+on:
+  schedule:
+    # 22:30 UTC Mon–Fri = 17:30/18:30 ET — after US market close
+    # year-round, when Yahoo has the day's completed daily bar.
+    - cron: "30 22 * * 1-5"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  issues: write
+
+# Never let two cycles write the ledger at the same time.
+concurrency:
+  group: paper-trading-cycle
+  cancel-in-progress: false
+
+jobs:
+  daily-cycle:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+
+      - name: Install bonito
+        run: pip install -e .
+
+      - name: Guard - paper mode only
+        run: |
+          python - <<'EOF'
+          import json, sys
+          cfg = json.load(open("config/universe.json"))
+          if cfg.get("mode") != "paper":
+              sys.exit("universe mode is not 'paper' — this workflow only runs the paper cycle")
+          EOF
+
+      - name: Refresh market data (with retries)
+        run: |
+          for i in 1 2 3; do
+            bonito live refresh && exit 0
+            echo "::warning::refresh failed (attempt $i), retrying in 60s"
+            sleep 60
+          done
+          echo "::error::market data refresh failed after 3 attempts"
+          exit 1
+
+      - name: Run daily cycle
+        run: bonito live run --no-refresh
+
+      - name: Account summary
+        if: always()
+        run: |
+          {
+            echo "## Paper account after cycle"
+            echo '```'
+            bonito live status || true
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Commit ledger state
+        run: |
+          git config user.name "bonito-paper-bot"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add livetrade/
+          if git diff --cached --quiet; then
+            echo "ledger unchanged — nothing to commit"
+            exit 0
+          fi
+          fills=$(python -c "import json; print(len(json.load(open('livetrade/paper_ledger.json'))['fills']))")
+          git commit -m "chore(livetrade): daily paper cycle $(date -u +%F) (total fills: $fills)"
+          # Rebase-retry in case something else pushed meanwhile.
+          for i in 1 2 3; do
+            git push && exit 0
+            git pull --rebase
+          done
+          exit 1
+
+      - name: Open issue on failure
+        if: failure()
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh issue create \
+            --title "Paper trading cycle failed $(date -u +%F)" \
+            --body "The scheduled paper-trading cycle failed. Logs: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+
+          Positions are NOT being managed (stops included) until this is fixed or a cycle is run manually: \`bonito live refresh && bonito live run --no-refresh\`." \
+            || echo "::warning::could not create failure issue"
