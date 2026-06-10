@@ -53,6 +53,17 @@ with drawdown-vs-kill-switch meter, equity curve reconstructed from fills,
 recent fills, kill-switch banner, staleness warnings. Auto-refreshes every
 30s. 7 state-builder tests.
 
+**Automation (added same session)**: `.github/workflows/paper-trading.yml`
+runs the full paper cycle at 22:30 UTC weekdays and commits `livetrade/`
+back as a heartbeat (`chore(livetrade): daily paper cycle …`). Paper-mode
+guard hard-stops if universe mode ever flips; failures open a GitHub
+issue so unmanaged positions are never silent. ⚠️ GitHub fires schedules
+only from the DEFAULT branch — the cron activates when this branch merges
+to main (manual `workflow_dispatch` also only registers then). All steps
+rehearsed locally end-to-end 2026-06-10; second same-day run filled ORCL
++ ARM → portfolio fully deployed 5/5, $100 cash buffer, equity $5,042.57.
+Note: max_daily_buys is per-run; the cron runs once daily.
+
 Decision points for Phase 3 (live):
 - Paper trades ALL 25 symbols for system-validation throughput; before
   flipping live, restrict entries to kill-filter passers (COST/MSFT/TSM as
