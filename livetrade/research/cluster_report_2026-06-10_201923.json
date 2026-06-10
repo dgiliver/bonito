@@ -1,0 +1,258 @@
+{
+  "generated_at": "2026-06-10T20:19:23.689924",
+  "start": "2022-01-01T00:00:00",
+  "holdout": "2025-01-01T00:00:00",
+  "end": "2026-06-10T20:18:11.185044",
+  "default_strategy_hash": "da16575a5622",
+  "clusters": [
+    {
+      "name": "defensive",
+      "members": [
+        "COST",
+        "MSFT"
+      ],
+      "volatility": {
+        "COST": 0.231,
+        "MSFT": 0.2744
+      },
+      "candidates_evaluated": 144,
+      "candidates_eligible": 114,
+      "winner_name": "c_ema20-50_rsi60_atr2.5_tp20",
+      "winner_hash": "0ee5a3a6a457",
+      "winner_config": {
+        "name": "c_ema20-50_rsi60_atr2.5_tp20",
+        "description": "EMA 20/50 cross + RSI<60, 2.5x ATR(14) trailing stop, TP 20%, SPY>SMA200 regime gate",
+        "version": "1.0",
+        "symbols": [
+          "SPY"
+        ],
+        "timeframe": "1d",
+        "indicators": [
+          {
+            "type": "ema",
+            "name": "ema_fast",
+            "params": {
+              "period": 20
+            }
+          },
+          {
+            "type": "ema",
+            "name": "ema_slow",
+            "params": {
+              "period": 50
+            }
+          },
+          {
+            "type": "rsi",
+            "name": "rsi_14",
+            "params": {
+              "period": 14
+            }
+          }
+        ],
+        "entry_rules": [
+          {
+            "conditions": [
+              {
+                "left": "ema_fast",
+                "comparison": "gt",
+                "right": "ema_slow",
+                "lookback": null
+              },
+              {
+                "left": "close",
+                "comparison": "gt",
+                "right": "ema_slow",
+                "lookback": null
+              },
+              {
+                "left": "rsi_14",
+                "comparison": "lt",
+                "right": 60.0,
+                "lookback": null
+              }
+            ],
+            "logic": "AND",
+            "side": "long"
+          }
+        ],
+        "exit_rules": [
+          {
+            "conditions": [
+              {
+                "left": "ema_fast",
+                "comparison": "crosses_below",
+                "right": "ema_slow",
+                "lookback": null
+              }
+            ],
+            "logic": "AND",
+            "side": "long"
+          }
+        ],
+        "position_size": {
+          "type": "percent_equity",
+          "value": 98.0
+        },
+        "max_positions": 1,
+        "stop_loss": {
+          "type": "trailing_atr",
+          "value": 2.5,
+          "atr_period": 14,
+          "trigger_percent": null
+        },
+        "take_profit": {
+          "type": "percent",
+          "value": 0.2
+        },
+        "regime_filter": {
+          "symbol": "SPY",
+          "sma_period": 200
+        }
+      },
+      "winner_train_score": 2.8958,
+      "verdicts": [
+        {
+          "symbol": "COST",
+          "train": {
+            "start": "2022-01-01T00:00:00",
+            "end": "2024-12-31T00:00:00",
+            "years": 2.9979466119096507,
+            "trades": 22,
+            "win_rate": 0.6363636363636364,
+            "total_return": 2.57974229235827,
+            "sharpe": 2.8958438502733985,
+            "max_drawdown": 0.11493901717193639
+          },
+          "holdout": {
+            "start": "2025-01-01T00:00:00",
+            "end": "2026-06-10T20:18:11.185044",
+            "years": 1.4373716632443532,
+            "trades": 9,
+            "win_rate": 0.5555555555555556,
+            "total_return": 0.06339762685926442,
+            "sharpe": 0.4907863064039739,
+            "max_drawdown": 0.1958572009461547
+          },
+          "holdout_reasons": [
+            "trades 9<11"
+          ]
+        },
+        {
+          "symbol": "MSFT",
+          "train": {
+            "start": "2022-01-01T00:00:00",
+            "end": "2024-12-31T00:00:00",
+            "years": 2.9979466119096507,
+            "trades": 20,
+            "win_rate": 0.55,
+            "total_return": 1.0020800533063534,
+            "sharpe": 1.6464768861770342,
+            "max_drawdown": 0.2609628709134178
+          },
+          "holdout": {
+            "start": "2025-01-01T00:00:00",
+            "end": "2026-06-10T20:18:11.185044",
+            "years": 1.4373716632443532,
+            "trades": 7,
+            "win_rate": 0.2857142857142857,
+            "total_return": -0.09163682901353565,
+            "sharpe": -0.6890153453293874,
+            "max_drawdown": 0.15254300582558958
+          },
+          "holdout_reasons": [
+            "trades 7<11"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "core",
+      "members": [
+        "ORCL",
+        "NOW",
+        "WDC",
+        "TSM",
+        "ASML",
+        "AVGO",
+        "LLY"
+      ],
+      "volatility": {
+        "ORCL": 0.4311,
+        "NOW": 0.4473,
+        "WDC": 0.4987,
+        "TSM": 0.3858,
+        "ASML": 0.4329,
+        "AVGO": 0.4532,
+        "LLY": 0.3295
+      },
+      "candidates_evaluated": 144,
+      "candidates_eligible": 0,
+      "winner_name": null,
+      "winner_hash": null,
+      "winner_config": null,
+      "winner_train_score": null,
+      "verdicts": []
+    },
+    {
+      "name": "growth",
+      "members": [
+        "TSLA",
+        "PLTR",
+        "MU",
+        "DELL",
+        "NVDA",
+        "AMD",
+        "HOOD",
+        "INTC",
+        "MRVL"
+      ],
+      "volatility": {
+        "TSLA": 0.6001,
+        "PLTR": 0.6741,
+        "MU": 0.548,
+        "DELL": 0.532,
+        "NVDA": 0.5253,
+        "AMD": 0.5678,
+        "HOOD": 0.685,
+        "INTC": 0.5451,
+        "MRVL": 0.6395
+      },
+      "candidates_evaluated": 144,
+      "candidates_eligible": 0,
+      "winner_name": null,
+      "winner_hash": null,
+      "winner_config": null,
+      "winner_train_score": null,
+      "verdicts": []
+    },
+    {
+      "name": "speculative",
+      "members": [
+        "SNDK",
+        "ARM",
+        "IREN",
+        "RKLB",
+        "ASTS",
+        "BE",
+        "TE"
+      ],
+      "volatility": {
+        "SNDK": 0.992,
+        "ARM": 0.7569,
+        "IREN": 1.1865,
+        "RKLB": 0.793,
+        "ASTS": 1.1258,
+        "BE": 0.87,
+        "TE": 1.0353
+      },
+      "candidates_evaluated": 144,
+      "candidates_eligible": 0,
+      "winner_name": null,
+      "winner_hash": null,
+      "winner_config": null,
+      "winner_train_score": null,
+      "verdicts": []
+    }
+  ]
+}

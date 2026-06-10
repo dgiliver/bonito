@@ -506,6 +506,122 @@ def research_run(
     )
 
 
+@research_app.command("clusters")
+def research_clusters(
+    universe_path: str = typer.Option("config/universe.json", "--universe", "-u"),
+    start: str = typer.Option("2022-01-01", "--start"),
+    holdout: str = typer.Option("2025-01-01", "--holdout", help="Out-of-sample boundary"),
+    end: str = typer.Option(None, "--end", help="Default: today"),
+    apply: bool = typer.Option(
+        False,
+        "--apply",
+        help="Write winning strategies to strategies/ and merge passing pairs "
+        "into universe.symbol_strategies (dry-run report otherwise)",
+    ),
+) -> None:
+    """Per-cluster strategy research over a fixed parameter grid.
+
+    Clusters the universe by realized volatility, ranks ~144 candidates per
+    cluster on the TRAIN window only, then gates the single winner on the
+    holdout kill filter. Assignments are per (symbol, strategy) pair —
+    symbols where nothing passes keep the default strategy.
+    """
+    from datetime import UTC as _UTC
+    from datetime import datetime as _dt
+
+    from bonito.research.cluster_research import (
+        apply_assignments,
+        candidate_grid,
+        run_cluster_research,
+        save_report,
+    )
+
+    universe = _load_universe(universe_path)
+    store = _get_store()
+    start_dt = datetime.strptime(start, "%Y-%m-%d")
+    holdout_dt = datetime.strptime(holdout, "%Y-%m-%d")
+    end_dt = datetime.strptime(end, "%Y-%m-%d") if end else _dt.now(_UTC).replace(tzinfo=None)
+
+    n_candidates = len(candidate_grid())
+    console.print(
+        Panel.fit(
+            f"[bold blue]Cluster Research[/bold blue]\n"
+            f"Train: {start} → {holdout} | Holdout: {holdout} → {end or 'today'}\n"
+            f"{n_candidates} candidates per cluster, ranked on train, gated on holdout",
+            border_style="blue",
+        )
+    )
+
+    with Progress(
+        SpinnerColumn(), TextColumn("[progress.description]{task.description}"), console=console
+    ) as prog:
+        task = prog.add_task("researching...", total=None)
+        done = {"n": 0}
+
+        def tick():
+            done["n"] += 1
+            prog.update(task, description=f"researching... {done['n']} candidates evaluated")
+
+        report = run_cluster_research(
+            universe, store, start_dt, holdout_dt, end_dt, progress=tick
+        )
+
+    report_path = save_report(report)
+
+    for cluster in report.clusters:
+        table = Table(
+            title=f"{cluster.name} — {len(cluster.members)} symbols, "
+            f"{cluster.candidates_eligible}/{cluster.candidates_evaluated} candidates eligible"
+        )
+        for col in ("Symbol", "Vol", "T.Sharpe", "T.DD %", "H.Trades", "H.Ret %", "H.Sharpe", "H.DD %", "Verdict"):
+            table.add_column(col, justify="right")
+        if cluster.winner_name is None:
+            console.print(
+                f"[yellow]{cluster.name}: no candidate passed the train filter on a "
+                f"majority of members — no assignment[/yellow]"
+            )
+            continue
+        for v in cluster.verdicts:
+            verdict = (
+                "[green]PASS[/green]" if v.passes else f"[red]{'; '.join(v.holdout_reasons)}[/red]"
+            )
+            table.add_row(
+                v.symbol,
+                f"{cluster.volatility.get(v.symbol, 0) * 100:.0f}%",
+                f"{v.train.sharpe:.2f}",
+                f"{v.train.max_drawdown * 100:.1f}",
+                str(v.holdout.trades),
+                f"{v.holdout.total_return * 100:+.1f}",
+                f"{v.holdout.sharpe:.2f}",
+                f"{v.holdout.max_drawdown * 100:.1f}",
+                verdict,
+            )
+        console.print(table)
+        console.print(
+            f"  winner: [bold]{cluster.winner_name}[/bold] ({cluster.winner_hash}) "
+            f"train score {cluster.winner_train_score}\n"
+        )
+
+    assignments = report.assignments()
+    console.print(f"[dim]Report saved to {report_path}[/dim]")
+    if not assignments:
+        console.print("[yellow]No (symbol, strategy) pairs passed the holdout gate.[/yellow]")
+        return
+
+    console.print(
+        f"[bold]{len(assignments)} symbol(s) qualify for per-symbol assignment:[/bold] "
+        + ", ".join(sorted(assignments))
+    )
+    if apply:
+        written = apply_assignments(report, Path(universe_path))
+        for symbol, path in sorted(written.items()):
+            console.print(f"  {symbol} → {path}")
+        console.print("[green]universe.json updated.[/green] Open positions are unaffected "
+                      "(they exit under their pinned strategy).")
+    else:
+        console.print("[dim]Dry run — re-run with --apply to write assignments.[/dim]")
+
+
 # --- Live trading commands (Robinhood option-A pipeline) ---
 
 

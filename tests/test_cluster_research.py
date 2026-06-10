@@ -1,0 +1,219 @@
+"""Tests for per-cluster strategy research (bonito.research.cluster_research)."""
+
+import json
+import math
+from datetime import datetime, timedelta
+from pathlib import Path
+
+import numpy as np
+import pytest
+
+from bonito.data.models import BarData
+from bonito.research.cluster_research import (
+    GridSpec,
+    annualized_volatility,
+    apply_assignments,
+    candidate_grid,
+    cluster_universe,
+    run_cluster_research,
+)
+from bonito.trading.live_runner import UniverseConfig
+from bonito.trading.validation import strategy_hash
+
+START = datetime(2024, 1, 1)
+HOLDOUT = datetime(2025, 6, 1)
+END = datetime(2026, 6, 1)
+
+
+def make_bars(symbol: str, closes: list[float], start: datetime = START) -> BarData:
+    n = len(closes)
+    return BarData(
+        symbol=symbol,
+        timeframe="1d",
+        timestamps=[start + timedelta(days=i) for i in range(n)],
+        opens=closes,
+        highs=[c * 1.01 for c in closes],
+        lows=[c * 0.99 for c in closes],
+        closes=closes,
+        volumes=[1_000_000.0] * n,
+    )
+
+
+def trending_closes(n: int, daily_vol: float, drift: float = 0.0005, seed: int = 7) -> list[float]:
+    rng = np.random.default_rng(seed)
+    returns = rng.normal(drift, daily_vol, n)
+    return (100 * np.exp(np.cumsum(returns))).tolist()
+
+
+class FakeStore:
+    def __init__(self, bars: dict[str, BarData]):
+        self.bars = bars
+
+    def get_bars(self, symbol, start, end, timeframe="1d"):
+        return self.bars.get(symbol)
+
+
+BASE_STRATEGY = {
+    "name": "default",
+    "symbols": ["SPY"],
+    "timeframe": "1d",
+    "indicators": [{"type": "sma", "name": "sma_2", "params": {"period": 2}}],
+    "entry_rules": [
+        {
+            "conditions": [{"left": "close", "comparison": "gt", "right": 0.0}],
+            "logic": "AND",
+            "side": "long",
+        }
+    ],
+    "exit_rules": [],
+}
+
+
+@pytest.fixture
+def universe(tmp_path):
+    strategy_path = tmp_path / "default.json"
+    strategy_path.write_text(json.dumps(BASE_STRATEGY))
+    return UniverseConfig(
+        name="research-test",
+        symbols=["CALM", "WILD"],
+        strategy_path=str(strategy_path),
+        data={"timeframe": "1d", "start_date": "2024-01-01"},
+        risk={"starting_cash_usd": 5000.0},
+    )
+
+
+class TestVolatilityClustering:
+    def test_annualized_vol_scales_with_daily_vol(self):
+        calm = make_bars("CALM", trending_closes(400, daily_vol=0.005))
+        wild = make_bars("WILD", trending_closes(400, daily_vol=0.06))
+        assert annualized_volatility(calm) < 0.30
+        assert annualized_volatility(wild) > 0.75
+
+    def test_insufficient_history_is_speculative(self):
+        tiny = make_bars("TINY", [100.0] * 10)
+        assert math.isinf(annualized_volatility(tiny))
+
+    def test_cluster_universe_buckets_and_excludes(self, universe):
+        store = FakeStore(
+            {
+                "CALM": make_bars("CALM", trending_closes(400, daily_vol=0.005)),
+                "WILD": make_bars("WILD", trending_closes(400, daily_vol=0.06)),
+            }
+        )
+        clusters, vols = cluster_universe(universe, store, START, END)
+        assert clusters["defensive"] == ["CALM"]
+        assert clusters["speculative"] == ["WILD"]
+        assert set(vols) == {"CALM", "WILD"}
+
+    def test_symbol_without_data_omitted(self, universe):
+        store = FakeStore({"CALM": make_bars("CALM", trending_closes(400, daily_vol=0.005))})
+        clusters, vols = cluster_universe(universe, store, START, END)
+        assert "WILD" not in vols
+        assert all("WILD" not in members for members in clusters.values())
+
+
+class TestCandidateGrid:
+    def test_default_grid_size(self):
+        grid = GridSpec()
+        expected = (
+            len(grid.ema_pairs) * len(grid.rsi_max) * len(grid.atr_mult) * len(grid.take_profit)
+        )
+        candidates = candidate_grid(grid)
+        assert len(candidates) == expected == 144
+
+    def test_deployed_config_is_in_the_grid(self):
+        with open("strategies/deployed_strategy.json") as f:
+            deployed = json.loads(f.read())
+        deployed_hash = strategy_hash(
+            __import__("bonito.backtest.strategy", fromlist=["StrategyConfig"]).StrategyConfig(
+                **deployed
+            )
+        )
+        hashes = {strategy_hash(c) for c in candidate_grid()}
+        assert deployed_hash in hashes
+
+    def test_all_candidates_have_regime_and_atr_stop(self):
+        for c in candidate_grid(GridSpec(ema_pairs=[(10, 26)], rsi_max=[68.0])):
+            assert c.regime_filter is not None
+            assert c.stop_loss.type.value == "trailing_atr"
+            assert c.name.startswith("c_ema10-26")
+
+
+class TestResearchAndApply:
+    def tiny_grid(self) -> GridSpec:
+        return GridSpec(ema_pairs=[(10, 26)], rsi_max=[68.0], atr_mult=[2.0], take_profit=[None])
+
+    def research_store(self, n: int = 700) -> FakeStore:
+        # Calm uptrending symbols (researchable) + SPY uptrend (regime on,
+        # history long enough that SMA200 is defined early).
+        spy_start = START - timedelta(days=400)
+        return FakeStore(
+            {
+                "CALM": make_bars("CALM", trending_closes(n, 0.004, drift=0.001, seed=1)),
+                "WILD": make_bars("WILD", trending_closes(n, 0.004, drift=0.001, seed=2)),
+                "SPY": make_bars(
+                    "SPY", trending_closes(n + 400, 0.002, drift=0.001, seed=3), start=spy_start
+                ),
+            }
+        )
+
+    def test_report_structure_and_determinism(self, universe):
+        store = self.research_store()
+        report1 = run_cluster_research(universe, store, START, HOLDOUT, END, grid=self.tiny_grid())
+        report2 = run_cluster_research(universe, store, START, HOLDOUT, END, grid=self.tiny_grid())
+        assert [c.winner_hash for c in report1.clusters] == [
+            c.winner_hash for c in report2.clusters
+        ]
+        for cluster in report1.clusters:
+            assert cluster.candidates_evaluated == 1
+            if cluster.winner_name:
+                assert cluster.winner_config is not None
+                assert all(v.symbol in cluster.members for v in cluster.verdicts)
+
+    def test_assignments_only_for_passing_pairs(self, universe):
+        store = self.research_store()
+        report = run_cluster_research(universe, store, START, HOLDOUT, END, grid=self.tiny_grid())
+        assignments = report.assignments()
+        for symbol, cluster in assignments.items():
+            assert symbol in cluster.passing_symbols
+            assert cluster.winner_hash != report.default_strategy_hash
+
+    def test_apply_writes_strategy_and_universe(self, universe, tmp_path):
+        store = self.research_store()
+        report = run_cluster_research(universe, store, START, HOLDOUT, END, grid=self.tiny_grid())
+        if not report.assignments():
+            pytest.skip("synthetic data produced no passing pairs for this grid")
+
+        universe_path = tmp_path / "universe.json"
+        universe_path.write_text(
+            json.dumps(
+                {
+                    "name": "research-test",
+                    "symbols": ["CALM", "WILD"],
+                    "strategy_path": universe.strategy_path,
+                    "symbol_strategies": {"KEEP": "strategies/existing.json"},
+                }
+            )
+        )
+        written = apply_assignments(report, universe_path, strategies_dir=tmp_path / "strategies")
+
+        config = json.loads(universe_path.read_text())
+        for symbol, path in written.items():
+            assert config["symbol_strategies"][symbol] == path
+            saved = json.loads((tmp_path / "strategies").joinpath(Path(path).name).read_text())
+            assert saved["regime_filter"]["symbol"] == "SPY"
+        # Pre-existing assignments preserved
+        assert config["symbol_strategies"]["KEEP"] == "strategies/existing.json"
+
+    def test_no_assignment_when_winner_is_default(self, universe, tmp_path):
+        # Make the universe default IDENTICAL to the single grid candidate →
+        # winner hash == default hash → no assignments.
+        candidate = candidate_grid(self.tiny_grid())[0]
+        default_path = tmp_path / "default_same.json"
+        default_path.write_text(candidate.model_dump_json())
+        universe.strategy_path = str(default_path)
+        universe._strategy_cache.clear()
+
+        store = self.research_store()
+        report = run_cluster_research(universe, store, START, HOLDOUT, END, grid=self.tiny_grid())
+        assert report.assignments() == {}
