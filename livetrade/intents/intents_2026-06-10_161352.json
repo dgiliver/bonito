@@ -1,0 +1,24 @@
+[
+  {
+    "symbol": "ORCL",
+    "side": "buy",
+    "dollar_amount": 1000.0,
+    "quantity": null,
+    "reason": "entry rule matched: ema_fast gt ema_slow, close gt ema_slow, rsi_14 lt 68.0",
+    "signal_price": 204.16000366210938,
+    "signal_date": "2026-06-10T04:00:00",
+    "strategy_name": "ema_cross_rsi_atr_regime",
+    "generated_at": "2026-06-10T16:13:52.020129Z"
+  },
+  {
+    "symbol": "ARM",
+    "side": "buy",
+    "dollar_amount": 900.0,
+    "quantity": null,
+    "reason": "entry rule matched: ema_fast gt ema_slow, close gt ema_slow, rsi_14 lt 68.0",
+    "signal_price": 309.92999267578125,
+    "signal_date": "2026-06-10T04:00:00",
+    "strategy_name": "ema_cross_rsi_atr_regime",
+    "generated_at": "2026-06-10T16:13:52.025358Z"
+  }
+]
