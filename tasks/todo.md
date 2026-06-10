@@ -44,6 +44,15 @@ exits; missing ATR/regime data = hold/risk-off, never guess.
 **Paper account re-seeded at $5,000** (max_position $1000, 5 positions,
 $100 buffer, 25% DD halt). First cycle filled MU/SNDK/DELL at $1k each.
 
+**Dashboard (added same session)**: standalone read-only web app at
+`make dashboard` / `bonito dashboard` (port 8050) — `src/bonito/dashboard/`
+(FastAPI + single static page, Bonito Mediterranean Pastel theme, no build
+step). Shows account stat cards, open positions with live trailing-stop /
+take-profit levels and distances, regime status (SPY vs SMA200), risk caps
+with drawdown-vs-kill-switch meter, equity curve reconstructed from fills,
+recent fills, kill-switch banner, staleness warnings. Auto-refreshes every
+30s. 7 state-builder tests.
+
 Decision points for Phase 3 (live):
 - Paper trades ALL 25 symbols for system-validation throughput; before
   flipping live, restrict entries to kill-filter passers (COST/MSFT/TSM as

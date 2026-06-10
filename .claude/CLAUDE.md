@@ -8,6 +8,7 @@
 # Development
 make api              # Start API server (port 8000)
 make web              # Start frontend (port 3000)
+make dashboard        # Live-trading dashboard, read-only (port 8050)
 make chat             # CLI agent chat
 make research         # Run autonomous strategy research (SPY, 1000 iterations)
 make ingest-universe  # Ingest 12-symbol universe into DuckDB

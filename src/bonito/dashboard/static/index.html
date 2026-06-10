@@ -1,0 +1,380 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Bonito — Live Dashboard</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet" />
+<style>
+  :root {
+    /* Bonito Mediterranean Pastel theme (mirrors web/src/app/globals.css) */
+    --bg-primary: #faf7f2;
+    --bg-secondary: #f5f0e8;
+    --bg-tertiary: #ebe4d8;
+    --bg-card: #ffffff;
+    --border-color: #e0d5c7;
+    --border-glow: #c9a87c;
+    --text-primary: #3d3a36;
+    --text-secondary: #6b645a;
+    --text-muted: #9a928a;
+    --accent-primary: #c9a87c;
+    --accent-secondary: #b8956e;
+    --accent-success: #8fae8b;
+    --accent-warning: #d4a574;
+    --accent-danger: #c88b8b;
+    --accent-info: #8ba5b5;
+    --gradient-start: #c9a87c;
+    --gradient-end: #8fae8b;
+  }
+  * { box-sizing: border-box; }
+  html, body { height: 100%; margin: 0; padding: 0; }
+  body {
+    background: var(--bg-primary);
+    color: var(--text-primary);
+    font-family: "DM Sans", -apple-system, BlinkMacSystemFont, sans-serif;
+    font-size: 14px;
+    line-height: 1.55;
+    -webkit-font-smoothing: antialiased;
+  }
+  .mono { font-family: "JetBrains Mono", "Fira Code", monospace; }
+  .wrap { max-width: 1180px; margin: 0 auto; padding: 24px 20px 48px; }
+
+  /* Header */
+  header { display: flex; align-items: baseline; gap: 14px; flex-wrap: wrap; margin-bottom: 20px; }
+  .logo {
+    font-size: 26px; font-weight: 700; letter-spacing: -0.5px;
+    background: linear-gradient(135deg, var(--gradient-start), var(--gradient-end));
+    -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text;
+  }
+  .subtitle { color: var(--text-secondary); font-size: 15px; }
+  header .spacer { flex: 1; }
+  .pill {
+    display: inline-flex; align-items: center; gap: 6px;
+    padding: 3px 12px; border-radius: 999px; font-size: 12px; font-weight: 600;
+    border: 1px solid var(--border-color); background: var(--bg-card);
+    color: var(--text-secondary); white-space: nowrap;
+  }
+  .pill .dot { width: 8px; height: 8px; border-radius: 50%; }
+  .pill.mode { color: var(--accent-secondary); border-color: var(--accent-primary); }
+  .pill.risk-on .dot { background: var(--accent-success); }
+  .pill.risk-off .dot { background: var(--accent-danger); }
+  .pill.stale { color: #fff; background: var(--accent-warning); border-color: var(--accent-warning); }
+
+  /* Kill-switch banner */
+  .banner {
+    display: none; margin-bottom: 20px; padding: 14px 18px; border-radius: 10px;
+    background: var(--accent-danger); color: #fff; font-weight: 600;
+    box-shadow: 0 4px 16px -4px rgba(200, 139, 139, 0.5);
+  }
+  .banner small { display: block; font-weight: 400; opacity: 0.9; margin-top: 2px; }
+
+  /* Cards */
+  .card {
+    background: var(--bg-card); border-radius: 10px; padding: 16px 18px;
+    box-shadow: 0 2px 8px -2px rgba(201, 168, 124, 0.2), 0 0 0 1px var(--border-color);
+  }
+  .stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(165px, 1fr)); gap: 12px; margin-bottom: 20px; }
+  .stat .label { font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.7px; color: var(--text-muted); }
+  .stat .value { font-size: 22px; font-weight: 700; margin-top: 2px; }
+  .stat .sub { font-size: 12px; color: var(--text-secondary); margin-top: 2px; }
+  .pos { color: var(--accent-success); }
+  .neg { color: var(--accent-danger); }
+
+  .grid { display: grid; grid-template-columns: 1fr 300px; gap: 16px; align-items: start; }
+  @media (max-width: 900px) { .grid { grid-template-columns: 1fr; } }
+
+  h2 { font-size: 13px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.8px;
+       color: var(--text-secondary); margin: 0 0 12px; }
+
+  /* Tables */
+  table { width: 100%; border-collapse: collapse; font-size: 13px; }
+  th { text-align: right; font-size: 11px; text-transform: uppercase; letter-spacing: 0.5px;
+       color: var(--text-muted); font-weight: 600; padding: 6px 8px; border-bottom: 1px solid var(--border-color); }
+  td { text-align: right; padding: 8px; border-bottom: 1px solid var(--bg-secondary); white-space: nowrap; }
+  th:first-child, td:first-child { text-align: left; }
+  tr:last-child td { border-bottom: none; }
+  td .sym { font-weight: 700; font-size: 14px; }
+  .muted { color: var(--text-muted); font-size: 12px; }
+  .empty { color: var(--text-muted); padding: 24px 0; text-align: center; }
+
+  .badge { display: inline-block; padding: 1px 8px; border-radius: 999px; font-size: 11px; font-weight: 600; }
+  .badge.buy { background: rgba(143, 174, 139, 0.18); color: #6d8d69; }
+  .badge.sell { background: rgba(200, 139, 139, 0.18); color: #ab6f6f; }
+
+  /* Side cards */
+  .kv { display: flex; justify-content: space-between; padding: 5px 0; font-size: 13px; }
+  .kv .k { color: var(--text-secondary); }
+  .kv .v { font-weight: 600; }
+  .section + .section { margin-top: 16px; }
+
+  /* Drawdown meter */
+  .meter { height: 8px; border-radius: 999px; background: var(--bg-tertiary); overflow: hidden; margin-top: 8px; }
+  .meter > div { height: 100%; border-radius: 999px; background: linear-gradient(90deg, var(--accent-success), var(--accent-warning), var(--accent-danger)); }
+
+  footer { margin-top: 24px; color: var(--text-muted); font-size: 12px; display: flex; gap: 8px; align-items: center; }
+  #spark path.line { stroke: var(--accent-primary); stroke-width: 2; fill: none; }
+  #spark path.fill { fill: rgba(201, 168, 124, 0.12); stroke: none; }
+  #spark line.base { stroke: var(--border-color); stroke-dasharray: 3 3; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <span class="logo">Bonito</span>
+    <span class="subtitle">Live Dashboard</span>
+    <span class="spacer"></span>
+    <span class="pill mode" id="mode-pill">—</span>
+    <span class="pill" id="regime-pill"><span class="dot"></span><span id="regime-text">regime —</span></span>
+    <span class="pill stale" id="stale-pill" style="display:none">DATA STALE</span>
+  </header>
+
+  <div class="banner" id="halt-banner">
+    ⛔ KILL SWITCH ACTIVE — trading halted
+    <small id="halt-reason"></small>
+  </div>
+
+  <div class="stats" id="stats"></div>
+
+  <div class="grid">
+    <div>
+      <div class="card section">
+        <h2>Open Positions</h2>
+        <div style="overflow-x:auto">
+          <table id="positions">
+            <thead><tr>
+              <th>Symbol</th><th>Qty</th><th>Entry</th><th>Last</th><th>Value</th>
+              <th>P&amp;L</th><th>P&amp;L %</th><th>Stop</th><th>Target</th><th>Days</th>
+            </tr></thead>
+            <tbody></tbody>
+          </table>
+        </div>
+      </div>
+
+      <div class="card section">
+        <h2>Equity</h2>
+        <svg id="spark" width="100%" height="120" preserveAspectRatio="none"></svg>
+        <div class="muted" id="spark-caption"></div>
+      </div>
+
+      <div class="card section">
+        <h2>Recent Fills</h2>
+        <div style="overflow-x:auto">
+          <table id="fills">
+            <thead><tr>
+              <th>When</th><th>Side</th><th>Symbol</th><th>Qty</th><th>Price</th><th>Notional</th><th style="text-align:left">Reason</th>
+            </tr></thead>
+            <tbody></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <div>
+      <div class="card section">
+        <h2>Regime</h2>
+        <div id="regime-card"></div>
+      </div>
+      <div class="card section">
+        <h2>Strategy</h2>
+        <div id="strategy-card"></div>
+      </div>
+      <div class="card section">
+        <h2>Risk Caps</h2>
+        <div id="risk-card"></div>
+      </div>
+    </div>
+  </div>
+
+  <footer>
+    <span id="updated">loading…</span>
+    <span>·</span><span>auto-refreshes every 30s</span>
+    <span>·</span><span>read-only</span>
+  </footer>
+</div>
+
+<script>
+const $ = (id) => document.getElementById(id);
+const usd = (v, signed = false) =>
+  (signed && v > 0 ? "+" : "") +
+  v.toLocaleString("en-US", { style: "currency", currency: "USD" });
+const pct = (v, signed = true) => (signed && v > 0 ? "+" : "") + v.toFixed(2) + "%";
+const cls = (v) => (v >= 0 ? "pos" : "neg");
+const esc = (s) =>
+  String(s).replace(/[&<>"']/g, (c) =>
+    ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]
+  );
+
+function statCard(label, value, sub = "", valueClass = "") {
+  return `<div class="card stat">
+    <div class="label">${label}</div>
+    <div class="value mono ${valueClass}">${value}</div>
+    ${sub ? `<div class="sub">${sub}</div>` : ""}
+  </div>`;
+}
+
+function render(s) {
+  const a = s.account;
+
+  $("mode-pill").textContent = s.mode.toUpperCase() + (s.live_enabled ? " · ARMED" : "");
+
+  const regime = s.regime;
+  const rp = $("regime-pill");
+  if (regime) {
+    rp.className = "pill " + (regime.risk_on ? "risk-on" : "risk-off");
+    $("regime-text").textContent = regime.risk_on ? "risk-on" : "risk-off";
+  } else {
+    $("regime-text").textContent = "no regime filter";
+  }
+
+  $("stale-pill").style.display = s.data_freshness.stale ? "" : "none";
+  $("halt-banner").style.display = a.halted ? "block" : "none";
+  $("halt-reason").textContent = a.halt_reason
+    ? a.halt_reason + " — clear with `bonito live resume` after review."
+    : "";
+
+  const ddCap = s.risk.max_drawdown_halt;
+  $("stats").innerHTML =
+    statCard("Equity", usd(a.equity), `${pct(a.total_return_pct)} all-time`, cls(a.total_return_pct)) +
+    statCard("Cash", usd(a.cash), `of ${usd(a.starting_cash)} start`) +
+    statCard("Unrealized P&L", usd(a.unrealized_pnl, true), "open positions", cls(a.unrealized_pnl)) +
+    statCard("Realized P&L", usd(a.realized_pnl, true), `${a.total_fills} fills`, cls(a.realized_pnl)) +
+    statCard(
+      "Drawdown",
+      pct(a.drawdown_pct, false),
+      ddCap ? `halts at ${(ddCap * 100).toFixed(0)}% · peak ${usd(a.peak_equity)}` : `peak ${usd(a.peak_equity)}`,
+      a.drawdown_pct > (ddCap ? ddCap * 100 * 0.6 : 15) ? "neg" : ""
+    ) +
+    statCard("Positions", `${a.open_positions}/${s.risk.max_positions}`, `max ${usd(s.risk.max_position_usd)} each`);
+
+  // Positions table
+  const tbody = $("positions").querySelector("tbody");
+  if (!s.positions.length) {
+    tbody.innerHTML = `<tr><td colspan="10" class="empty">No open positions</td></tr>`;
+  } else {
+    tbody.innerHTML = s.positions
+      .map((p) => {
+        const stop = p.stop_price !== null
+          ? `<span class="mono">${usd(p.stop_price)}</span><div class="muted">${pct(p.stop_distance_pct, false)} away</div>`
+          : `<span class="muted">—</span>`;
+        const tp = p.take_profit_price !== null
+          ? `<span class="mono">${usd(p.take_profit_price)}</span><div class="muted">${pct(p.tp_distance_pct, false)} away</div>`
+          : `<span class="muted">—</span>`;
+        return `<tr>
+          <td><span class="sym">${esc(p.symbol)}</span>${p.stale ? ' <span class="badge sell">stale</span>' : ""}
+            <div class="muted">${esc(p.strategy_name)}</div></td>
+          <td class="mono">${p.quantity}</td>
+          <td class="mono">${usd(p.entry_price)}</td>
+          <td class="mono">${usd(p.current_price)}</td>
+          <td class="mono">${usd(p.market_value)}</td>
+          <td class="mono ${cls(p.unrealized_pnl)}">${usd(p.unrealized_pnl, true)}</td>
+          <td class="mono ${cls(p.unrealized_pct)}">${pct(p.unrealized_pct)}</td>
+          <td>${stop}</td>
+          <td>${tp}</td>
+          <td class="mono">${p.days_held}</td>
+        </tr>`;
+      })
+      .join("");
+  }
+
+  // Equity sparkline
+  drawSpark(s.equity_curve, a.starting_cash);
+
+  // Fills
+  const fbody = $("fills").querySelector("tbody");
+  if (!s.fills.length) {
+    fbody.innerHTML = `<tr><td colspan="7" class="empty">No fills yet</td></tr>`;
+  } else {
+    fbody.innerHTML = s.fills
+      .map((f) => {
+        const when = new Date(f.filled_at).toLocaleString("en-US", {
+          month: "short", day: "numeric", hour: "2-digit", minute: "2-digit",
+        });
+        return `<tr>
+          <td class="muted">${when}</td>
+          <td><span class="badge ${f.side}">${f.side.toUpperCase()}</span></td>
+          <td><span class="sym">${esc(f.symbol)}</span></td>
+          <td class="mono">${f.quantity}</td>
+          <td class="mono">${usd(f.price)}</td>
+          <td class="mono">${usd(f.notional)}</td>
+          <td style="text-align:left" class="muted">${esc(f.reason)}</td>
+        </tr>`;
+      })
+      .join("");
+  }
+
+  // Side cards
+  $("regime-card").innerHTML = regime
+    ? `<div class="kv"><span class="k">Status</span>
+         <span class="v ${regime.risk_on ? "pos" : "neg"}">${regime.risk_on ? "RISK-ON" : "RISK-OFF"}</span></div>
+       <div class="kv"><span class="k">${esc(regime.symbol)} close</span><span class="v mono">${regime.close !== null ? usd(regime.close) : "—"}</span></div>
+       <div class="kv"><span class="k">SMA(${regime.sma_period})</span><span class="v mono">${regime.sma !== null ? usd(regime.sma) : "—"}</span></div>
+       <div class="muted" style="margin-top:6px">${regime.risk_on ? "New long entries allowed" : "New entries blocked; exits unaffected"}</div>`
+    : `<div class="muted">Deployed strategy has no regime filter.</div>`;
+
+  $("strategy-card").innerHTML = `
+    <div class="kv"><span class="k">Name</span><span class="v">${esc(s.universe.strategy_name)}</span></div>
+    <div class="kv"><span class="k">Hash</span><span class="v mono">${esc(s.universe.strategy_hash)}</span></div>
+    <div class="kv"><span class="k">Universe</span><span class="v">${esc(s.universe.name)}</span></div>
+    <div class="kv"><span class="k">Symbols</span><span class="v mono">${s.universe.symbols}</span></div>
+    <div class="muted" style="margin-top:6px">${esc(s.universe.strategy_description || "")}</div>`;
+
+  const ddUsed = ddCap ? Math.min((a.drawdown_pct / (ddCap * 100)) * 100, 100) : 0;
+  $("risk-card").innerHTML = `
+    <div class="kv"><span class="k">Max position</span><span class="v mono">${usd(s.risk.max_position_usd)}</span></div>
+    <div class="kv"><span class="k">Max positions</span><span class="v mono">${s.risk.max_positions}</span></div>
+    <div class="kv"><span class="k">Daily buy cap</span><span class="v mono">${s.risk.max_daily_buys}</span></div>
+    <div class="kv"><span class="k">Cash buffer</span><span class="v mono">${usd(s.risk.min_cash_buffer_usd)}</span></div>
+    <div class="kv"><span class="k">DD kill switch</span><span class="v mono">${ddCap ? (ddCap * 100).toFixed(0) + "%" : "off"}</span></div>
+    ${ddCap ? `<div class="meter" title="drawdown vs kill switch"><div style="width:${ddUsed}%"></div></div>
+    <div class="muted" style="margin-top:4px">${pct(a.drawdown_pct, false)} of ${(ddCap * 100).toFixed(0)}% used</div>` : ""}`;
+
+  $("updated").textContent =
+    "updated " + new Date().toLocaleTimeString() +
+    (s.data_freshness.last_bar ? ` · last bar ${s.data_freshness.last_bar.slice(0, 10)}` : "");
+}
+
+function drawSpark(curve, baseline) {
+  const svg = $("spark");
+  const W = svg.clientWidth || 800, H = 120, pad = 6;
+  svg.setAttribute("viewBox", `0 0 ${W} ${H}`);
+  if (!curve.length) {
+    svg.innerHTML = "";
+    $("spark-caption").textContent = "Equity history appears after the first fill.";
+    return;
+  }
+  const vals = curve.map((p) => p.equity);
+  const lo = Math.min(...vals, baseline), hi = Math.max(...vals, baseline);
+  const span = hi - lo || 1;
+  const x = (i) => curve.length === 1 ? W / 2 : pad + (i / (curve.length - 1)) * (W - 2 * pad);
+  const y = (v) => H - pad - ((v - lo) / span) * (H - 2 * pad);
+  const pts = vals.map((v, i) => `${x(i).toFixed(1)},${y(v).toFixed(1)}`);
+  const line = "M" + pts.join(" L");
+  const fill = `M${pad},${H - pad} L` + pts.join(" L") + ` L${W - pad},${H - pad} Z`;
+  svg.innerHTML =
+    `<line class="base" x1="0" x2="${W}" y1="${y(baseline)}" y2="${y(baseline)}"></line>` +
+    `<path class="fill" d="${fill}"></path><path class="line" d="${line}"></path>` +
+    (curve.length === 1
+      ? `<circle cx="${x(0)}" cy="${y(vals[0])}" r="3" fill="var(--accent-primary)"></circle>`
+      : "");
+  const first = curve[0], last = curve[curve.length - 1];
+  $("spark-caption").textContent =
+    `${first.date} → ${last.date} · ${usd(last.equity)} (dashed line = starting cash)`;
+}
+
+async function refresh() {
+  try {
+    const res = await fetch("/api/state");
+    if (!res.ok) throw new Error(res.status);
+    render(await res.json());
+  } catch (e) {
+    $("updated").textContent = "failed to load state — is the API up? (" + e + ")";
+  }
+}
+refresh();
+setInterval(refresh, 30_000);
+window.addEventListener("resize", () => refresh());
+</script>
+</body>
+</html>

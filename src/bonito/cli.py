@@ -825,6 +825,18 @@ def live_record_fill(
     console.print(f"Recorded {side.upper()} {symbol} @ ${price:.2f}")
 
 
+@app.command("dashboard")
+def dashboard(
+    port: int = typer.Option(8050, "--port", "-p"),
+    host: str = typer.Option("127.0.0.1", "--host"),
+) -> None:
+    """Serve the read-only live-trading dashboard (positions, P&L, regime)."""
+    import uvicorn
+
+    console.print(f"[bold]Bonito dashboard[/bold] → http://{host}:{port}")
+    uvicorn.run("bonito.dashboard.app:app", host=host, port=port)
+
+
 @live_app.command("resume")
 def live_resume(
     universe_path: str = typer.Option("config/universe.json", "--universe", "-u"),

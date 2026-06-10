@@ -90,6 +90,10 @@ setup: install-dev
 api:
 	uvicorn bonito.api.main:app --reload --host 0.0.0.0 --port 8000
 
+# Live-trading dashboard (standalone, read-only)
+dashboard:
+	uvicorn bonito.dashboard.app:app --host 0.0.0.0 --port 8050
+
 # CLI Chat
 chat:
 	$(PYTHON) -m bonito.cli chat -v
