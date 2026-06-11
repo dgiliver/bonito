@@ -1,6 +1,6 @@
 {
   "name": "robinhood-agentic",
-  "description": "21-symbol watchlist traded on the Robinhood Agentic cash account",
+  "description": "34-symbol watchlist traded on the Robinhood Agentic cash account",
   "broker": "robinhood",
   "account_nickname": "Agentic",
   "mode": "paper",
@@ -30,7 +30,16 @@
     "ASML",
     "AVGO",
     "MRVL",
-    "LLY"
+    "LLY",
+    "AMAT",
+    "KLAC",
+    "LRCX",
+    "AAPL",
+    "GOOGL",
+    "META",
+    "AMZN",
+    "AXON",
+    "CORZ"
   ],
   "strategy_path": "strategies/deployed_strategy.json",
   "symbol_strategies": {},
