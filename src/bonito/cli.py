@@ -562,9 +562,7 @@ def research_clusters(
             done["n"] += 1
             prog.update(task, description=f"researching... {done['n']} candidates evaluated")
 
-        report = run_cluster_research(
-            universe, store, start_dt, holdout_dt, end_dt, progress=tick
-        )
+        report = run_cluster_research(universe, store, start_dt, holdout_dt, end_dt, progress=tick)
 
     report_path = save_report(report)
 
@@ -573,7 +571,17 @@ def research_clusters(
             title=f"{cluster.name} — {len(cluster.members)} symbols, "
             f"{cluster.candidates_eligible}/{cluster.candidates_evaluated} candidates eligible"
         )
-        for col in ("Symbol", "Vol", "T.Sharpe", "T.DD %", "H.Trades", "H.Ret %", "H.Sharpe", "H.DD %", "Verdict"):
+        for col in (
+            "Symbol",
+            "Vol",
+            "T.Sharpe",
+            "T.DD %",
+            "H.Trades",
+            "H.Ret %",
+            "H.Sharpe",
+            "H.DD %",
+            "Verdict",
+        ):
             table.add_column(col, justify="right")
         if cluster.winner_name is None:
             console.print(
@@ -616,8 +624,10 @@ def research_clusters(
         written = apply_assignments(report, Path(universe_path))
         for symbol, path in sorted(written.items()):
             console.print(f"  {symbol} → {path}")
-        console.print("[green]universe.json updated.[/green] Open positions are unaffected "
-                      "(they exit under their pinned strategy).")
+        console.print(
+            "[green]universe.json updated.[/green] Open positions are unaffected "
+            "(they exit under their pinned strategy)."
+        )
     else:
         console.print("[dim]Dry run — re-run with --apply to write assignments.[/dim]")
 
@@ -766,31 +776,66 @@ def live_check_stops(
 ) -> None:
     """Intraday stop-loss/take-profit sweep against supplied prices."""
     import json as _json
-    from datetime import UTC as _UTC
-    from datetime import datetime as _dt
-
-    from bonito.trading.live_runner import check_stops, execute_paper, save_intents
-    from bonito.trading.signals import latest_atr
 
     universe = _load_universe(universe_path)
     ledger = _load_ledger(universe)
     prices = {k.upper(): float(v) for k, v in _json.loads(prices_json).items()}
+    _sweep_stops(universe, ledger, prices, execute)
 
-    # ATR-based stops need the current ATR from stored daily bars.
-    atrs: dict[str, float] = {}
-    store = _get_store()
-    start = datetime.strptime(universe.data.start_date, "%Y-%m-%d")
-    now = _dt.now(_UTC).replace(tzinfo=None)
-    for symbol, pos in ledger.positions.items():
-        strat = pos.pinned_strategy() or universe.load_strategy_for(symbol)
-        if strat.stop_loss and strat.stop_loss.type.value in ("atr", "trailing_atr"):
-            data = store.get_bars(symbol, start, now, universe.data.timeframe)
-            if data is not None and len(data) >= 2:
-                atrs[symbol] = latest_atr(data, strat.stop_loss.atr_period)
 
+@live_app.command("sweep")
+def live_sweep(
+    universe_path: str = typer.Option("config/universe.json", "--universe", "-u"),
+    execute: bool = typer.Option(
+        False, "--execute", help="Fill triggered exits in the paper ledger"
+    ),
+    no_refresh: bool = typer.Option(
+        False, "--no-refresh", help="Skip refreshing daily bars (the ATR source)"
+    ),
+) -> None:
+    """Self-contained intraday stop sweep.
+
+    Fetches live quotes for every open position via yfinance and runs the
+    stop-loss/take-profit check — same as check-stops, but it sources its
+    own prices. Built for the scheduled intraday-stops workflow.
+    """
+    from bonito.data.quotes import fetch_latest_quotes
+    from bonito.trading.live_runner import refresh_data
+
+    universe = _load_universe(universe_path)
+    ledger = _load_ledger(universe)
+    if not ledger.positions:
+        console.print("[dim]No open positions — nothing to monitor.[/dim]")
+        return
+
+    symbols = sorted(ledger.positions)
+    if not no_refresh:
+        refresh_data(universe, _get_store(), symbols=symbols)
+
+    prices = fetch_latest_quotes(symbols)
+    missing = [s for s in symbols if s not in prices]
+    if missing:
+        console.print(f"[yellow]No quotes for {', '.join(missing)} — holding those.[/yellow]")
+    if not prices:
+        console.print("[red]All quote lookups failed — sweep aborted.[/red]")
+        raise typer.Exit(1)
+
+    _sweep_stops(universe, ledger, prices, execute)
+
+
+def _sweep_stops(universe, ledger, prices: dict[str, float], execute: bool) -> None:
+    """Shared body of check-stops/sweep: ATRs → stop check → report/execute."""
+    from bonito.trading.live_runner import (
+        check_stops,
+        compute_position_atrs,
+        execute_paper,
+        save_intents,
+    )
+
+    atrs = compute_position_atrs(universe, ledger, _get_store())
     intents = check_stops(universe, ledger, prices, atrs=atrs)
     if not intents:
-        console.print("[dim]No stops triggered.[/dim]")
+        console.print(f"[dim]No stops triggered ({len(prices)} price(s) checked).[/dim]")
         ledger.save()  # persist high-water-mark updates
         return
 

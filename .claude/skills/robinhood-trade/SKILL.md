@@ -66,13 +66,21 @@ git pull origin <current-branch>   # pick up latest ledger state
 
 ## Intraday monitor
 
-For each sweep (every ~15 min during 9:30–16:00 ET via /loop):
+**Paper mode is automated**: the `Intraday stop sweep` workflow
+(`.github/workflows/intraday-stops.yml`) runs `bonito live sweep --execute`
+every 15 minutes during 9:30–16:00 ET and commits any ledger change. A
+manual sweep is still fine anytime — same command, idempotent — but pull
+first (`git pull`) so you don't race the workflow's commits.
+
+For a live-mode sweep (or paper when Actions is down), every ~15 min
+during RTH via /loop:
 
 1. Read open positions from the mode's ledger (`livetrade/paper_ledger.json`
    or `livetrade/live_ledger.json`). None → done.
 2. Get current prices: `get_equity_quotes` for those symbols.
 3. `.venv/bin/bonito live check-stops '{"TSLA": 412.5, ...}'`
-   - Paper mode: add `--execute` to fill exits in the ledger.
+   - Paper mode: add `--execute` to fill exits in the ledger (or just run
+     `bonito live sweep --execute`, which fetches its own yfinance quotes).
    - Live mode: for each emitted exit intent, place the sell via the MCP
      (same review → place → record-fill flow as the daily cycle).
 4. If any exits fired: commit + push `livetrade/`.

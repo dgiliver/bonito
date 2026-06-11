@@ -1,0 +1,13 @@
+[
+  {
+    "symbol": "SNDK",
+    "side": "sell",
+    "dollar_amount": null,
+    "quantity": 0.6150118291429271,
+    "reason": "take profit triggered (intraday)",
+    "signal_price": 1829.72998046875,
+    "signal_date": "2026-06-11T18:54:32.722098Z",
+    "strategy_name": "ema_cross_rsi_atr_regime",
+    "generated_at": "2026-06-11T18:54:32.722358Z"
+  }
+]

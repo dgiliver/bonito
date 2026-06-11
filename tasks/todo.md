@@ -1,3 +1,44 @@
+# Intraday Stop Automation + Pre-Live Stubs (2026-06-11)
+
+- [x] `bonito live sweep [--execute] [--no-refresh]` — self-contained intraday
+      stop sweep: refreshes daily bars for open positions only (ATR source),
+      fetches live quotes via yfinance (`bonito/data/quotes.py`), runs the
+      same check-stops path. Missing quote = hold + warn, all-missing = exit 1.
+- [x] `.github/workflows/intraday-stops.yml` — every 15 min, 13:00–21:45 UTC
+      Mon–Fri; in-job guard trims to 9:30–16:00 ET (DST-proof via zoneinfo)
+      and skips when flat or non-paper. Shares concurrency group
+      `livetrade-state` with the daily cycle so ledger commits never race.
+      Failure opens ONE GitHub issue (no 26-issues-a-day spam).
+- [x] `entry_allowlist` on UniverseConfig — when set, only listed symbols may
+      open NEW positions; exits never gated. Default null = no change.
+      This is the pre-live lever for restricting to kill-filter passers.
+- [x] `config/universe.live.json` — DRAFT $150 live config (max_position $30,
+      buffer $5, allowlist COST/MSFT/TSM). mode="live" but live_enabled=false:
+      inert until explicit sign-off flips it.
+- [x] `make live-sweep`; runbook updated; tests (allowlist, ATR helper,
+      refresh subset, quote fetcher)
+- [x] Smoke test: first real sweep took SNDK out at $1829.73 on the 10%
+      take-profit → +$125.31 realized (entry $1625.98 on 2026-06-10).
+
+## Pre-live checklist (Phase 3 — every box needs doing before flags flip)
+
+- [ ] ≥2 weeks of paper history → review ~2026-06-24: win rate, max DD,
+      holding periods vs backtest; paper fill prices vs backtest's 0.1%
+      commission assumption (Robinhood = commission-free + spread) →
+      recalibrate engine costs if material.
+- [ ] Re-run `bonito live backtest-universe` and update
+      `entry_allowlist` in universe.live.json to the CURRENT holdout
+      passers (COST/MSFT/TSM as of 2026-06-10 — stale by flip time).
+- [ ] Re-run `bonito research clusters` with the longer holdout; apply any
+      passing per-symbol assignments.
+- [ ] Review universe.live.json caps against actual account balance.
+- [ ] Live MCP rehearsal on the Agentic account (••••8597, NEVER margin):
+      reconcile → review_equity_order ($1–2) → place → record-fill →
+      reconcile → sell. Verifies the full order path before real sizing.
+- [ ] USER SIGN-OFF, then flip `live_enabled: true` in universe.live.json
+      and point the daily session at it. Live placement stays in Claude
+      sessions via MCP — the Actions workflows are paper-only by guard.
+
 # Per-Cluster Strategy Research (2026-06-10/11)
 
 - [x] `research/cluster_research.py`: vol clustering, 144-candidate grid, train-rank → holdout-gate

@@ -68,6 +68,11 @@ class UniverseConfig(BaseModel):
     mode: str = "paper"
     live_enabled: bool = False
     symbols: list[str] = Field(..., min_length=1)
+    entry_allowlist: list[str] | None = Field(
+        default=None,
+        description="If set, only these symbols may open NEW positions (exits are "
+        "never gated). Pre-live lever: restrict entries to kill-filter passers.",
+    )
     strategy_path: str
     symbol_strategies: dict[str, str] = Field(
         default_factory=dict,
@@ -112,8 +117,14 @@ def refresh_data(
     universe: UniverseConfig,
     store: MarketDataStore,
     end: datetime | None = None,
+    symbols: list[str] | None = None,
 ) -> dict[str, int]:
     """Ingest fresh daily bars for every universe symbol.
+
+    Args:
+        symbols: Refresh only this subset (regime symbols are then skipped
+            too) — used by the intraday sweep, which only needs ATR bars
+            for open positions. None refreshes the full universe.
 
     Returns:
         Symbol → number of bars ingested. Failures are logged and return -1
@@ -121,7 +132,7 @@ def refresh_data(
     """
     end = end or datetime.now(UTC).replace(tzinfo=None) + timedelta(days=1)
     results: dict[str, int] = {}
-    for symbol in universe.symbols:
+    for symbol in symbols if symbols is not None else universe.symbols:
         try:
             results[symbol] = store.ingest_from_yahoo(
                 symbol,
@@ -132,6 +143,8 @@ def refresh_data(
         except Exception:
             logger.error(f"Failed to refresh {symbol}", exc_info=True)
             results[symbol] = -1
+    if symbols is not None:
+        return results
 
     # Regime reference symbols need extra history so the SMA is defined
     # from the universe start date onward.
@@ -257,6 +270,11 @@ def generate_intents(
     available = ledger.cash - universe.risk.min_cash_buffer_usd
     buys = 0
     regime_cache: dict[tuple[str, int], bool] = {}
+    allowset = (
+        None if universe.entry_allowlist is None else {s.upper() for s in universe.entry_allowlist}
+    )
+    if allowset is not None:
+        logger.info(f"entry allowlist active: {sorted(allowset)}")
 
     for symbol in universe.symbols:
         if buys >= universe.risk.max_daily_buys:
@@ -264,6 +282,8 @@ def generate_intents(
         if open_after_exits + buys >= universe.risk.max_positions:
             break
         if symbol in ledger.positions:
+            continue
+        if allowset is not None and symbol.upper() not in allowset:
             continue
 
         dollar = min(universe.risk.max_position_usd, available)
@@ -385,6 +405,33 @@ def execute_paper(
             errors.append(f"{intent.symbol}: {e}")
 
     return fills, errors
+
+
+def compute_position_atrs(
+    universe: UniverseConfig,
+    ledger: PaperLedger,
+    store: MarketDataStore,
+    as_of: datetime | None = None,
+) -> dict[str, float]:
+    """Current ATR for each open position whose pinned strategy uses an ATR stop.
+
+    Positions without enough stored bars are omitted — check_stops then
+    holds them with a warning instead of guessing a stop level.
+    """
+    as_of = as_of or datetime.now(UTC).replace(tzinfo=None)
+    start = datetime.strptime(universe.data.start_date, "%Y-%m-%d")
+    atrs: dict[str, float] = {}
+    for symbol, pos in ledger.positions.items():
+        strategy = _position_strategy(pos, universe)
+        stop = strategy.stop_loss
+        if stop is None or stop.type.value not in ("atr", "trailing_atr"):
+            continue
+        data = store.get_bars(symbol, start, as_of, universe.data.timeframe)
+        if data is not None and len(data) >= 2:
+            atrs[symbol] = signals.latest_atr(data, stop.atr_period)
+        else:
+            logger.warning(f"{symbol}: no bars for ATR — stop check will hold")
+    return atrs
 
 
 def check_stops(

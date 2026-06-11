@@ -1,0 +1,114 @@
+# Intraday stop sweep — enforces trailing stops between daily cycles.
+#
+# The daily cycle runs once after the close, which leaves open positions
+# unmonitored for the whole session. This job runs every 15 minutes
+# during US regular trading hours, pulls live quotes for open positions,
+# and fills any triggered stop/take-profit exits into the paper ledger.
+#
+# The cron is a UTC superset of market hours across EDT/EST; the in-job
+# guard trims to 9:30–16:00 ET and exits quietly outside it, when the
+# book is flat, or if the universe ever leaves paper mode. Market
+# holidays aren't special-cased: quotes just come back stale and the
+# sweep no-ops.
+#
+# Paper mode only — never holds broker credentials, never places real
+# orders. Live intraday monitoring runs through a Claude session
+# (see .claude/skills/robinhood-trade/SKILL.md).
+
+name: Intraday stop sweep
+
+on:
+  schedule:
+    # Every 15 min, 13:00–21:45 UTC Mon–Fri (guard trims to 9:30–16:00 ET).
+    - cron: "*/15 13-21 * * 1-5"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  issues: write
+
+# Shares the ledger-writer lock with the daily cycle so two jobs never
+# commit livetrade/ at the same time.
+concurrency:
+  group: livetrade-state
+  cancel-in-progress: false
+
+jobs:
+  stop-sweep:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Guard - market hours, open positions, paper mode
+        id: guard
+        run: |
+          python3 - <<'EOF' >> "$GITHUB_OUTPUT"
+          import json
+          from datetime import datetime
+          from zoneinfo import ZoneInfo
+
+          now = datetime.now(ZoneInfo("America/New_York"))
+          in_hours = now.weekday() < 5 and (9, 30) <= (now.hour, now.minute) <= (16, 0)
+          positions = json.load(open("livetrade/paper_ledger.json")).get("positions", {})
+          paper = json.load(open("config/universe.json")).get("mode") == "paper"
+          run = in_hours and bool(positions) and paper
+          print(f"run={'true' if run else 'false'}")
+          print(f"why=in_hours:{in_hours} positions:{len(positions)} paper:{paper}")
+          EOF
+
+      - name: Skip reason
+        if: steps.guard.outputs.run != 'true'
+        run: echo "skipping sweep — ${{ steps.guard.outputs.why }}"
+
+      - uses: actions/setup-python@v5
+        if: steps.guard.outputs.run == 'true'
+        with:
+          python-version: "3.12"
+          cache: pip
+
+      - name: Install bonito
+        if: steps.guard.outputs.run == 'true'
+        run: pip install -e .
+
+      - name: Sweep stops
+        if: steps.guard.outputs.run == 'true'
+        run: bonito live sweep --execute
+
+      - name: Commit ledger state
+        if: steps.guard.outputs.run == 'true'
+        run: |
+          git config user.name "bonito-paper-bot"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add livetrade/
+          if git diff --cached --quiet; then
+            echo "ledger unchanged — nothing to commit"
+            exit 0
+          fi
+          git commit -m "chore(livetrade): intraday stop sweep $(date -u +%FT%H:%MZ)"
+          # Rebase-retry in case something else pushed meanwhile.
+          for i in 1 2 3; do
+            git push && exit 0
+            git pull --rebase
+          done
+          exit 1
+
+      - name: Open issue on failure
+        if: failure()
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          # One open issue at a time — a broken sweep fires every 15 min
+          # and must not open 26 issues a day.
+          existing=$(gh issue list --state open --search "Intraday stop sweep failing" \
+            --json number --jq length)
+          if [ "$existing" = "0" ]; then
+            gh issue create \
+              --title "Intraday stop sweep failing $(date -u +%F)" \
+              --body "The intraday stop sweep failed. Logs: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+
+          Trailing stops are only enforced at the daily 22:30 UTC cycle until this is fixed or a sweep is run manually: \`bonito live sweep --execute\`." \
+              || echo "::warning::could not create failure issue"
+          else
+            echo "failure issue already open — not spamming"
+          fi

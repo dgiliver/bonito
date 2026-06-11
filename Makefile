@@ -132,5 +132,8 @@ live-run:
 live-status:
 	$(PYTHON) -m bonito.cli live status
 
+live-sweep:
+	$(PYTHON) -m bonito.cli live sweep --execute
+
 live-backtest:
 	$(PYTHON) -m bonito.cli live backtest-universe

@@ -552,3 +552,120 @@ class TestRegimeGate:
         universe._strategy_cache.clear()
 
         assert universe.regime_symbols() == {"SPY"}
+
+
+class TestEntryAllowlist:
+    def test_only_allowlisted_symbols_get_entries(self, universe):
+        universe.entry_allowlist = ["BBB", "ddd"]  # case-insensitive
+        store = uptrend_store(universe.symbols)
+        ledger = PaperLedger(cash=150.0, starting_cash=150.0)
+
+        intents, _ = generate_intents(universe, store, ledger, as_of=AS_OF)
+
+        assert {i.symbol for i in intents if i.side == "buy"} == {"BBB", "DDD"}
+
+    def test_none_allowlist_means_all_symbols(self, universe):
+        assert universe.entry_allowlist is None
+        store = uptrend_store(universe.symbols)
+        ledger = PaperLedger(cash=150.0, starting_cash=150.0)
+
+        intents, _ = generate_intents(universe, store, ledger, as_of=AS_OF)
+        assert len([i for i in intents if i.side == "buy"]) == 3  # max_daily_buys
+
+    def test_exits_never_gated_by_allowlist(self, universe):
+        universe.entry_allowlist = []  # nothing may enter
+        store = uptrend_store(universe.symbols)
+        ledger = PaperLedger(cash=150.0, starting_cash=150.0)
+        _open_position(ledger, "AAA", quantity=0.5, entry_price=200.0)  # stop breach
+
+        intents, _ = generate_intents(universe, store, ledger, as_of=AS_OF)
+
+        assert [i.symbol for i in intents if i.side == "sell"] == ["AAA"]
+        assert not [i for i in intents if i.side == "buy"]
+
+
+class TestComputePositionAtrs:
+    def test_atr_computed_for_atr_stop_positions_only(self, universe, tmp_path):
+        from bonito.trading.live_runner import compute_position_atrs
+        from bonito.trading.signals import latest_atr
+
+        atr_strategy = {
+            **ALWAYS_ENTER_STRATEGY,
+            "name": "atr_stop",
+            "stop_loss": {"type": "trailing_atr", "value": 2.0, "atr_period": 14},
+        }
+        path = tmp_path / "atr_stop.json"
+        path.write_text(json.dumps(atr_strategy))
+        universe.symbol_strategies = {"AAA": str(path)}
+
+        store = uptrend_store(["AAA", "BBB"])
+        ledger = PaperLedger(cash=0.0, starting_cash=150.0)
+        _open_position(ledger, "AAA", quantity=1.0, entry_price=100.0)  # ATR stop
+        _open_position(ledger, "BBB", quantity=1.0, entry_price=100.0)  # percent stop
+
+        atrs = compute_position_atrs(universe, ledger, store, as_of=AS_OF)
+
+        assert set(atrs) == {"AAA"}
+        assert atrs["AAA"] == pytest.approx(latest_atr(store.bars["AAA"], 14))
+
+    def test_missing_bars_omit_symbol(self, universe, tmp_path):
+        from bonito.trading.live_runner import compute_position_atrs
+
+        atr_strategy = {
+            **ALWAYS_ENTER_STRATEGY,
+            "name": "atr_stop",
+            "stop_loss": {"type": "trailing_atr", "value": 2.0, "atr_period": 14},
+        }
+        path = tmp_path / "atr_stop.json"
+        path.write_text(json.dumps(atr_strategy))
+        universe.symbol_strategies = {"AAA": str(path)}
+
+        ledger = PaperLedger(cash=0.0, starting_cash=150.0)
+        _open_position(ledger, "AAA", quantity=1.0, entry_price=100.0)
+
+        assert compute_position_atrs(universe, ledger, FakeStore({}), as_of=AS_OF) == {}
+
+
+class TestRefreshSubset:
+    class RecordingStore(FakeStore):
+        def __init__(self):
+            super().__init__({})
+            self.ingested: list[str] = []
+
+        def ingest_from_yahoo(self, symbol, start, end, timeframe="1d"):
+            self.ingested.append(symbol)
+            return 1
+
+    def test_symbols_subset_skips_rest_and_regime(self, universe, tmp_path):
+        from bonito.trading.live_runner import refresh_data
+
+        strategy = {
+            **ALWAYS_ENTER_STRATEGY,
+            "name": "gated",
+            "regime_filter": {"symbol": "SPY", "sma_period": 200},
+        }
+        path = tmp_path / "gated.json"
+        path.write_text(json.dumps(strategy))
+        universe.strategy_path = str(path)
+        universe._strategy_cache.clear()
+
+        store = self.RecordingStore()
+        refresh_data(universe, store, symbols=["AAA", "CCC"])
+        assert store.ingested == ["AAA", "CCC"]
+
+    def test_full_refresh_still_includes_regime(self, universe, tmp_path):
+        from bonito.trading.live_runner import refresh_data
+
+        strategy = {
+            **ALWAYS_ENTER_STRATEGY,
+            "name": "gated",
+            "regime_filter": {"symbol": "SPY", "sma_period": 200},
+        }
+        path = tmp_path / "gated.json"
+        path.write_text(json.dumps(strategy))
+        universe.strategy_path = str(path)
+        universe._strategy_cache.clear()
+
+        store = self.RecordingStore()
+        refresh_data(universe, store)
+        assert store.ingested == [*universe.symbols, "SPY"]
