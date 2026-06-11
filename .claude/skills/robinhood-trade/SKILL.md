@@ -85,6 +85,17 @@ during RTH via /loop:
      (same review → place → record-fill flow as the daily cycle).
 4. If any exits fired: commit + push `livetrade/`.
 
+## Validation tools (periodic — NOT part of the daily cycle)
+
+- `bonito live backtest-universe` — per-symbol strategy validation with
+  train/holdout kill-filter verdicts. Answers "is the strategy sound on
+  this ticker".
+- `bonito live backtest-account` — replays the ACTUAL live pipeline
+  (caps, cash competition, regime gate, pinning, kill switch, intraday
+  stop sweep) day by day over history. Answers "what would the account
+  have done". Run it after any change to live_runner/strategy/caps and
+  compare against the previous saved result in `livetrade/research/`.
+
 ## Strategy research (periodic — NOT part of the daily cycle)
 
 `.venv/bin/bonito research clusters` sweeps a fixed 144-candidate grid per

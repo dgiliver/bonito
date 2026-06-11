@@ -90,9 +90,9 @@ class TestEMA:
         # SMA at index 10 = avg(100,100,100,100,150) = 110
         # EMA at index 10 should be > 110 due to weighting
         idx = 11  # Second bar after jump
-        assert (
-            ema_result[idx] > sma_result[idx]
-        ), f"EMA ({ema_result[idx]:.2f}) should respond faster than SMA ({sma_result[idx]:.2f})"
+        assert ema_result[idx] > sma_result[idx], (
+            f"EMA ({ema_result[idx]:.2f}) should respond faster than SMA ({sma_result[idx]:.2f})"
+        )
 
     def test_ema_formula(self):
         """Verify EMA uses correct multiplier: 2/(period+1)."""
@@ -404,3 +404,17 @@ class TestComputeIndicators:
         assert "bb_upper" in result
         assert "bb_middle" in result
         assert "bb_lower" in result
+
+
+class TestShortDataEdges:
+    """Indicators must return all-NaN (not crash) when data is shorter than the period."""
+
+    def test_ema_shorter_than_period(self):
+        result = ema(np.array([100.0, 101.0]), period=10)
+        assert len(result) == 2
+        assert np.all(np.isnan(result))
+
+    def test_rsi_shorter_than_period(self):
+        result = rsi(np.array([100.0, 101.0, 102.0]), period=14)
+        assert len(result) == 3
+        assert np.all(np.isnan(result))

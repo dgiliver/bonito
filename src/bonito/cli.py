@@ -1172,5 +1172,117 @@ def live_backtest_universe(
     console.print(f"[bold]{passed}/{len(universe.symbols)} symbols pass the kill filter[/bold]")
 
 
+@live_app.command("backtest-account")
+def live_backtest_account(
+    universe_path: str = typer.Option("config/universe.json", "--universe", "-u"),
+    start: str = typer.Option(None, "--start", help="Default: universe data.start_date"),
+    end: str = typer.Option(None, "--end", help="Default: today"),
+    holdout: str = typer.Option(
+        "2025-01-01",
+        "--holdout",
+        help="Out-of-sample boundary for the train/holdout split. 'none' disables.",
+    ),
+    intraday_stops: bool = typer.Option(
+        True,
+        "--intraday-stops/--no-intraday-stops",
+        help="Model the 15-min stop sweep from daily highs/lows",
+    ),
+) -> None:
+    """Backtest the ACCOUNT, not just the strategy.
+
+    Replays the exact live pipeline (generate_intents → execute_paper)
+    day by day over history: position caps, daily-buy limits, cash buffer,
+    regime gate, strategy pinning, and the portfolio kill switch all apply.
+    This answers "what would the paper account have done", where
+    backtest-universe answers "is the strategy sound per symbol".
+    """
+    from datetime import UTC as _UTC
+    from datetime import datetime as _dt
+
+    from bonito.trading.portfolio_backtest import (
+        ReplayStore,
+        backtest_account,
+        save_account_result,
+    )
+
+    universe = _load_universe(universe_path)
+    start_dt = datetime.strptime(start or universe.data.start_date, "%Y-%m-%d")
+    end_dt = datetime.strptime(end, "%Y-%m-%d") if end else _dt.now(_UTC).replace(tzinfo=None)
+    holdout_dt = None if holdout.lower() == "none" else datetime.strptime(holdout, "%Y-%m-%d")
+
+    console.print(
+        f"[dim]Replaying the live pipeline {start_dt.date()} → {end_dt.date()} "
+        f"({len(universe.symbols)} symbols, ${universe.risk.starting_cash_usd:,.0f} start, "
+        f"intraday stops {'on' if intraday_stops else 'off'})...[/dim]"
+    )
+    replay = ReplayStore.from_store(_get_store(), universe, end_dt)
+    result = backtest_account(universe, replay, start_dt, end_dt, intraday_stops=intraday_stops)
+
+    pf = "inf" if result.profit_factor == float("inf") else f"{result.profit_factor:.2f}"
+    halt_line = ""
+    if result.halted:
+        halt_line = (
+            f"\n[bold red]KILL SWITCH FIRED {result.halt_date.date()}[/bold red] — "
+            f"{result.halt_reason}\n[red]Account stayed halted to the end "
+            f"(production requires `bonito live resume`).[/red]"
+        )
+    console.print(
+        Panel.fit(
+            f"[bold]Equity ${result.final_equity:,.2f}[/bold] "
+            f"({result.total_return * 100:+.1f}% on ${result.starting_cash:,.0f})\n"
+            f"Realized P&L ${result.realized_pnl:+,.2f} | "
+            f"Unrealized ${result.unrealized_pnl:+,.2f} | "
+            f"{len(result.trades)} closed trades, {result.rejected_intents} rejected intents\n"
+            f"Sharpe {result.sharpe:.2f} | Max DD {result.max_drawdown * 100:.1f}% | "
+            f"Win rate {result.win_rate * 100:.0f}% | PF {pf}\n"
+            f"Positions: max {result.max_concurrent_positions} concurrent, "
+            f"avg {result.avg_concurrent_positions:.1f}, "
+            f"in market {result.pct_days_in_market * 100:.0f}% of days"
+            f"{halt_line}",
+            title=f"Account Backtest — {result.universe_name}",
+        )
+    )
+
+    windows = [("Full", start_dt, end_dt)]
+    if holdout_dt and start_dt < holdout_dt < end_dt:
+        windows += [("Train", start_dt, holdout_dt), ("Holdout", holdout_dt, end_dt)]
+    table = Table(title="Account windows (kill filter applied per window)")
+    for col in ("Window", "Trades", "Ret %", "Sharpe", "DD %", "Win %", "Verdict"):
+        table.add_column(col, justify="right")
+    for name, w_start, w_end in windows:
+        m = result.window_metrics(w_start, w_end)
+        reasons = result.verdict(w_start, w_end)
+        verdict = "[green]PASS[/green]" if not reasons else f"[red]{'; '.join(reasons)}[/red]"
+        table.add_row(
+            name,
+            str(m.trades),
+            f"{m.total_return * 100:+.1f}",
+            f"{m.sharpe:.2f}",
+            f"{m.max_drawdown * 100:.1f}",
+            f"{m.win_rate * 100:.0f}",
+            verdict,
+        )
+    console.print(table)
+
+    contrib = sorted(result.per_symbol_pnl.items(), key=lambda kv: kv[1], reverse=True)
+    if contrib:
+        table = Table(title="Realized P&L by symbol")
+        table.add_column("Symbol")
+        table.add_column("P&L $", justify="right")
+        table.add_column("Trades", justify="right")
+        counts = {s: sum(1 for t in result.trades if t.symbol == s) for s, _ in contrib}
+        for symbol, pnl in contrib:
+            color = "green" if pnl >= 0 else "red"
+            table.add_row(symbol, f"[{color}]{pnl:+,.2f}[/{color}]", str(counts[symbol]))
+        console.print(table)
+
+    if result.open_positions:
+        open_str = ", ".join(f"{s} ({p:+,.2f})" for s, p in sorted(result.open_positions.items()))
+        console.print(f"Open at end: {open_str}")
+
+    path = save_account_result(result)
+    console.print(f"[dim]Result saved to {path}[/dim]")
+
+
 if __name__ == "__main__":
     app()

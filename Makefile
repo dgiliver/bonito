@@ -137,3 +137,6 @@ live-sweep:
 
 live-backtest:
 	$(PYTHON) -m bonito.cli live backtest-universe
+
+live-backtest-account:
+	$(PYTHON) -m bonito.cli live backtest-account

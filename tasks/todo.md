@@ -1,3 +1,52 @@
+# Account-Level Backtest (2026-06-11) — "backtest the account, not the strategy"
+
+- [x] `trading/portfolio_backtest.py`: day-by-day replay through the REAL
+      live pipeline (generate_intents → execute_paper → PaperLedger) — caps,
+      daily-buy limits, cash buffer, regime gate, pinning, kill switch all
+      apply. ReplayStore serves point-in-time slices → look-ahead is
+      structurally impossible. Fills at signal close (paper behavior, not
+      the engine's next-open rule).
+- [x] Intraday 15-min sweep approximated from daily OHLC: stop fires off
+      the low vs PRIOR-HWM level (same-day ratchet never saves you), fills
+      at level or at open on gaps; TP mirrors off the high; stop beats TP
+      in the same bar. ATR from bars through the previous close.
+- [x] `signals.stop_level()` / `take_profit_level()` extracted — single
+      source of stop math (stop_loss_triggered now derives from it).
+- [x] Root-cause fix: `ema()`/`rsi()` crashed on data shorter than the
+      period (IndexError) — now return all-NaN per convention. Found by the
+      replay's early-window slices; engine was never exposed because stored
+      history was always long.
+- [x] CLI `bonito live backtest-account` (+ `make live-backtest-account`):
+      summary panel, train/holdout kill verdicts on the ACCOUNT curve,
+      per-symbol P&L contribution, saved JSON to livetrade/research/.
+- [x] 12 replay tests + 2 indicator edge tests; suite 620 passed.
+
+## Review — first account replay (2022-01-01 → 2026-06-11, $5k, 12s runtime)
+
+**$5,000 → $13,295 (+165.9%) | Sharpe 1.19 | Max DD 23.4% | 688 trades |
+win 48% | PF 1.41 | kill switch NEVER fired | all 3 windows PASS:**
+| window | trades | ret % | sharpe | DD % | verdict |
+|---|---|---|---|---|---|
+| Full | 688 | +165.9 | 1.19 | 23.4 | PASS |
+| Train | 393 | +67.3 | 0.93 | 23.4 | PASS |
+| Holdout | 295 | +58.4 | 1.81 | 18.7 | PASS |
+
+**The headline insight: the account passes everywhere the single symbols
+fail.** Per-symbol validation passes 3/25 (drawdowns 30–90%); the account
+passes all windows because $1k slices + 5-position cap + cash buffer turn
+huge single-name drawdowns into small account dents. Even TE (−86%
+single-symbol holdout) contributed +$422 at account level. Top: DELL
++$1,605, ARM +$1,389, SNDK +$1,347. Worst: IREN −$270.
+
+**Risk caveat: max DD 23.4% vs the 25% kill switch — 1.6 points from a
+permanent halt.** A slightly worse path trips flatten+halt and the curve
+flatlines. Watch this at the two-week review; consider whether the halt
+threshold and per-position sizing leave enough margin.
+
+Known approximations (documented in the module): paper fills at signal
+close (no spread/commission — calibration pending vs real fills);
+intraday sweep modeled from daily OHLC, not 15-min quotes.
+
 # Intraday Stop Automation + Pre-Live Stubs (2026-06-11)
 
 - [x] `bonito live sweep [--execute] [--no-refresh]` — self-contained intraday

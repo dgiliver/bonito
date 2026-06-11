@@ -340,6 +340,8 @@ def sma(prices: np.ndarray, period: int) -> np.ndarray:
 def ema(prices: np.ndarray, period: int) -> np.ndarray:
     """Exponential Moving Average."""
     result = np.full_like(prices, np.nan)
+    if len(prices) < period:
+        return result
     multiplier = 2 / (period + 1)
 
     # Initialize with SMA
@@ -359,6 +361,8 @@ def rsi(prices: np.ndarray, period: int = 14) -> np.ndarray:
     losses = np.where(deltas < 0, -deltas, 0)
 
     result = np.full_like(prices, np.nan)
+    if len(prices) <= period:
+        return result
 
     # Initial averages
     avg_gain = np.mean(gains[:period])

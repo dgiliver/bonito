@@ -183,6 +183,44 @@ def latest_atr(data: BarData, period: int) -> float:
     return float(np.mean(window))
 
 
+def stop_level(
+    side: Literal["long", "short"],
+    entry_price: float,
+    stop_config: StopLossConfig,
+    tracked_extreme: float | None = None,
+    atr: float | None = None,
+) -> float | None:
+    """The price at which the stop fires, given the CURRENT tracked extreme.
+
+    Single source of truth for stop math — stop_loss_triggered, the
+    dashboard, and the account replay all derive levels from here.
+
+    Returns:
+        None when the level cannot be computed (ATR stop without an ATR).
+    """
+    stop_type = stop_config.type.value
+    is_short = side == "short"
+    extreme = tracked_extreme if tracked_extreme is not None else entry_price
+
+    if stop_type == "percent":
+        factor = 1 + stop_config.value if is_short else 1 - stop_config.value
+        return entry_price * factor
+    if stop_type == "trailing_percent":
+        factor = 1 + stop_config.value if is_short else 1 - stop_config.value
+        return extreme * factor
+    if stop_type == "atr":
+        if atr is None:
+            return None
+        offset = stop_config.value * atr
+        return entry_price + offset if is_short else entry_price - offset
+    if stop_type == "trailing_atr":
+        if atr is None:
+            return None
+        offset = stop_config.value * atr
+        return extreme + offset if is_short else extreme - offset
+    return None
+
+
 def stop_loss_triggered(
     side: Literal["long", "short"],
     entry_price: float,
@@ -207,36 +245,17 @@ def stop_loss_triggered(
     is_short = side == "short"
     extreme = tracked_extreme if tracked_extreme is not None else entry_price
 
-    if stop_type == "percent":
-        if is_short:
-            return current_price >= entry_price * (1 + stop_config.value), extreme
-        return current_price <= entry_price * (1 - stop_config.value), extreme
-
-    if stop_type == "trailing_percent":
-        if is_short:
-            extreme = min(extreme, current_price)
-            return current_price >= extreme * (1 + stop_config.value), extreme
-        extreme = max(extreme, current_price)
-        return current_price <= extreme * (1 - stop_config.value), extreme
-
-    if stop_type == "atr":
-        if atr is None:
-            logger.warning("atr stop configured but no ATR value supplied; holding")
-            return False, extreme
-        if is_short:
-            return current_price >= entry_price + stop_config.value * atr, extreme
-        return current_price <= entry_price - stop_config.value * atr, extreme
-
-    if stop_type == "trailing_atr":
+    if stop_type in ("trailing_percent", "trailing_atr"):
         extreme = min(extreme, current_price) if is_short else max(extreme, current_price)
-        if atr is None:
-            logger.warning("trailing_atr stop configured but no ATR value supplied; holding")
-            return False, extreme
-        if is_short:
-            return current_price >= extreme + stop_config.value * atr, extreme
-        return current_price <= extreme - stop_config.value * atr, extreme
 
-    return False, extreme
+    level = stop_level(side, entry_price, stop_config, extreme, atr=atr)
+    if level is None:
+        if stop_type in ("atr", "trailing_atr"):
+            logger.warning(f"{stop_type} stop configured but no ATR value supplied; holding")
+        return False, extreme
+
+    triggered = current_price >= level if is_short else current_price <= level
+    return triggered, extreme
 
 
 def regime_allows_long(regime: RegimeFilterConfig, regime_data: BarData | None) -> bool:
@@ -252,6 +271,18 @@ def regime_allows_long(regime: RegimeFilterConfig, regime_data: BarData | None) 
     return float(closes[-1]) > sma
 
 
+def take_profit_level(
+    side: Literal["long", "short"],
+    entry_price: float,
+    tp_config: TakeProfitConfig,
+) -> float | None:
+    """The price at which the take profit fires (None for unsupported types)."""
+    if tp_config.type.value != "percent":
+        return None
+    factor = 1 - tp_config.value if side == "short" else 1 + tp_config.value
+    return entry_price * factor
+
+
 def take_profit_triggered(
     side: Literal["long", "short"],
     entry_price: float,
@@ -259,14 +290,15 @@ def take_profit_triggered(
     tp_config: TakeProfitConfig,
 ) -> bool:
     """Check a take profit target."""
-    if tp_config.type.value != "percent":
+    level = take_profit_level(side, entry_price, tp_config)
+    if level is None:
         return False
     # Epsilon absorbs float error so a fill exactly at target triggers
     # (e.g. 100 * 1.10 == 110.00000000000001).
     eps = 1e-9
     if side == "short":
-        return current_price <= entry_price * (1 - tp_config.value) + eps
-    return current_price >= entry_price * (1 + tp_config.value) - eps
+        return current_price <= level + eps
+    return current_price >= level - eps
 
 
 def latest_entry_signal(
