@@ -77,6 +77,17 @@ For each sweep (every ~15 min during 9:30–16:00 ET via /loop):
      (same review → place → record-fill flow as the daily cycle).
 4. If any exits fired: commit + push `livetrade/`.
 
+## Strategy research (periodic — NOT part of the daily cycle)
+
+`.venv/bin/bonito research clusters` sweeps a fixed 144-candidate grid per
+volatility cluster: ranked on the train window only, gated once on the
+holdout kill filter. Dry-run by default (report → `livetrade/research/`);
+`--apply` writes holdout-passing winners to `strategies/` and merges them
+into `symbol_strategies` in universe.json. Open positions are unaffected —
+they exit on the strategy pinned at entry; new assignments apply to the
+next entry. Zero assignments is a normal outcome (the gate working), not
+a failure. Run roughly monthly; commit the report and any assignments.
+
 ## Kill switch
 
 `bonito live run` flattens everything and HALTS the ledger when account

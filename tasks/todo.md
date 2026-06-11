@@ -1,3 +1,36 @@
+# Per-Cluster Strategy Research (2026-06-10/11)
+
+- [x] `research/cluster_research.py`: vol clustering, 144-candidate grid, train-rank → holdout-gate
+- [x] Cross-sectional sanity: candidate must pass train kill filter on majority of cluster
+- [x] `apply_assignments()`: per-symbol strategy JSONs + `symbol_strategies` merge (winner==default → skip)
+- [x] CLI `bonito research clusters` (`--apply` to write; dry-run report otherwise)
+- [x] Tests (10 passed, 1 skipped); full suite 598 passed; ruff clean
+- [x] First real sweep + report committed (`livetrade/research/`)
+- [x] Commit + push
+
+## Review (2026-06-10/11 session)
+
+**Per-cluster research** (`src/bonito/research/cluster_research.py`):
+universe symbols are bucketed by annualized realized vol (defensive <30%,
+core <50%, growth <75%, speculative ≥75%), then a fixed 144-candidate grid
+(EMA pairs 8/21·10/26·12/26·20/50 × RSI cap 60/68/75 × ATR mult
+1.5/2.0/2.5/3.0 × TP 10%/20%/none — all with SPY>SMA200 regime + ATR
+trailing stop, non-negotiable) is ranked per cluster on TRAIN-window median
+Sharpe across members passing the train kill filter. The single winner is
+then gated once on the holdout kill filter per symbol. Only (symbol,
+strategy) pairs that pass holdout AND differ from the default strategy are
+ever assigned. `bonito research clusters --apply` writes winners to
+`strategies/` and merges into `universe.symbol_strategies`; without
+`--apply` it's a dry-run report saved to `livetrade/research/`.
+
+**First sweep** (train 2022→2025, holdout 2025→2026-06-10): defensive
+(COST+MSFT) produced a winner — `c_ema20-50_rsi60_atr2.5_tp20`, train
+score 2.90 — but both symbols missed the holdout min-trades gate (9 and 7
+vs ~11 needed). Core/growth/speculative had no candidate passing the train
+filter on a majority of members. **Zero assignments — the holdout gate
+doing its job.** All 25 symbols stay on the deployed default. Re-run after
+more holdout history accumulates (`bonito research clusters`).
+
 # Enhancement Build (2026-06-10) — validation harness, regime filter, ATR stops, $5k paper
 
 - [x] `trading/validation.py`: kill-filter thresholds + windowed (train/holdout) metrics + verdict + strategy_hash
