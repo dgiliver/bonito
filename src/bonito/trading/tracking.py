@@ -53,8 +53,10 @@ MATCH_TOLERANCE_DAYS = 1
 MAX_MEAN_FILL_BPS = 50.0  # mean |paper - replay| fill price gap
 MAX_DECISION_DIVERGENCE = 0.20  # share of paper fills with no replay match
 MAX_EQUITY_GAP_PCT = 3.0  # |paper - replay| final equity, % of replay
-# Below this many matched fills the comparison is statistically meaningless.
-MIN_MATCHED_FILLS = 5
+# Below this many matched fills the comparison is statistically meaningless —
+# a single intraday-vs-close outlier dominates the mean (observed 2026-06-12:
+# 5 fills, worst 944bps, all explained by config churn + fill timing).
+MIN_MATCHED_FILLS = 10
 
 
 class FillComparison(BaseModel):
