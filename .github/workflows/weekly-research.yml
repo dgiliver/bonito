@@ -30,7 +30,7 @@ concurrency:
 jobs:
   auto-research:
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    timeout-minutes: 60
     steps:
       - uses: actions/checkout@v4
 
@@ -77,6 +77,25 @@ jobs:
           print(f"body={body}")
           EOF
 
+      - name: Paper-vs-replay tracking check
+        id: tracking
+        run: |
+          bonito live tracking
+          python3 - <<'EOF' >> "$GITHUB_OUTPUT"
+          import glob, json
+          path = sorted(glob.glob("livetrade/research/tracking_*.json"))[-1]
+          t = json.load(open(path))
+          print(f"status={t['status']}")
+          fill_bps = t.get("mean_abs_fill_bps")
+          summary = (
+              f"Tracking **{t['status']}**: {t['matched_fills']}/{t['paper_fills']} fills matched "
+              f"(divergence {t['decision_divergence']:.0%}), mean fill gap "
+              f"{fill_bps if fill_bps is not None else 'n/a'}bps, equity gap "
+              f"{t['equity_gap_pct']:+.2f}% | " + "; ".join(t.get("reasons", []) or ["clean"])
+          )
+          print(f"summary={summary}")
+          EOF
+
       - name: Commit research state
         run: |
           git config user.name "bonito-research-bot"
@@ -98,12 +117,33 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          printf '%b\n\nRun: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}\n' \
-            "${{ steps.digest.outputs.body }}" > /tmp/issue_body.md
+          printf '%b\n\n%s\n\nRun: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}\n' \
+            "${{ steps.digest.outputs.body }}" \
+            "${{ steps.tracking.outputs.summary }}" > /tmp/issue_body.md
           gh issue create \
             --title "Weekly research $(date -u +%F): ${{ steps.digest.outputs.outcome }}" \
             --body-file /tmp/issue_body.md \
             || echo "::warning::could not create visibility issue"
+
+      - name: Open issue on tracking WARN
+        if: steps.tracking.outputs.status == 'WARN'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          # The simulation is no longer tracking reality — this gates trust
+          # in every replay-based decision, so it gets its own alarm.
+          existing=$(gh issue list --state open --search "Paper-vs-replay tracking WARN" \
+            --json number --jq length)
+          if [ "$existing" = "0" ]; then
+            printf '%s\n\nRun: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}\n' \
+              "${{ steps.tracking.outputs.summary }}" > /tmp/tracking_issue.md
+            gh issue create \
+              --title "Paper-vs-replay tracking WARN $(date -u +%F)" \
+              --body-file /tmp/tracking_issue.md \
+              || echo "::warning::could not create tracking issue"
+          else
+            echo "tracking issue already open — not spamming"
+          fi
 
       - name: Open issue on failure
         if: failure()

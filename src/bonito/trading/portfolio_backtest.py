@@ -147,6 +147,14 @@ class ClosedTrade(BaseModel):
     strategy_name: str = ""
 
 
+class OpenPositionEntry(BaseModel):
+    """Entry details of a position still open when the replay ended."""
+
+    entry_date: datetime
+    entry_price: float
+    quantity: float
+
+
 class AccountBacktestResult(BaseModel):
     """Everything the account replay produced."""
 
@@ -177,6 +185,11 @@ class AccountBacktestResult(BaseModel):
     halt_reason: str = ""
     open_positions: dict[str, float] = Field(
         default_factory=dict, description="Symbol → unrealized P&L of positions open at end"
+    )
+    open_position_entries: dict[str, "OpenPositionEntry"] = Field(
+        default_factory=dict,
+        description="Symbol → entry details of positions still open at end "
+        "(lets tracking match paper entry fills the replay hasn't closed yet)",
     )
     per_symbol_pnl: dict[str, float] = Field(
         default_factory=dict, description="Symbol → realized P&L over the replay"
@@ -447,6 +460,12 @@ def _build_result(
         halt_date=halt_date,
         halt_reason=ledger.halt_reason,
         open_positions=open_pnl,
+        open_position_entries={
+            symbol: OpenPositionEntry(
+                entry_date=pos.entry_date, entry_price=pos.entry_price, quantity=pos.quantity
+            )
+            for symbol, pos in ledger.positions.items()
+        },
         per_symbol_pnl=per_symbol,
         rejected_intents=rejected,
         intraday_stops_modeled=intraday_stops,

@@ -660,17 +660,20 @@ class TestGridEdgeFlags:
         return report
 
     def test_edge_winner_flagged(self):
-        report = self.report_with_winner(self.winner_config(fast=8, slow=21, atr=1.5, rsi=60.0))
+        # Edges of the EXTENDED grid: ema (5,13), rsi 50, atr 1.0.
+        report = self.report_with_winner(self.winner_config(fast=5, slow=13, atr=1.0, rsi=50.0))
         flags = auto_research.grid_edge_flags(report)
         assert len(flags) == 1
         assert "AAA" in flags[0]
-        assert "atr=1.5" in flags[0] and "rsi<60" in flags[0] and "ema=(8, 21)" in flags[0]
+        assert "atr=1" in flags[0] and "rsi<50" in flags[0] and "ema=(5, 13)" in flags[0]
 
     def test_interior_winner_not_flagged(self):
-        report = self.report_with_winner(self.winner_config(fast=10, slow=26, atr=2.0, rsi=68.0))
+        # 8/21, rsi 60, atr 1.5 were edges of the ORIGINAL grid — the
+        # 2026-06-12 extension moved them to the interior.
+        report = self.report_with_winner(self.winner_config(fast=8, slow=21, atr=1.5, rsi=60.0))
         assert auto_research.grid_edge_flags(report) == []
 
     def test_non_passing_winner_not_flagged(self):
-        report = self.report_with_winner(self.winner_config(atr=1.5))
+        report = self.report_with_winner(self.winner_config(fast=5, slow=13, atr=1.0))
         report.clusters[0].verdicts[0].holdout_reasons = ["DD 40%>25%"]
         assert auto_research.grid_edge_flags(report) == []

@@ -605,7 +605,7 @@ def research_clusters(
 ) -> None:
     """Per-cluster strategy research over a fixed parameter grid.
 
-    Clusters the universe by realized volatility, ranks ~144 candidates per
+    Clusters the universe by realized volatility, ranks ~450 candidates per
     cluster on the TRAIN window only, then gates the single winner on the
     holdout kill filter. Assignments are per (symbol, strategy) pair —
     symbols where nothing passes keep the default strategy.
@@ -1300,6 +1300,64 @@ def live_backtest_universe(
 
     console.print(table)
     console.print(f"[bold]{passed}/{len(universe.symbols)} symbols pass the kill filter[/bold]")
+
+
+@live_app.command("tracking")
+def live_tracking(
+    universe_path: str = typer.Option("config/universe.json", "--universe", "-u"),
+    end: str = typer.Option(None, "--end", help="Default: today"),
+) -> None:
+    """Paper-vs-replay fidelity check: is the simulation tracking reality?
+
+    Matches every paper-ledger fill against the replay's fills over the
+    same window (price gaps in bps + decision divergences) and compares
+    the reconstructed paper equity curve against the replay's. WARN means
+    the backtest numbers can no longer be trusted at face value.
+    """
+    from datetime import UTC as _UTC
+    from datetime import datetime as _dt
+
+    from bonito.trading.tracking import run_tracking, save_tracking_report
+
+    universe = _load_universe(universe_path)
+    ledger = _load_ledger(universe)
+    end_dt = datetime.strptime(end, "%Y-%m-%d") if end else _dt.now(_UTC).replace(tzinfo=None)
+
+    report = run_tracking(universe, ledger, _get_store(), end=end_dt)
+    path = save_tracking_report(report)
+
+    color = {"OK": "green", "WARN": "red", "INSUFFICIENT": "yellow"}[report.status]
+    fill_bits = (
+        f"mean {report.mean_abs_fill_bps}bps | median {report.median_abs_fill_bps}bps | "
+        f"worst {report.worst_fill_bps}bps"
+        if report.mean_abs_fill_bps is not None
+        else "no matched fills yet"
+    )
+    te = (
+        f"{report.mean_daily_tracking_error_bps}bps"
+        if report.mean_daily_tracking_error_bps is not None
+        else "n/a"
+    )
+    console.print(
+        Panel.fit(
+            f"[bold {color}]Tracking — {report.status}[/bold {color}]\n"
+            f"Window: {report.window_start:%Y-%m-%d} → {report.window_end:%Y-%m-%d}\n"
+            f"Fills: {report.matched_fills}/{report.paper_fills} matched "
+            f"(divergence {report.decision_divergence:.0%}) | {fill_bits}\n"
+            f"Equity: paper ${report.paper_final_equity:,.2f} vs replay "
+            f"${report.replay_final_equity:,.2f} ({report.equity_gap_pct:+.2f}%) | "
+            f"daily TE {te}",
+            border_style=color,
+        )
+    )
+    for reason in report.reasons:
+        console.print(f"  [yellow]{reason}[/yellow]")
+    unmatched = [f for f in report.fills if not f.matched]
+    if unmatched:
+        console.print("[dim]Decision divergences (paper fill, no replay counterpart):[/dim]")
+        for f in unmatched:
+            console.print(f"  {f.paper_date:%Y-%m-%d} {f.side} {f.symbol} @ {f.paper_price}")
+    console.print(f"[dim]Report saved to {path}[/dim]")
 
 
 @live_app.command("backtest-account")

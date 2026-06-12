@@ -81,6 +81,19 @@ intraday sweep modeled from daily OHLC, not 15-min quotes.
 - [ ] Re-run `bonito research clusters` with the longer holdout; apply any
       passing per-symbol assignments.
 - [ ] Review universe.live.json caps against actual account balance.
+- [ ] Decide allowlist-vs-blocklist for live: the stale COST/MSFT/TSM
+      allowlist is now redundant (replay gate + auto-managed blocklist
+      cover it) — recommend dropping it at flip.
+- [ ] Broker-side stop orders for live: after each live entry, place a GTC
+      stop_market at the broker (level from signals.stop_level); the daily
+      cycle cancels+replaces to ratchet trailing stops. Robinhood enforces
+      stops 24/7 — no Claude session, laptop, or phone needed for
+      intraday protection. Track stop order IDs in the live ledger.
+      This REPLACES the need for an all-day /loop session in live mode.
+- [ ] ≥2 weeks of paper-vs-replay tracking (`bonito live tracking`,
+      automated in the weekly workflow): status OK, mean fill gap and
+      decision divergence within thresholds. This is the quantitative
+      basis for trusting replay numbers with real money.
 - [x] Live MCP rehearsal on the Agentic account (••••8597, NEVER margin) —
       DONE 2026-06-12: RIVN 1-share round trip. Buy limit $15.75 → filled
       $15.7478 (~200ms); sell limit $15.74 → filled $15.7501 (price

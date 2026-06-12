@@ -119,7 +119,7 @@ class TestCandidateGrid:
             len(grid.ema_pairs) * len(grid.rsi_max) * len(grid.atr_mult) * len(grid.take_profit)
         )
         candidates = candidate_grid(grid)
-        assert len(candidates) == expected == 144
+        assert len(candidates) == expected == 450
 
     def test_deployed_config_is_in_the_grid(self):
         with open("strategies/deployed_strategy.json") as f:

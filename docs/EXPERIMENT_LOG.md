@@ -46,6 +46,12 @@ ideas, structural changes) still follow the steps below by hand:
 | 2026-06-12 | Momentum-ranked entry competition (21-day momentum decides who gets slots instead of universe list order) | Train improved +83.4%→+121.8% | Holdout collapsed to **-20.1%** and the 25% kill switch fired (DD 26.3%). Ranking by momentum buys the most extended signals and concentrates into correlated high-beta names. Classic overfit: better in-sample, fatal out-of-sample |
 | 2026-06-12 | Per-symbol grid winner for MSFT | Passed the kill filter on holdout | Holdout return was **-10.1%** — the kill filter checks structure (trades/DD/Sharpe ceiling), not profitability. Led to the profitable-holdout gate now in `cluster_research.py` |
 
+## Grid changes
+
+| Date | Change | Trigger |
+|------|--------|---------|
+| 2026-06-12 | Extended GridSpec 144 → 450 candidates: ema +(5,13), rsi +50/+55, atr +1.0/+1.25 | Grid-edge flags: every adopted winner sat at the ema/rsi/atr minimums. One-time human-approved extension; the gate judges the new region like any other candidate |
+
 ## Standing conclusions
 
 - **Universe list order for entry competition is a tested decision** — do

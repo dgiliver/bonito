@@ -12,7 +12,7 @@ Overfitting guardrails, in order of importance:
 - Cross-sectional sanity: a candidate is eligible only if it passes the
   train-window kill filter on at least half the cluster's members. A
   config that only works on one ticker's path is noise.
-- The search space is deliberately small (~144 configs) and structured;
+- The search space is deliberately small (~450 configs) and structured;
   the regime filter is always on (structural risk decision, not a knob).
 - Assignments are written per symbol only where the winner passes the
   holdout kill filter for that symbol AND made money in the holdout.
@@ -53,11 +53,17 @@ DEFAULT_BUCKETS: list[tuple[float, str]] = [
 
 
 class GridSpec(BaseModel):
-    """The candidate search space. Keep it small on purpose."""
+    """The candidate search space. Keep it small on purpose.
 
-    ema_pairs: list[tuple[int, int]] = [(8, 21), (10, 26), (12, 26), (20, 50)]
-    rsi_max: list[float] = [60.0, 68.0, 75.0]
-    atr_mult: list[float] = [1.5, 2.0, 2.5, 3.0]
+    Extended 2026-06-12 after grid-edge flags: every adopted winner sat at
+    the ema/rsi/atr minimums, so each flagged axis gained headroom below
+    (ema (5,13), rsi 50/55, atr 1.0/1.25). 450 candidates total — growth
+    is deliberate and one-time; auto-research flags edges, humans extend.
+    """
+
+    ema_pairs: list[tuple[int, int]] = [(5, 13), (8, 21), (10, 26), (12, 26), (20, 50)]
+    rsi_max: list[float] = [50.0, 55.0, 60.0, 68.0, 75.0]
+    atr_mult: list[float] = [1.0, 1.25, 1.5, 2.0, 2.5, 3.0]
     take_profit: list[float | None] = [0.10, 0.20, None]
 
 
