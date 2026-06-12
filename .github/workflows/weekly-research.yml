@@ -1,0 +1,120 @@
+# Weekly autonomous research — keeps symbol_strategies current, gated.
+#
+# Saturday after the trading week: refresh bars, re-run the per-symbol
+# grid sweep with a ROLLING holdout, and adopt the new assignment bundle
+# only if the account replay shows neither train nor holdout degrading
+# (the same pre-registered criterion as manual experiments — see
+# docs/EXPERIMENT_LOG.md). Rejected bundles change nothing and are
+# retried next week. Every cycle commits an audit digest.
+#
+# Oversight without intervention: an issue is opened whenever the cycle
+# ADOPTS or REJECTS a change (silent when unchanged), so the assignment
+# history shows up as a notification feed. This workflow never touches
+# mode, live_enabled, or risk caps — those stay human-only.
+
+name: Weekly strategy research
+
+on:
+  schedule:
+    - cron: "0 13 * * 6" # Saturday 13:00 UTC, markets closed
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  issues: write
+
+concurrency:
+  group: livetrade-state
+  cancel-in-progress: false
+
+jobs:
+  auto-research:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+
+      - name: Install bonito
+        run: pip install -e .
+
+      - name: Refresh market data
+        run: bonito live refresh
+
+      - name: Run gated auto research
+        run: bonito research auto --apply
+
+      - name: Summarize digest
+        id: digest
+        run: |
+          python3 - <<'EOF' >> "$GITHUB_OUTPUT"
+          import glob, json
+          path = sorted(glob.glob("livetrade/research/auto_research_*.json"))[-1]
+          d = json.load(open(path))
+          print(f"outcome={d['outcome']}")
+          lines = [
+              f"Outcome: **{d['outcome'].upper()}**",
+              f"Windows: train {d['start'][:10]} → {d['holdout'][:10]}, "
+              f"holdout {d['holdout'][:10]} → {d['end'][:10]} (rolling)",
+              f"Assignments: +{d['added']} ~{d['updated']} -{d['removed']}",
+          ]
+          for c in d.get("comparisons", []):
+              lines.append(
+                  f"- {c['window']}: Sharpe {c['baseline_sharpe']} → {c['candidate_sharpe']}, "
+                  f"return {c['baseline_return']*100:+.1f}% → {c['candidate_return']*100:+.1f}%"
+              )
+          lines += [f"- gate: {r}" for r in d.get("reasons", [])]
+          lines.append(f"Digest: `{path}`")
+          body = "\\n".join(lines).replace("\n", "\\n")
+          print(f"body={body}")
+          EOF
+
+      - name: Commit research state
+        run: |
+          git config user.name "bonito-research-bot"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add livetrade/research/ strategies/ config/universe.json
+          if git diff --cached --quiet; then
+            echo "nothing to commit"
+            exit 0
+          fi
+          git commit -m "chore(research): weekly auto research $(date -u +%F) — ${{ steps.digest.outputs.outcome }}"
+          for i in 1 2 3; do
+            git push && exit 0
+            git pull --rebase
+          done
+          exit 1
+
+      - name: Open visibility issue when assignments changed
+        if: steps.digest.outputs.outcome != 'unchanged'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          printf '%b\n\nRun: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}\n' \
+            "${{ steps.digest.outputs.body }}" > /tmp/issue_body.md
+          gh issue create \
+            --title "Weekly research $(date -u +%F): ${{ steps.digest.outputs.outcome }}" \
+            --body-file /tmp/issue_body.md \
+            || echo "::warning::could not create visibility issue"
+
+      - name: Open issue on failure
+        if: failure()
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          existing=$(gh issue list --state open --search "Weekly research failing" \
+            --json number --jq length)
+          if [ "$existing" = "0" ]; then
+            gh issue create \
+              --title "Weekly research failing $(date -u +%F)" \
+              --body "The weekly auto-research cycle failed. Logs: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+
+          Strategy assignments stay frozen at their last validated state until this is fixed or a cycle is run manually: \`bonito research auto --apply\`." \
+              || echo "::warning::could not create failure issue"
+          else
+            echo "failure issue already open — not spamming"
+          fi

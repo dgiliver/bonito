@@ -1,0 +1,54 @@
+{
+  "generated_at": "2026-06-12T17:02:04.524820",
+  "universe_path": "config/universe.json",
+  "start": "2022-01-01T00:00:00",
+  "holdout": "2024-12-19T17:00:33.553418",
+  "end": "2026-06-12T17:00:33.553418",
+  "outcome": "rejected",
+  "reasons": [
+    "holdout Sharpe degrades: 2.036 < 2.245"
+  ],
+  "previous_assignments": {
+    "AAPL": "strategies/cluster_AAPL_54746177d5a1.json",
+    "GOOGL": "strategies/cluster_GOOGL_7fa6fdd674c8.json",
+    "IREN": "strategies/iren_ema8-21_rsi68_atr1.5_tpnone.json"
+  },
+  "candidate_assignments": {
+    "AAPL": "strategies/auto_AAPL_54746177d5a1.json",
+    "COST": "strategies/auto_COST_e980bc3afb33.json",
+    "GOOGL": "strategies/auto_GOOGL_7fa6fdd674c8.json"
+  },
+  "added": [
+    "COST"
+  ],
+  "removed": [
+    "IREN"
+  ],
+  "updated": [
+    "AAPL",
+    "GOOGL"
+  ],
+  "comparisons": [
+    {
+      "window": "train",
+      "baseline_sharpe": 1.0877,
+      "candidate_sharpe": 1.2006,
+      "baseline_return": 0.8724,
+      "candidate_return": 1.0164,
+      "baseline_failures": [],
+      "candidate_failures": []
+    },
+    {
+      "window": "holdout",
+      "baseline_sharpe": 2.2445,
+      "candidate_sharpe": 2.0365,
+      "baseline_return": 1.7824,
+      "candidate_return": 1.511,
+      "baseline_failures": [],
+      "candidate_failures": []
+    }
+  ],
+  "baseline_final_equity": 26024.22,
+  "candidate_final_equity": 24968.94,
+  "report_path": "livetrade/research/cluster_report_2026-06-12_170204.json"
+}

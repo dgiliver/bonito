@@ -7,7 +7,16 @@ attribution tables are re-read.
 ## Protocol
 
 Every candidate change is judged by `bonito live backtest-account` (the
-replay of the real pipeline code), never by raw P&L attribution:
+replay of the real pipeline code), never by raw P&L attribution.
+
+**The routine version of this protocol is automated**: the weekly
+`Weekly strategy research` workflow runs `bonito research auto --apply`
+(`src/bonito/research/auto_research.py`) — rolling-holdout per-symbol
+sweep, stateless symbol_strategies rebuild, and an account-replay gate
+that adopts a bundle only if neither train nor holdout degrades. Rejected
+or adopted cycles open a visibility issue; every cycle commits a digest
+to `livetrade/research/auto_research_*.json`. Manual experiments (new
+ideas, structural changes) still follow the steps below by hand:
 
 1. **Pre-register the criterion before running**: adopt only if the TRAIN
    window improves AND the holdout does not degrade.

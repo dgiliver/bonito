@@ -106,16 +106,21 @@ pre-register the criterion (train improves AND holdout doesn't degrade),
 judge only via `bonito live backtest-account`, one shot per idea, log the
 outcome in the experiment log either way.
 
-## Strategy research (periodic — NOT part of the daily cycle)
+## Strategy research (AUTOMATED weekly — manual runs optional)
 
-`.venv/bin/bonito research clusters` sweeps a fixed 144-candidate grid per
-volatility cluster: ranked on the train window only, gated once on the
-holdout kill filter. Dry-run by default (report → `livetrade/research/`);
-`--apply` writes holdout-passing winners to `strategies/` and merges them
-into `symbol_strategies` in universe.json. Open positions are unaffected —
-they exit on the strategy pinned at entry; new assignments apply to the
-next entry. Zero assignments is a normal outcome (the gate working), not
-a failure. Run roughly monthly; commit the report and any assignments.
+The `Weekly strategy research` workflow (`.github/workflows/weekly-research.yml`)
+runs `bonito research auto --apply` every Saturday: rolling-holdout
+per-symbol sweep → stateless symbol_strategies rebuild → account-replay
+gate (adopt only if neither train nor holdout degrades). It commits a
+digest every cycle and opens an issue when anything changed or was
+rejected; silent weeks mean "unchanged". It never touches mode,
+live_enabled, or risk caps. A REJECTED cycle is the gate working, not a
+failure — do not force-apply a rejected bundle.
+
+Manual sweeps remain available: `bonito research auto` (dry run digest),
+`bonito research clusters [--per-symbol] [--apply]` for fixed-window
+exploration. Open positions are never affected — they exit on the
+strategy pinned at entry.
 
 ## Kill switch
 

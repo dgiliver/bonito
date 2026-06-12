@@ -506,6 +506,75 @@ def research_run(
     )
 
 
+@research_app.command("auto")
+def research_auto(
+    universe_path: str = typer.Option("config/universe.json", "--universe", "-u"),
+    end: str = typer.Option(None, "--end", help="Default: today"),
+    apply: bool = typer.Option(
+        False,
+        "--apply",
+        help="When the replay gate adopts the bundle, write it into "
+        "universe.symbol_strategies (dry-run digest otherwise)",
+    ),
+) -> None:
+    """Autonomous research cycle: rolling-holdout sweep, replay-gated adoption.
+
+    Re-runs per-symbol research with the holdout boundary tracking the
+    calendar, rebuilds symbol_strategies statelessly (overrides exist only
+    while they currently validate), and adopts the bundle only if the
+    account replay shows neither train nor holdout degrading. Designed to
+    run unattended (weekly workflow); every cycle writes an audit digest
+    to livetrade/research/. Never touches mode, live_enabled, or risk caps.
+    """
+    from datetime import UTC as _UTC
+    from datetime import datetime as _dt
+
+    from bonito.research.auto_research import run_auto_research
+
+    end_dt = datetime.strptime(end, "%Y-%m-%d") if end else _dt.now(_UTC).replace(tzinfo=None)
+
+    with Progress(
+        SpinnerColumn(), TextColumn("[progress.description]{task.description}"), console=console
+    ) as prog:
+        task = prog.add_task("auto research...", total=None)
+        done = {"n": 0}
+
+        def tick():
+            done["n"] += 1
+            prog.update(task, description=f"auto research... {done['n']} candidates evaluated")
+
+        result = run_auto_research(
+            Path(universe_path), _get_store(), end=end_dt, apply=apply, progress=tick
+        )
+
+    color = {"adopted": "green", "rejected": "yellow", "unchanged": "dim"}[result.outcome]
+    console.print(
+        Panel.fit(
+            f"[bold {color}]Auto research — {result.outcome.upper()}[/bold {color}]\n"
+            f"Train: {result.start:%Y-%m-%d} → {result.holdout:%Y-%m-%d} | "
+            f"Holdout: {result.holdout:%Y-%m-%d} → {result.end:%Y-%m-%d} (rolling)\n"
+            f"Assignments: +{len(result.added)} ~{len(result.updated)} -{len(result.removed)}",
+            border_style=color,
+        )
+    )
+    for change, symbols in (
+        ("added", result.added),
+        ("updated", result.updated),
+        ("removed", result.removed),
+    ):
+        if symbols:
+            console.print(f"  {change}: {', '.join(symbols)}")
+    for c in result.comparisons:
+        console.print(
+            f"  {c.window}: Sharpe {c.baseline_sharpe:.2f} → {c.candidate_sharpe:.2f}, "
+            f"return {c.baseline_return * 100:+.1f}% → {c.candidate_return * 100:+.1f}%"
+        )
+    for reason in result.reasons:
+        console.print(f"  [yellow]{reason}[/yellow]")
+    if result.outcome == "adopted" and not apply:
+        console.print("[dim]Dry run — re-run with --apply to write the adopted bundle.[/dim]")
+
+
 @research_app.command("clusters")
 def research_clusters(
     universe_path: str = typer.Option("config/universe.json", "--universe", "-u"),
