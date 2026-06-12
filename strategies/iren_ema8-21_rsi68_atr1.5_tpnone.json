@@ -1,0 +1,88 @@
+{
+  "name": "iren_ema8-21_rsi68_atr1.5_tpnone",
+  "description": "EMA 8/21 cross + RSI<68, 1.5x ATR(14) trailing stop, TP none%, SPY>SMA200 regime gate",
+  "version": "1.0",
+  "symbols": [
+    "IREN"
+  ],
+  "timeframe": "1d",
+  "indicators": [
+    {
+      "type": "ema",
+      "name": "ema_fast",
+      "params": {
+        "period": 8
+      }
+    },
+    {
+      "type": "ema",
+      "name": "ema_slow",
+      "params": {
+        "period": 21
+      }
+    },
+    {
+      "type": "rsi",
+      "name": "rsi_14",
+      "params": {
+        "period": 14
+      }
+    }
+  ],
+  "entry_rules": [
+    {
+      "conditions": [
+        {
+          "left": "ema_fast",
+          "comparison": "gt",
+          "right": "ema_slow",
+          "lookback": null
+        },
+        {
+          "left": "close",
+          "comparison": "gt",
+          "right": "ema_slow",
+          "lookback": null
+        },
+        {
+          "left": "rsi_14",
+          "comparison": "lt",
+          "right": 68.0,
+          "lookback": null
+        }
+      ],
+      "logic": "AND",
+      "side": "long"
+    }
+  ],
+  "exit_rules": [
+    {
+      "conditions": [
+        {
+          "left": "ema_fast",
+          "comparison": "crosses_below",
+          "right": "ema_slow",
+          "lookback": null
+        }
+      ],
+      "logic": "AND",
+      "side": "long"
+    }
+  ],
+  "position_size": {
+    "type": "percent_equity",
+    "value": 98.0
+  },
+  "max_positions": 1,
+  "stop_loss": {
+    "type": "trailing_atr",
+    "value": 1.5,
+    "atr_period": 14,
+    "trigger_percent": null
+  },
+  "take_profit": null,
+  "regime_filter": {
+    "symbol": "SPY",
+    "sma_period": 200
+  }
+}

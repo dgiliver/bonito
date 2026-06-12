@@ -1,0 +1,41 @@
+{
+  "generated_at": "2026-06-12T16:21:23.778699",
+  "start": "2022-01-01T00:00:00",
+  "holdout": "2025-01-01T00:00:00",
+  "end": "2026-06-12T16:21:17.219432",
+  "default_strategy_hash": "da16575a5622",
+  "clusters": [
+    {
+      "name": "IREN",
+      "members": [
+        "IREN"
+      ],
+      "volatility": {
+        "IREN": 1.187
+      },
+      "candidates_evaluated": 144,
+      "candidates_eligible": 0,
+      "winner_name": null,
+      "winner_hash": null,
+      "winner_config": null,
+      "winner_train_score": null,
+      "verdicts": []
+    },
+    {
+      "name": "NVDA",
+      "members": [
+        "NVDA"
+      ],
+      "volatility": {
+        "NVDA": 0.5253
+      },
+      "candidates_evaluated": 144,
+      "candidates_eligible": 0,
+      "winner_name": null,
+      "winner_hash": null,
+      "winner_config": null,
+      "winner_train_score": null,
+      "verdicts": []
+    }
+  ]
+}

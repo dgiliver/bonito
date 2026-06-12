@@ -42,6 +42,11 @@ class RiskConfig(BaseModel):
 
     starting_cash_usd: float = 150.0
     max_position_usd: float = 30.0
+    position_pct_equity: float | None = Field(
+        default=None,
+        description="When set, position size = equity * this fraction, capped at "
+        "max_position_usd. Allows gains to compound. E.g. 0.20 = 20% of current equity.",
+    )
     max_positions: int = 5
     max_daily_buys: int = 3
     min_cash_buffer_usd: float = 5.0
@@ -230,9 +235,10 @@ def generate_intents(
 
     # --- Portfolio kill switch: flatten and halt on excessive drawdown ---
     sells = {i.symbol for i in intents}
+    current_equity = ledger.equity(prices)
     threshold = universe.risk.max_drawdown_halt
     if threshold is not None:
-        equity = ledger.equity(prices)
+        equity = current_equity
         drawdown = ledger.note_equity(equity)
         if not ledger.halted and drawdown >= threshold:
             ledger.halt(
@@ -286,7 +292,9 @@ def generate_intents(
         if allowset is not None and symbol.upper() not in allowset:
             continue
 
-        dollar = min(universe.risk.max_position_usd, available)
+        pct = universe.risk.position_pct_equity
+        target = (current_equity * pct) if pct is not None else universe.risk.max_position_usd
+        dollar = min(target, universe.risk.max_position_usd, available)
         if dollar < MIN_ORDER_USD:
             break
 
