@@ -518,6 +518,12 @@ def research_clusters(
         help="Write winning strategies to strategies/ and merge passing pairs "
         "into universe.symbol_strategies (dry-run report otherwise)",
     ),
+    per_symbol: bool = typer.Option(
+        False,
+        "--per-symbol",
+        help="Research every ticker as its own singleton cluster (winner tuned "
+        "per symbol; holdout gate is the only out-of-sample protection)",
+    ),
 ) -> None:
     """Per-cluster strategy research over a fixed parameter grid.
 
@@ -543,9 +549,10 @@ def research_clusters(
     end_dt = datetime.strptime(end, "%Y-%m-%d") if end else _dt.now(_UTC).replace(tzinfo=None)
 
     n_candidates = len(candidate_grid())
+    mode = "per-symbol (singleton clusters)" if per_symbol else "per-cluster"
     console.print(
         Panel.fit(
-            f"[bold blue]Cluster Research[/bold blue]\n"
+            f"[bold blue]Strategy Research — {mode}[/bold blue]\n"
             f"Train: {start} → {holdout} | Holdout: {holdout} → {end or 'today'}\n"
             f"{n_candidates} candidates per cluster, ranked on train, gated on holdout",
             border_style="blue",
@@ -562,10 +569,76 @@ def research_clusters(
             done["n"] += 1
             prog.update(task, description=f"researching... {done['n']} candidates evaluated")
 
-        report = run_cluster_research(universe, store, start_dt, holdout_dt, end_dt, progress=tick)
+        report = run_cluster_research(
+            universe, store, start_dt, holdout_dt, end_dt, progress=tick, per_symbol=per_symbol
+        )
 
     report_path = save_report(report)
 
+    if per_symbol:
+        _print_per_symbol_report(report)
+    else:
+        _print_cluster_report(report)
+
+    assignments = report.assignments()
+    console.print(f"[dim]Report saved to {report_path}[/dim]")
+    if not assignments:
+        console.print("[yellow]No (symbol, strategy) pairs passed the holdout gate.[/yellow]")
+        return
+
+    console.print(
+        f"[bold]{len(assignments)} symbol(s) qualify for per-symbol assignment:[/bold] "
+        + ", ".join(sorted(assignments))
+    )
+    if apply:
+        written = apply_assignments(report, Path(universe_path))
+        for symbol, path in sorted(written.items()):
+            console.print(f"  {symbol} → {path}")
+        console.print(
+            "[green]universe.json updated.[/green] Open positions are unaffected "
+            "(they exit under their pinned strategy)."
+        )
+    else:
+        console.print("[dim]Dry run — re-run with --apply to write assignments.[/dim]")
+
+
+def _print_per_symbol_report(report) -> None:
+    """One combined table: a row per symbol with its winner and holdout verdict."""
+    table = Table(title="Per-symbol research results")
+    for col in (
+        "Symbol",
+        "Winner",
+        "T.Sharpe",
+        "H.Trades",
+        "H.Ret %",
+        "H.Sharpe",
+        "H.DD %",
+        "Verdict",
+    ):
+        table.add_column(col, justify="right")
+    for cluster in report.clusters:
+        symbol = cluster.name
+        if cluster.winner_name is None:
+            table.add_row(symbol, "[dim]none eligible[/dim]", "-", "-", "-", "-", "-", "-")
+            continue
+        v = cluster.verdicts[0]
+        verdict = (
+            "[green]PASS[/green]" if v.passes else f"[red]{'; '.join(v.holdout_reasons)}[/red]"
+        )
+        table.add_row(
+            symbol,
+            cluster.winner_name,
+            f"{v.train.sharpe:.2f}",
+            str(v.holdout.trades),
+            f"{v.holdout.total_return * 100:+.1f}",
+            f"{v.holdout.sharpe:.2f}",
+            f"{v.holdout.max_drawdown * 100:.1f}",
+            verdict,
+        )
+    console.print(table)
+
+
+def _print_cluster_report(report) -> None:
     for cluster in report.clusters:
         table = Table(
             title=f"{cluster.name} — {len(cluster.members)} symbols, "
@@ -609,27 +682,6 @@ def research_clusters(
             f"  winner: [bold]{cluster.winner_name}[/bold] ({cluster.winner_hash}) "
             f"train score {cluster.winner_train_score}\n"
         )
-
-    assignments = report.assignments()
-    console.print(f"[dim]Report saved to {report_path}[/dim]")
-    if not assignments:
-        console.print("[yellow]No (symbol, strategy) pairs passed the holdout gate.[/yellow]")
-        return
-
-    console.print(
-        f"[bold]{len(assignments)} symbol(s) qualify for per-symbol assignment:[/bold] "
-        + ", ".join(sorted(assignments))
-    )
-    if apply:
-        written = apply_assignments(report, Path(universe_path))
-        for symbol, path in sorted(written.items()):
-            console.print(f"  {symbol} → {path}")
-        console.print(
-            "[green]universe.json updated.[/green] Open positions are unaffected "
-            "(they exit under their pinned strategy)."
-        )
-    else:
-        console.print("[dim]Dry run — re-run with --apply to write assignments.[/dim]")
 
 
 # --- Live trading commands (Robinhood option-A pipeline) ---

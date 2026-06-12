@@ -1,0 +1,2070 @@
+{
+  "generated_at": "2026-06-12T00:46:10.937546",
+  "start": "2022-01-01T00:00:00",
+  "holdout": "2025-01-01T00:00:00",
+  "end": "2026-06-12T00:44:12.055028",
+  "default_strategy_hash": "da16575a5622",
+  "clusters": [
+    {
+      "name": "AAPL",
+      "members": [
+        "AAPL"
+      ],
+      "volatility": {
+        "AAPL": 0.2813
+      },
+      "candidates_evaluated": 144,
+      "candidates_eligible": 3,
+      "winner_name": "c_ema8-21_rsi60_atr1.5_tp10",
+      "winner_hash": "54746177d5a1",
+      "winner_config": {
+        "name": "c_ema8-21_rsi60_atr1.5_tp10",
+        "description": "EMA 8/21 cross + RSI<60, 1.5x ATR(14) trailing stop, TP 10%, SPY>SMA200 regime gate",
+        "version": "1.0",
+        "symbols": [
+          "SPY"
+        ],
+        "timeframe": "1d",
+        "indicators": [
+          {
+            "type": "ema",
+            "name": "ema_fast",
+            "params": {
+              "period": 8
+            }
+          },
+          {
+            "type": "ema",
+            "name": "ema_slow",
+            "params": {
+              "period": 21
+            }
+          },
+          {
+            "type": "rsi",
+            "name": "rsi_14",
+            "params": {
+              "period": 14
+            }
+          }
+        ],
+        "entry_rules": [
+          {
+            "conditions": [
+              {
+                "left": "ema_fast",
+                "comparison": "gt",
+                "right": "ema_slow",
+                "lookback": null
+              },
+              {
+                "left": "close",
+                "comparison": "gt",
+                "right": "ema_slow",
+                "lookback": null
+              },
+              {
+                "left": "rsi_14",
+                "comparison": "lt",
+                "right": 60.0,
+                "lookback": null
+              }
+            ],
+            "logic": "AND",
+            "side": "long"
+          }
+        ],
+        "exit_rules": [
+          {
+            "conditions": [
+              {
+                "left": "ema_fast",
+                "comparison": "crosses_below",
+                "right": "ema_slow",
+                "lookback": null
+              }
+            ],
+            "logic": "AND",
+            "side": "long"
+          }
+        ],
+        "position_size": {
+          "type": "percent_equity",
+          "value": 98.0
+        },
+        "max_positions": 1,
+        "stop_loss": {
+          "type": "trailing_atr",
+          "value": 1.5,
+          "atr_period": 14,
+          "trigger_percent": null
+        },
+        "take_profit": {
+          "type": "percent",
+          "value": 0.1
+        },
+        "regime_filter": {
+          "symbol": "SPY",
+          "sma_period": 200
+        }
+      },
+      "winner_train_score": 2.6465,
+      "verdicts": [
+        {
+          "symbol": "AAPL",
+          "train": {
+            "start": "2022-01-01T00:00:00",
+            "end": "2024-12-31T00:00:00",
+            "years": 2.9979466119096507,
+            "trades": 32,
+            "win_rate": 0.46875,
+            "total_return": 1.0850707496882208,
+            "sharpe": 2.646469016756821,
+            "max_drawdown": 0.16620929034296317
+          },
+          "holdout": {
+            "start": "2025-01-01T00:00:00",
+            "end": "2026-06-12T00:44:12.055028",
+            "years": 1.4428473648186173,
+            "trades": 16,
+            "win_rate": 0.625,
+            "total_return": 0.40784648708177706,
+            "sharpe": 2.611043317245668,
+            "max_drawdown": 0.13230773899758771
+          },
+          "holdout_reasons": []
+        }
+      ]
+    },
+    {
+      "name": "AMAT",
+      "members": [
+        "AMAT"
+      ],
+      "volatility": {
+        "AMAT": 0.4493
+      },
+      "candidates_evaluated": 144,
+      "candidates_eligible": 10,
+      "winner_name": "c_ema20-50_rsi60_atr1.5_tp20",
+      "winner_hash": "f28bbf698ceb",
+      "winner_config": {
+        "name": "c_ema20-50_rsi60_atr1.5_tp20",
+        "description": "EMA 20/50 cross + RSI<60, 1.5x ATR(14) trailing stop, TP 20%, SPY>SMA200 regime gate",
+        "version": "1.0",
+        "symbols": [
+          "SPY"
+        ],
+        "timeframe": "1d",
+        "indicators": [
+          {
+            "type": "ema",
+            "name": "ema_fast",
+            "params": {
+              "period": 20
+            }
+          },
+          {
+            "type": "ema",
+            "name": "ema_slow",
+            "params": {
+              "period": 50
+            }
+          },
+          {
+            "type": "rsi",
+            "name": "rsi_14",
+            "params": {
+              "period": 14
+            }
+          }
+        ],
+        "entry_rules": [
+          {
+            "conditions": [
+              {
+                "left": "ema_fast",
+                "comparison": "gt",
+                "right": "ema_slow",
+                "lookback": null
+              },
+              {
+                "left": "close",
+                "comparison": "gt",
+                "right": "ema_slow",
+                "lookback": null
+              },
+              {
+                "left": "rsi_14",
+                "comparison": "lt",
+                "right": 60.0,
+                "lookback": null
+              }
+            ],
+            "logic": "AND",
+            "side": "long"
+          }
+        ],
+        "exit_rules": [
+          {
+            "conditions": [
+              {
+                "left": "ema_fast",
+                "comparison": "crosses_below",
+                "right": "ema_slow",
+                "lookback": null
+              }
+            ],
+            "logic": "AND",
+            "side": "long"
+          }
+        ],
+        "position_size": {
+          "type": "percent_equity",
+          "value": 98.0
+        },
+        "max_positions": 1,
+        "stop_loss": {
+          "type": "trailing_atr",
+          "value": 1.5,
+          "atr_period": 14,
+          "trigger_percent": null
+        },
+        "take_profit": {
+          "type": "percent",
+          "value": 0.2
+        },
+        "regime_filter": {
+          "symbol": "SPY",
+          "sma_period": 200
+        }
+      },
+      "winner_train_score": 2.1407,
+      "verdicts": [
+        {
+          "symbol": "AMAT",
+          "train": {
+            "start": "2022-01-01T00:00:00",
+            "end": "2024-12-31T00:00:00",
+            "years": 2.9979466119096507,
+            "trades": 34,
+            "win_rate": 0.5294117647058824,
+            "total_return": 1.9899247338432247,
+            "sharpe": 2.140672568261523,
+            "max_drawdown": 0.201358784705265
+          },
+          "holdout": {
+            "start": "2025-01-01T00:00:00",
+            "end": "2026-06-12T00:44:12.055028",
+            "years": 1.4428473648186173,
+            "trades": 22,
+            "win_rate": 0.5909090909090909,
+            "total_return": 1.9843605830241384,
+            "sharpe": 2.572675034808767,
+            "max_drawdown": 0.35616897249737894
+          },
+          "holdout_reasons": [
+            "DD 36%>25%"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "AMD",
+      "members": [
+        "AMD"
+      ],
+      "volatility": {
+        "AMD": 0.569
+      },
+      "candidates_evaluated": 144,
+      "candidates_eligible": 0,
+      "winner_name": null,
+      "winner_hash": null,
+      "winner_config": null,
+      "winner_train_score": null,
+      "verdicts": []
+    },
+    {
+      "name": "AMZN",
+      "members": [
+        "AMZN"
+      ],
+      "volatility": {
+        "AMZN": 0.3674
+      },
+      "candidates_evaluated": 144,
+      "candidates_eligible": 34,
+      "winner_name": "c_ema10-26_rsi68_atr1.5_tp10",
+      "winner_hash": "76faa4ffd880",
+      "winner_config": {
+        "name": "c_ema10-26_rsi68_atr1.5_tp10",
+        "description": "EMA 10/26 cross + RSI<68, 1.5x ATR(14) trailing stop, TP 10%, SPY>SMA200 regime gate",
+        "version": "1.0",
+        "symbols": [
+          "SPY"
+        ],
+        "timeframe": "1d",
+        "indicators": [
+          {
+            "type": "ema",
+            "name": "ema_fast",
+            "params": {
+              "period": 10
+            }
+          },
+          {
+            "type": "ema",
+            "name": "ema_slow",
+            "params": {
+              "period": 26
+            }
+          },
+          {
+            "type": "rsi",
+            "name": "rsi_14",
+            "params": {
+              "period": 14
+            }
+          }
+        ],
+        "entry_rules": [
+          {
+            "conditions": [
+              {
+                "left": "ema_fast",
+                "comparison": "gt",
+                "right": "ema_slow",
+                "lookback": null
+              },
+              {
+                "left": "close",
+                "comparison": "gt",
+                "right": "ema_slow",
+                "lookback": null
+              },
+              {
+                "left": "rsi_14",
+                "comparison": "lt",
+                "right": 68.0,
+                "lookback": null
+              }
+            ],
+            "logic": "AND",
+            "side": "long"
+          }
+        ],
+        "exit_rules": [
+          {
+            "conditions": [
+              {
+                "left": "ema_fast",
+                "comparison": "crosses_below",
+                "right": "ema_slow",
+                "lookback": null
+              }
+            ],
+            "logic": "AND",
+            "side": "long"
+          }
+        ],
+        "position_size": {
+          "type": "percent_equity",
+          "value": 98.0
+        },
+        "max_positions": 1,
+        "stop_loss": {
+          "type": "trailing_atr",
+          "value": 1.5,
+          "atr_period": 14,
+          "trigger_percent": null
+        },
+        "take_profit": {
+          "type": "percent",
+          "value": 0.1
+        },
+        "regime_filter": {
+          "symbol": "SPY",
+          "sma_period": 200
+        }
+      },
+      "winner_train_score": 2.722,
+      "verdicts": [
+        {
+          "symbol": "AMZN",
+          "train": {
+            "start": "2022-01-01T00:00:00",
+            "end": "2024-12-31T00:00:00",
+            "years": 2.9979466119096507,
+            "trades": 48,
+            "win_rate": 0.5625,
+            "total_return": 2.885867700321542,
+            "sharpe": 2.7220028899396933,
+            "max_drawdown": 0.1594019202368734
+          },
+          "holdout": {
+            "start": "2025-01-01T00:00:00",
+            "end": "2026-06-12T00:44:12.055028",
+            "years": 1.4428473648186173,
+            "trades": 29,
+            "win_rate": 0.3103448275862069,
+            "total_return": -0.2079600063278787,
+            "sharpe": -0.7474351814678146,
+            "max_drawdown": 0.35654838834114233
+          },
+          "holdout_reasons": [
+            "DD 36%>25%",
+            "holdout return -20.8%≤0"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "ARM",
+      "members": [
+        "ARM"
+      ],
+      "volatility": {
+        "ARM": 0.7594
+      },
+      "candidates_evaluated": 144,
+      "candidates_eligible": 0,
+      "winner_name": null,
+      "winner_hash": null,
+      "winner_config": null,
+      "winner_train_score": null,
+      "verdicts": []
+    },
+    {
+      "name": "ASML",
+      "members": [
+        "ASML"
+      ],
+      "volatility": {
+        "ASML": 0.4351
+      },
+      "candidates_evaluated": 144,
+      "candidates_eligible": 9,
+      "winner_name": "c_ema20-50_rsi60_atr1.5_tpnone",
+      "winner_hash": "7439d285eafd",
+      "winner_config": {
+        "name": "c_ema20-50_rsi60_atr1.5_tpnone",
+        "description": "EMA 20/50 cross + RSI<60, 1.5x ATR(14) trailing stop, TP none%, SPY>SMA200 regime gate",
+        "version": "1.0",
+        "symbols": [
+          "SPY"
+        ],
+        "timeframe": "1d",
+        "indicators": [
+          {
+            "type": "ema",
+            "name": "ema_fast",
+            "params": {
+              "period": 20
+            }
+          },
+          {
+            "type": "ema",
+            "name": "ema_slow",
+            "params": {
+              "period": 50
+            }
+          },
+          {
+            "type": "rsi",
+            "name": "rsi_14",
+            "params": {
+              "period": 14
+            }
+          }
+        ],
+        "entry_rules": [
+          {
+            "conditions": [
+              {
+                "left": "ema_fast",
+                "comparison": "gt",
+                "right": "ema_slow",
+                "lookback": null
+              },
+              {
+                "left": "close",
+                "comparison": "gt",
+                "right": "ema_slow",
+                "lookback": null
+              },
+              {
+                "left": "rsi_14",
+                "comparison": "lt",
+                "right": 60.0,
+                "lookback": null
+              }
+            ],
+            "logic": "AND",
+            "side": "long"
+          }
+        ],
+        "exit_rules": [
+          {
+            "conditions": [
+              {
+                "left": "ema_fast",
+                "comparison": "crosses_below",
+                "right": "ema_slow",
+                "lookback": null
+              }
+            ],
+            "logic": "AND",
+            "side": "long"
+          }
+        ],
+        "position_size": {
+          "type": "percent_equity",
+          "value": 98.0
+        },
+        "max_positions": 1,
+        "stop_loss": {
+          "type": "trailing_atr",
+          "value": 1.5,
+          "atr_period": 14,
+          "trigger_percent": null
+        },
+        "take_profit": null,
+        "regime_filter": {
+          "symbol": "SPY",
+          "sma_period": 200
+        }
+      },
+      "winner_train_score": 1.1886,
+      "verdicts": [
+        {
+          "symbol": "ASML",
+          "train": {
+            "start": "2022-01-01T00:00:00",
+            "end": "2024-12-31T00:00:00",
+            "years": 2.9979466119096507,
+            "trades": 27,
+            "win_rate": 0.5185185185185185,
+            "total_return": 0.4736961574146299,
+            "sharpe": 1.18861498336239,
+            "max_drawdown": 0.195682360601434
+          },
+          "holdout": {
+            "start": "2025-01-01T00:00:00",
+            "end": "2026-06-12T00:44:12.055028",
+            "years": 1.4428473648186173,
+            "trades": 27,
+            "win_rate": 0.48148148148148145,
+            "total_return": 1.3678707456915364,
+            "sharpe": 1.7929279804911586,
+            "max_drawdown": 0.3824148195151404
+          },
+          "holdout_reasons": [
+            "DD 38%>25%"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "ASTS",
+      "members": [
+        "ASTS"
+      ],
+      "volatility": {
+        "ASTS": 1.1266
+      },
+      "candidates_evaluated": 144,
+      "candidates_eligible": 0,
+      "winner_name": null,
+      "winner_hash": null,
+      "winner_config": null,
+      "winner_train_score": null,
+      "verdicts": []
+    },
+    {
+      "name": "AVGO",
+      "members": [
+        "AVGO"
+      ],
+      "volatility": {
+        "AVGO": 0.4533
+      },
+      "candidates_evaluated": 144,
+      "candidates_eligible": 0,
+      "winner_name": null,
+      "winner_hash": null,
+      "winner_config": null,
+      "winner_train_score": null,
+      "verdicts": []
+    },
+    {
+      "name": "AXON",
+      "members": [
+        "AXON"
+      ],
+      "volatility": {
+        "AXON": 0.4934
+      },
+      "candidates_evaluated": 144,
+      "candidates_eligible": 12,
+      "winner_name": "c_ema8-21_rsi60_atr1.5_tp20",
+      "winner_hash": "e980bc3afb33",
+      "winner_config": {
+        "name": "c_ema8-21_rsi60_atr1.5_tp20",
+        "description": "EMA 8/21 cross + RSI<60, 1.5x ATR(14) trailing stop, TP 20%, SPY>SMA200 regime gate",
+        "version": "1.0",
+        "symbols": [
+          "SPY"
+        ],
+        "timeframe": "1d",
+        "indicators": [
+          {
+            "type": "ema",
+            "name": "ema_fast",
+            "params": {
+              "period": 8
+            }
+          },
+          {
+            "type": "ema",
+            "name": "ema_slow",
+            "params": {
+              "period": 21
+            }
+          },
+          {
+            "type": "rsi",
+            "name": "rsi_14",
+            "params": {
+              "period": 14
+            }
+          }
+        ],
+        "entry_rules": [
+          {
+            "conditions": [
+              {
+                "left": "ema_fast",
+                "comparison": "gt",
+                "right": "ema_slow",
+                "lookback": null
+              },
+              {
+                "left": "close",
+                "comparison": "gt",
+                "right": "ema_slow",
+                "lookback": null
+              },
+              {
+                "left": "rsi_14",
+                "comparison": "lt",
+                "right": 60.0,
+                "lookback": null
+              }
+            ],
+            "logic": "AND",
+            "side": "long"
+          }
+        ],
+        "exit_rules": [
+          {
+            "conditions": [
+              {
+                "left": "ema_fast",
+                "comparison": "crosses_below",
+                "right": "ema_slow",
+                "lookback": null
+              }
+            ],
+            "logic": "AND",
+            "side": "long"
+          }
+        ],
+        "position_size": {
+          "type": "percent_equity",
+          "value": 98.0
+        },
+        "max_positions": 1,
+        "stop_loss": {
+          "type": "trailing_atr",
+          "value": 1.5,
+          "atr_period": 14,
+          "trigger_percent": null
+        },
+        "take_profit": {
+          "type": "percent",
+          "value": 0.2
+        },
+        "regime_filter": {
+          "symbol": "SPY",
+          "sma_period": 200
+        }
+      },
+      "winner_train_score": 2.7985,
+      "verdicts": [
+        {
+          "symbol": "AXON",
+          "train": {
+            "start": "2022-01-01T00:00:00",
+            "end": "2024-12-31T00:00:00",
+            "years": 2.9979466119096507,
+            "trades": 32,
+            "win_rate": 0.59375,
+            "total_return": 3.4868606042119312,
+            "sharpe": 2.798517983642356,
+            "max_drawdown": 0.16649331283976426
+          },
+          "holdout": {
+            "start": "2025-01-01T00:00:00",
+            "end": "2026-06-12T00:44:12.055028",
+            "years": 1.4428473648186173,
+            "trades": 15,
+            "win_rate": 0.26666666666666666,
+            "total_return": -0.5833896707148774,
+            "sharpe": -2.9524829217342003,
+            "max_drawdown": 0.6869239413593442
+          },
+          "holdout_reasons": [
+            "DD 69%>25%",
+            "holdout return -58.3%≤0"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "BE",
+      "members": [
+        "BE"
+      ],
+      "volatility": {
+        "BE": 0.87
+      },
+      "candidates_evaluated": 144,
+      "candidates_eligible": 0,
+      "winner_name": null,
+      "winner_hash": null,
+      "winner_config": null,
+      "winner_train_score": null,
+      "verdicts": []
+    },
+    {
+      "name": "CORZ",
+      "members": [
+        "CORZ"
+      ],
+      "volatility": {
+        "CORZ": 0.8522
+      },
+      "candidates_evaluated": 144,
+      "candidates_eligible": 0,
+      "winner_name": null,
+      "winner_hash": null,
+      "winner_config": null,
+      "winner_train_score": null,
+      "verdicts": []
+    },
+    {
+      "name": "COST",
+      "members": [
+        "COST"
+      ],
+      "volatility": {
+        "COST": 0.231
+      },
+      "candidates_evaluated": 144,
+      "candidates_eligible": 114,
+      "winner_name": "c_ema20-50_rsi60_atr2.5_tp20",
+      "winner_hash": "0ee5a3a6a457",
+      "winner_config": {
+        "name": "c_ema20-50_rsi60_atr2.5_tp20",
+        "description": "EMA 20/50 cross + RSI<60, 2.5x ATR(14) trailing stop, TP 20%, SPY>SMA200 regime gate",
+        "version": "1.0",
+        "symbols": [
+          "SPY"
+        ],
+        "timeframe": "1d",
+        "indicators": [
+          {
+            "type": "ema",
+            "name": "ema_fast",
+            "params": {
+              "period": 20
+            }
+          },
+          {
+            "type": "ema",
+            "name": "ema_slow",
+            "params": {
+              "period": 50
+            }
+          },
+          {
+            "type": "rsi",
+            "name": "rsi_14",
+            "params": {
+              "period": 14
+            }
+          }
+        ],
+        "entry_rules": [
+          {
+            "conditions": [
+              {
+                "left": "ema_fast",
+                "comparison": "gt",
+                "right": "ema_slow",
+                "lookback": null
+              },
+              {
+                "left": "close",
+                "comparison": "gt",
+                "right": "ema_slow",
+                "lookback": null
+              },
+              {
+                "left": "rsi_14",
+                "comparison": "lt",
+                "right": 60.0,
+                "lookback": null
+              }
+            ],
+            "logic": "AND",
+            "side": "long"
+          }
+        ],
+        "exit_rules": [
+          {
+            "conditions": [
+              {
+                "left": "ema_fast",
+                "comparison": "crosses_below",
+                "right": "ema_slow",
+                "lookback": null
+              }
+            ],
+            "logic": "AND",
+            "side": "long"
+          }
+        ],
+        "position_size": {
+          "type": "percent_equity",
+          "value": 98.0
+        },
+        "max_positions": 1,
+        "stop_loss": {
+          "type": "trailing_atr",
+          "value": 2.5,
+          "atr_period": 14,
+          "trigger_percent": null
+        },
+        "take_profit": {
+          "type": "percent",
+          "value": 0.2
+        },
+        "regime_filter": {
+          "symbol": "SPY",
+          "sma_period": 200
+        }
+      },
+      "winner_train_score": 2.8958,
+      "verdicts": [
+        {
+          "symbol": "COST",
+          "train": {
+            "start": "2022-01-01T00:00:00",
+            "end": "2024-12-31T00:00:00",
+            "years": 2.9979466119096507,
+            "trades": 22,
+            "win_rate": 0.6363636363636364,
+            "total_return": 2.5797417145415165,
+            "sharpe": 2.895844199940089,
+            "max_drawdown": 0.11493838775432612
+          },
+          "holdout": {
+            "start": "2025-01-01T00:00:00",
+            "end": "2026-06-12T00:44:12.055028",
+            "years": 1.4428473648186173,
+            "trades": 9,
+            "win_rate": 0.5555555555555556,
+            "total_return": 0.06339748592186445,
+            "sharpe": 0.490785566780627,
+            "max_drawdown": 0.19585726268059825
+          },
+          "holdout_reasons": [
+            "trades 9<11"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "DELL",
+      "members": [
+        "DELL"
+      ],
+      "volatility": {
+        "DELL": 0.5327
+      },
+      "candidates_evaluated": 144,
+      "candidates_eligible": 13,
+      "winner_name": "c_ema10-26_rsi60_atr2.5_tp10",
+      "winner_hash": "77a7f377c856",
+      "winner_config": {
+        "name": "c_ema10-26_rsi60_atr2.5_tp10",
+        "description": "EMA 10/26 cross + RSI<60, 2.5x ATR(14) trailing stop, TP 10%, SPY>SMA200 regime gate",
+        "version": "1.0",
+        "symbols": [
+          "SPY"
+        ],
+        "timeframe": "1d",
+        "indicators": [
+          {
+            "type": "ema",
+            "name": "ema_fast",
+            "params": {
+              "period": 10
+            }
+          },
+          {
+            "type": "ema",
+            "name": "ema_slow",
+            "params": {
+              "period": 26
+            }
+          },
+          {
+            "type": "rsi",
+            "name": "rsi_14",
+            "params": {
+              "period": 14
+            }
+          }
+        ],
+        "entry_rules": [
+          {
+            "conditions": [
+              {
+                "left": "ema_fast",
+                "comparison": "gt",
+                "right": "ema_slow",
+                "lookback": null
+              },
+              {
+                "left": "close",
+                "comparison": "gt",
+                "right": "ema_slow",
+                "lookback": null
+              },
+              {
+                "left": "rsi_14",
+                "comparison": "lt",
+                "right": 60.0,
+                "lookback": null
+              }
+            ],
+            "logic": "AND",
+            "side": "long"
+          }
+        ],
+        "exit_rules": [
+          {
+            "conditions": [
+              {
+                "left": "ema_fast",
+                "comparison": "crosses_below",
+                "right": "ema_slow",
+                "lookback": null
+              }
+            ],
+            "logic": "AND",
+            "side": "long"
+          }
+        ],
+        "position_size": {
+          "type": "percent_equity",
+          "value": 98.0
+        },
+        "max_positions": 1,
+        "stop_loss": {
+          "type": "trailing_atr",
+          "value": 2.5,
+          "atr_period": 14,
+          "trigger_percent": null
+        },
+        "take_profit": {
+          "type": "percent",
+          "value": 0.1
+        },
+        "regime_filter": {
+          "symbol": "SPY",
+          "sma_period": 200
+        }
+      },
+      "winner_train_score": 2.9642,
+      "verdicts": [
+        {
+          "symbol": "DELL",
+          "train": {
+            "start": "2022-01-01T00:00:00",
+            "end": "2024-12-31T00:00:00",
+            "years": 2.9979466119096507,
+            "trades": 26,
+            "win_rate": 0.6153846153846154,
+            "total_return": 5.732318901999197,
+            "sharpe": 2.9641627376172273,
+            "max_drawdown": 0.21831521001111312
+          },
+          "holdout": {
+            "start": "2025-01-01T00:00:00",
+            "end": "2026-06-12T00:44:12.055028",
+            "years": 1.4428473648186173,
+            "trades": 13,
+            "win_rate": 0.6153846153846154,
+            "total_return": 0.6946206534320762,
+            "sharpe": 2.3389780864288987,
+            "max_drawdown": 0.26799036554284283
+          },
+          "holdout_reasons": [
+            "DD 27%>25%"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "GOOGL",
+      "members": [
+        "GOOGL"
+      ],
+      "volatility": {
+        "GOOGL": 0.3245
+      },
+      "candidates_evaluated": 144,
+      "candidates_eligible": 21,
+      "winner_name": "c_ema20-50_rsi60_atr1.5_tp10",
+      "winner_hash": "7fa6fdd674c8",
+      "winner_config": {
+        "name": "c_ema20-50_rsi60_atr1.5_tp10",
+        "description": "EMA 20/50 cross + RSI<60, 1.5x ATR(14) trailing stop, TP 10%, SPY>SMA200 regime gate",
+        "version": "1.0",
+        "symbols": [
+          "SPY"
+        ],
+        "timeframe": "1d",
+        "indicators": [
+          {
+            "type": "ema",
+            "name": "ema_fast",
+            "params": {
+              "period": 20
+            }
+          },
+          {
+            "type": "ema",
+            "name": "ema_slow",
+            "params": {
+              "period": 50
+            }
+          },
+          {
+            "type": "rsi",
+            "name": "rsi_14",
+            "params": {
+              "period": 14
+            }
+          }
+        ],
+        "entry_rules": [
+          {
+            "conditions": [
+              {
+                "left": "ema_fast",
+                "comparison": "gt",
+                "right": "ema_slow",
+                "lookback": null
+              },
+              {
+                "left": "close",
+                "comparison": "gt",
+                "right": "ema_slow",
+                "lookback": null
+              },
+              {
+                "left": "rsi_14",
+                "comparison": "lt",
+                "right": 60.0,
+                "lookback": null
+              }
+            ],
+            "logic": "AND",
+            "side": "long"
+          }
+        ],
+        "exit_rules": [
+          {
+            "conditions": [
+              {
+                "left": "ema_fast",
+                "comparison": "crosses_below",
+                "right": "ema_slow",
+                "lookback": null
+              }
+            ],
+            "logic": "AND",
+            "side": "long"
+          }
+        ],
+        "position_size": {
+          "type": "percent_equity",
+          "value": 98.0
+        },
+        "max_positions": 1,
+        "stop_loss": {
+          "type": "trailing_atr",
+          "value": 1.5,
+          "atr_period": 14,
+          "trigger_percent": null
+        },
+        "take_profit": {
+          "type": "percent",
+          "value": 0.1
+        },
+        "regime_filter": {
+          "symbol": "SPY",
+          "sma_period": 200
+        }
+      },
+      "winner_train_score": 2.7708,
+      "verdicts": [
+        {
+          "symbol": "GOOGL",
+          "train": {
+            "start": "2022-01-01T00:00:00",
+            "end": "2024-12-31T00:00:00",
+            "years": 2.9979466119096507,
+            "trades": 40,
+            "win_rate": 0.525,
+            "total_return": 2.5003687769206953,
+            "sharpe": 2.7708430887837436,
+            "max_drawdown": 0.20795915741194665
+          },
+          "holdout": {
+            "start": "2025-01-01T00:00:00",
+            "end": "2026-06-12T00:44:12.055028",
+            "years": 1.4428473648186173,
+            "trades": 20,
+            "win_rate": 0.5,
+            "total_return": 0.9604796295938134,
+            "sharpe": 2.7790847085070443,
+            "max_drawdown": 0.20247100401985196
+          },
+          "holdout_reasons": []
+        }
+      ]
+    },
+    {
+      "name": "HOOD",
+      "members": [
+        "HOOD"
+      ],
+      "volatility": {
+        "HOOD": 0.685
+      },
+      "candidates_evaluated": 144,
+      "candidates_eligible": 0,
+      "winner_name": null,
+      "winner_hash": null,
+      "winner_config": null,
+      "winner_train_score": null,
+      "verdicts": []
+    },
+    {
+      "name": "INTC",
+      "members": [
+        "INTC"
+      ],
+      "volatility": {
+        "INTC": 0.5466
+      },
+      "candidates_evaluated": 144,
+      "candidates_eligible": 0,
+      "winner_name": null,
+      "winner_hash": null,
+      "winner_config": null,
+      "winner_train_score": null,
+      "verdicts": []
+    },
+    {
+      "name": "IREN",
+      "members": [
+        "IREN"
+      ],
+      "volatility": {
+        "IREN": 1.187
+      },
+      "candidates_evaluated": 144,
+      "candidates_eligible": 0,
+      "winner_name": null,
+      "winner_hash": null,
+      "winner_config": null,
+      "winner_train_score": null,
+      "verdicts": []
+    },
+    {
+      "name": "KLAC",
+      "members": [
+        "KLAC"
+      ],
+      "volatility": {
+        "KLAC": 0.6137
+      },
+      "candidates_evaluated": 144,
+      "candidates_eligible": 0,
+      "winner_name": null,
+      "winner_hash": null,
+      "winner_config": null,
+      "winner_train_score": null,
+      "verdicts": []
+    },
+    {
+      "name": "LLY",
+      "members": [
+        "LLY"
+      ],
+      "volatility": {
+        "LLY": 0.3296
+      },
+      "candidates_evaluated": 144,
+      "candidates_eligible": 17,
+      "winner_name": "c_ema20-50_rsi75_atr2.5_tp10",
+      "winner_hash": "bfe3ef026428",
+      "winner_config": {
+        "name": "c_ema20-50_rsi75_atr2.5_tp10",
+        "description": "EMA 20/50 cross + RSI<75, 2.5x ATR(14) trailing stop, TP 10%, SPY>SMA200 regime gate",
+        "version": "1.0",
+        "symbols": [
+          "SPY"
+        ],
+        "timeframe": "1d",
+        "indicators": [
+          {
+            "type": "ema",
+            "name": "ema_fast",
+            "params": {
+              "period": 20
+            }
+          },
+          {
+            "type": "ema",
+            "name": "ema_slow",
+            "params": {
+              "period": 50
+            }
+          },
+          {
+            "type": "rsi",
+            "name": "rsi_14",
+            "params": {
+              "period": 14
+            }
+          }
+        ],
+        "entry_rules": [
+          {
+            "conditions": [
+              {
+                "left": "ema_fast",
+                "comparison": "gt",
+                "right": "ema_slow",
+                "lookback": null
+              },
+              {
+                "left": "close",
+                "comparison": "gt",
+                "right": "ema_slow",
+                "lookback": null
+              },
+              {
+                "left": "rsi_14",
+                "comparison": "lt",
+                "right": 75.0,
+                "lookback": null
+              }
+            ],
+            "logic": "AND",
+            "side": "long"
+          }
+        ],
+        "exit_rules": [
+          {
+            "conditions": [
+              {
+                "left": "ema_fast",
+                "comparison": "crosses_below",
+                "right": "ema_slow",
+                "lookback": null
+              }
+            ],
+            "logic": "AND",
+            "side": "long"
+          }
+        ],
+        "position_size": {
+          "type": "percent_equity",
+          "value": 98.0
+        },
+        "max_positions": 1,
+        "stop_loss": {
+          "type": "trailing_atr",
+          "value": 2.5,
+          "atr_period": 14,
+          "trigger_percent": null
+        },
+        "take_profit": {
+          "type": "percent",
+          "value": 0.1
+        },
+        "regime_filter": {
+          "symbol": "SPY",
+          "sma_period": 200
+        }
+      },
+      "winner_train_score": 2.4127,
+      "verdicts": [
+        {
+          "symbol": "LLY",
+          "train": {
+            "start": "2022-01-01T00:00:00",
+            "end": "2024-12-31T00:00:00",
+            "years": 2.9979466119096507,
+            "trades": 27,
+            "win_rate": 0.5555555555555556,
+            "total_return": 2.4739438989825313,
+            "sharpe": 2.412668152835195,
+            "max_drawdown": 0.2421034664995629
+          },
+          "holdout": {
+            "start": "2025-01-01T00:00:00",
+            "end": "2026-06-12T00:44:12.055028",
+            "years": 1.4428473648186173,
+            "trades": 17,
+            "win_rate": 0.4117647058823529,
+            "total_return": 0.05213686280661123,
+            "sharpe": 0.3892013786838409,
+            "max_drawdown": 0.3673422832038873
+          },
+          "holdout_reasons": [
+            "DD 37%>25%"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "LRCX",
+      "members": [
+        "LRCX"
+      ],
+      "volatility": {
+        "LRCX": 0.4784
+      },
+      "candidates_evaluated": 144,
+      "candidates_eligible": 8,
+      "winner_name": "c_ema20-50_rsi60_atr2.0_tp20",
+      "winner_hash": "ea261e3db24a",
+      "winner_config": {
+        "name": "c_ema20-50_rsi60_atr2.0_tp20",
+        "description": "EMA 20/50 cross + RSI<60, 2.0x ATR(14) trailing stop, TP 20%, SPY>SMA200 regime gate",
+        "version": "1.0",
+        "symbols": [
+          "SPY"
+        ],
+        "timeframe": "1d",
+        "indicators": [
+          {
+            "type": "ema",
+            "name": "ema_fast",
+            "params": {
+              "period": 20
+            }
+          },
+          {
+            "type": "ema",
+            "name": "ema_slow",
+            "params": {
+              "period": 50
+            }
+          },
+          {
+            "type": "rsi",
+            "name": "rsi_14",
+            "params": {
+              "period": 14
+            }
+          }
+        ],
+        "entry_rules": [
+          {
+            "conditions": [
+              {
+                "left": "ema_fast",
+                "comparison": "gt",
+                "right": "ema_slow",
+                "lookback": null
+              },
+              {
+                "left": "close",
+                "comparison": "gt",
+                "right": "ema_slow",
+                "lookback": null
+              },
+              {
+                "left": "rsi_14",
+                "comparison": "lt",
+                "right": 60.0,
+                "lookback": null
+              }
+            ],
+            "logic": "AND",
+            "side": "long"
+          }
+        ],
+        "exit_rules": [
+          {
+            "conditions": [
+              {
+                "left": "ema_fast",
+                "comparison": "crosses_below",
+                "right": "ema_slow",
+                "lookback": null
+              }
+            ],
+            "logic": "AND",
+            "side": "long"
+          }
+        ],
+        "position_size": {
+          "type": "percent_equity",
+          "value": 98.0
+        },
+        "max_positions": 1,
+        "stop_loss": {
+          "type": "trailing_atr",
+          "value": 2.0,
+          "atr_period": 14,
+          "trigger_percent": null
+        },
+        "take_profit": {
+          "type": "percent",
+          "value": 0.2
+        },
+        "regime_filter": {
+          "symbol": "SPY",
+          "sma_period": 200
+        }
+      },
+      "winner_train_score": 1.9874,
+      "verdicts": [
+        {
+          "symbol": "LRCX",
+          "train": {
+            "start": "2022-01-01T00:00:00",
+            "end": "2024-12-31T00:00:00",
+            "years": 2.9979466119096507,
+            "trades": 25,
+            "win_rate": 0.64,
+            "total_return": 1.7684529775169993,
+            "sharpe": 1.987416560235257,
+            "max_drawdown": 0.23111392063373115
+          },
+          "holdout": {
+            "start": "2025-01-01T00:00:00",
+            "end": "2026-06-12T00:44:12.055028",
+            "years": 1.4428473648186173,
+            "trades": 17,
+            "win_rate": 0.6470588235294118,
+            "total_return": 3.577128606050783,
+            "sharpe": 2.9877145439012227,
+            "max_drawdown": 0.28126487373357284
+          },
+          "holdout_reasons": [
+            "DD 28%>25%"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "META",
+      "members": [
+        "META"
+      ],
+      "volatility": {
+        "META": 0.4569
+      },
+      "candidates_evaluated": 144,
+      "candidates_eligible": 9,
+      "winner_name": "c_ema8-21_rsi68_atr1.5_tp10",
+      "winner_hash": "0a3fb4a5661d",
+      "winner_config": {
+        "name": "c_ema8-21_rsi68_atr1.5_tp10",
+        "description": "EMA 8/21 cross + RSI<68, 1.5x ATR(14) trailing stop, TP 10%, SPY>SMA200 regime gate",
+        "version": "1.0",
+        "symbols": [
+          "SPY"
+        ],
+        "timeframe": "1d",
+        "indicators": [
+          {
+            "type": "ema",
+            "name": "ema_fast",
+            "params": {
+              "period": 8
+            }
+          },
+          {
+            "type": "ema",
+            "name": "ema_slow",
+            "params": {
+              "period": 21
+            }
+          },
+          {
+            "type": "rsi",
+            "name": "rsi_14",
+            "params": {
+              "period": 14
+            }
+          }
+        ],
+        "entry_rules": [
+          {
+            "conditions": [
+              {
+                "left": "ema_fast",
+                "comparison": "gt",
+                "right": "ema_slow",
+                "lookback": null
+              },
+              {
+                "left": "close",
+                "comparison": "gt",
+                "right": "ema_slow",
+                "lookback": null
+              },
+              {
+                "left": "rsi_14",
+                "comparison": "lt",
+                "right": 68.0,
+                "lookback": null
+              }
+            ],
+            "logic": "AND",
+            "side": "long"
+          }
+        ],
+        "exit_rules": [
+          {
+            "conditions": [
+              {
+                "left": "ema_fast",
+                "comparison": "crosses_below",
+                "right": "ema_slow",
+                "lookback": null
+              }
+            ],
+            "logic": "AND",
+            "side": "long"
+          }
+        ],
+        "position_size": {
+          "type": "percent_equity",
+          "value": 98.0
+        },
+        "max_positions": 1,
+        "stop_loss": {
+          "type": "trailing_atr",
+          "value": 1.5,
+          "atr_period": 14,
+          "trigger_percent": null
+        },
+        "take_profit": {
+          "type": "percent",
+          "value": 0.1
+        },
+        "regime_filter": {
+          "symbol": "SPY",
+          "sma_period": 200
+        }
+      },
+      "winner_train_score": 2.6984,
+      "verdicts": [
+        {
+          "symbol": "META",
+          "train": {
+            "start": "2022-01-01T00:00:00",
+            "end": "2024-12-31T00:00:00",
+            "years": 2.9979466119096507,
+            "trades": 53,
+            "win_rate": 0.5094339622641509,
+            "total_return": 5.233486935909742,
+            "sharpe": 2.6983697757914986,
+            "max_drawdown": 0.23835978466392377
+          },
+          "holdout": {
+            "start": "2025-01-01T00:00:00",
+            "end": "2026-06-12T00:44:12.055028",
+            "years": 1.4428473648186173,
+            "trades": 32,
+            "win_rate": 0.40625,
+            "total_return": -0.39177800555913356,
+            "sharpe": -1.6846749060073964,
+            "max_drawdown": 0.5411411733139304
+          },
+          "holdout_reasons": [
+            "DD 54%>25%",
+            "holdout return -39.2%≤0"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "MRVL",
+      "members": [
+        "MRVL"
+      ],
+      "volatility": {
+        "MRVL": 0.6416
+      },
+      "candidates_evaluated": 144,
+      "candidates_eligible": 0,
+      "winner_name": null,
+      "winner_hash": null,
+      "winner_config": null,
+      "winner_train_score": null,
+      "verdicts": []
+    },
+    {
+      "name": "MSFT",
+      "members": [
+        "MSFT"
+      ],
+      "volatility": {
+        "MSFT": 0.2745
+      },
+      "candidates_evaluated": 144,
+      "candidates_eligible": 51,
+      "winner_name": "c_ema8-21_rsi60_atr1.5_tp20",
+      "winner_hash": "e980bc3afb33",
+      "winner_config": {
+        "name": "c_ema8-21_rsi60_atr1.5_tp20",
+        "description": "EMA 8/21 cross + RSI<60, 1.5x ATR(14) trailing stop, TP 20%, SPY>SMA200 regime gate",
+        "version": "1.0",
+        "symbols": [
+          "SPY"
+        ],
+        "timeframe": "1d",
+        "indicators": [
+          {
+            "type": "ema",
+            "name": "ema_fast",
+            "params": {
+              "period": 8
+            }
+          },
+          {
+            "type": "ema",
+            "name": "ema_slow",
+            "params": {
+              "period": 21
+            }
+          },
+          {
+            "type": "rsi",
+            "name": "rsi_14",
+            "params": {
+              "period": 14
+            }
+          }
+        ],
+        "entry_rules": [
+          {
+            "conditions": [
+              {
+                "left": "ema_fast",
+                "comparison": "gt",
+                "right": "ema_slow",
+                "lookback": null
+              },
+              {
+                "left": "close",
+                "comparison": "gt",
+                "right": "ema_slow",
+                "lookback": null
+              },
+              {
+                "left": "rsi_14",
+                "comparison": "lt",
+                "right": 60.0,
+                "lookback": null
+              }
+            ],
+            "logic": "AND",
+            "side": "long"
+          }
+        ],
+        "exit_rules": [
+          {
+            "conditions": [
+              {
+                "left": "ema_fast",
+                "comparison": "crosses_below",
+                "right": "ema_slow",
+                "lookback": null
+              }
+            ],
+            "logic": "AND",
+            "side": "long"
+          }
+        ],
+        "position_size": {
+          "type": "percent_equity",
+          "value": 98.0
+        },
+        "max_positions": 1,
+        "stop_loss": {
+          "type": "trailing_atr",
+          "value": 1.5,
+          "atr_period": 14,
+          "trigger_percent": null
+        },
+        "take_profit": {
+          "type": "percent",
+          "value": 0.2
+        },
+        "regime_filter": {
+          "symbol": "SPY",
+          "sma_period": 200
+        }
+      },
+      "winner_train_score": 2.109,
+      "verdicts": [
+        {
+          "symbol": "MSFT",
+          "train": {
+            "start": "2022-01-01T00:00:00",
+            "end": "2024-12-31T00:00:00",
+            "years": 2.9979466119096507,
+            "trades": 33,
+            "win_rate": 0.5757575757575758,
+            "total_return": 1.3143512701836104,
+            "sharpe": 2.108963561018901,
+            "max_drawdown": 0.18087740024556265
+          },
+          "holdout": {
+            "start": "2025-01-01T00:00:00",
+            "end": "2026-06-12T00:44:12.055028",
+            "years": 1.4428473648186173,
+            "trades": 11,
+            "win_rate": 0.36363636363636365,
+            "total_return": -0.10109255843402276,
+            "sharpe": -0.9007921317746679,
+            "max_drawdown": 0.16393637727960947
+          },
+          "holdout_reasons": [
+            "holdout return -10.1%≤0"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "MU",
+      "members": [
+        "MU"
+      ],
+      "volatility": {
+        "MU": 0.5506
+      },
+      "candidates_evaluated": 144,
+      "candidates_eligible": 0,
+      "winner_name": null,
+      "winner_hash": null,
+      "winner_config": null,
+      "winner_train_score": null,
+      "verdicts": []
+    },
+    {
+      "name": "NOW",
+      "members": [
+        "NOW"
+      ],
+      "volatility": {
+        "NOW": 0.4472
+      },
+      "candidates_evaluated": 144,
+      "candidates_eligible": 0,
+      "winner_name": null,
+      "winner_hash": null,
+      "winner_config": null,
+      "winner_train_score": null,
+      "verdicts": []
+    },
+    {
+      "name": "NVDA",
+      "members": [
+        "NVDA"
+      ],
+      "volatility": {
+        "NVDA": 0.5253
+      },
+      "candidates_evaluated": 144,
+      "candidates_eligible": 0,
+      "winner_name": null,
+      "winner_hash": null,
+      "winner_config": null,
+      "winner_train_score": null,
+      "verdicts": []
+    },
+    {
+      "name": "ORCL",
+      "members": [
+        "ORCL"
+      ],
+      "volatility": {
+        "ORCL": 0.433
+      },
+      "candidates_evaluated": 144,
+      "candidates_eligible": 0,
+      "winner_name": null,
+      "winner_hash": null,
+      "winner_config": null,
+      "winner_train_score": null,
+      "verdicts": []
+    },
+    {
+      "name": "PLTR",
+      "members": [
+        "PLTR"
+      ],
+      "volatility": {
+        "PLTR": 0.6739
+      },
+      "candidates_evaluated": 144,
+      "candidates_eligible": 0,
+      "winner_name": null,
+      "winner_hash": null,
+      "winner_config": null,
+      "winner_train_score": null,
+      "verdicts": []
+    },
+    {
+      "name": "RKLB",
+      "members": [
+        "RKLB"
+      ],
+      "volatility": {
+        "RKLB": 0.7939
+      },
+      "candidates_evaluated": 144,
+      "candidates_eligible": 0,
+      "winner_name": null,
+      "winner_hash": null,
+      "winner_config": null,
+      "winner_train_score": null,
+      "verdicts": []
+    },
+    {
+      "name": "SNDK",
+      "members": [
+        "SNDK"
+      ],
+      "volatility": {
+        "SNDK": 0.9972
+      },
+      "candidates_evaluated": 144,
+      "candidates_eligible": 0,
+      "winner_name": null,
+      "winner_hash": null,
+      "winner_config": null,
+      "winner_train_score": null,
+      "verdicts": []
+    },
+    {
+      "name": "TE",
+      "members": [
+        "TE"
+      ],
+      "volatility": {
+        "TE": 1.0363
+      },
+      "candidates_evaluated": 144,
+      "candidates_eligible": 0,
+      "winner_name": null,
+      "winner_hash": null,
+      "winner_config": null,
+      "winner_train_score": null,
+      "verdicts": []
+    },
+    {
+      "name": "TSLA",
+      "members": [
+        "TSLA"
+      ],
+      "volatility": {
+        "TSLA": 0.6003
+      },
+      "candidates_evaluated": 144,
+      "candidates_eligible": 0,
+      "winner_name": null,
+      "winner_hash": null,
+      "winner_config": null,
+      "winner_train_score": null,
+      "verdicts": []
+    },
+    {
+      "name": "TSM",
+      "members": [
+        "TSM"
+      ],
+      "volatility": {
+        "TSM": 0.3861
+      },
+      "candidates_evaluated": 144,
+      "candidates_eligible": 6,
+      "winner_name": "c_ema8-21_rsi60_atr2.0_tp10",
+      "winner_hash": "9375e52198f4",
+      "winner_config": {
+        "name": "c_ema8-21_rsi60_atr2.0_tp10",
+        "description": "EMA 8/21 cross + RSI<60, 2.0x ATR(14) trailing stop, TP 10%, SPY>SMA200 regime gate",
+        "version": "1.0",
+        "symbols": [
+          "SPY"
+        ],
+        "timeframe": "1d",
+        "indicators": [
+          {
+            "type": "ema",
+            "name": "ema_fast",
+            "params": {
+              "period": 8
+            }
+          },
+          {
+            "type": "ema",
+            "name": "ema_slow",
+            "params": {
+              "period": 21
+            }
+          },
+          {
+            "type": "rsi",
+            "name": "rsi_14",
+            "params": {
+              "period": 14
+            }
+          }
+        ],
+        "entry_rules": [
+          {
+            "conditions": [
+              {
+                "left": "ema_fast",
+                "comparison": "gt",
+                "right": "ema_slow",
+                "lookback": null
+              },
+              {
+                "left": "close",
+                "comparison": "gt",
+                "right": "ema_slow",
+                "lookback": null
+              },
+              {
+                "left": "rsi_14",
+                "comparison": "lt",
+                "right": 60.0,
+                "lookback": null
+              }
+            ],
+            "logic": "AND",
+            "side": "long"
+          }
+        ],
+        "exit_rules": [
+          {
+            "conditions": [
+              {
+                "left": "ema_fast",
+                "comparison": "crosses_below",
+                "right": "ema_slow",
+                "lookback": null
+              }
+            ],
+            "logic": "AND",
+            "side": "long"
+          }
+        ],
+        "position_size": {
+          "type": "percent_equity",
+          "value": 98.0
+        },
+        "max_positions": 1,
+        "stop_loss": {
+          "type": "trailing_atr",
+          "value": 2.0,
+          "atr_period": 14,
+          "trigger_percent": null
+        },
+        "take_profit": {
+          "type": "percent",
+          "value": 0.1
+        },
+        "regime_filter": {
+          "symbol": "SPY",
+          "sma_period": 200
+        }
+      },
+      "winner_train_score": 2.7957,
+      "verdicts": [
+        {
+          "symbol": "TSM",
+          "train": {
+            "start": "2022-01-01T00:00:00",
+            "end": "2024-12-31T00:00:00",
+            "years": 2.9979466119096507,
+            "trades": 30,
+            "win_rate": 0.5666666666666667,
+            "total_return": 2.3486320681947137,
+            "sharpe": 2.7956757024092167,
+            "max_drawdown": 0.2416438681390416
+          },
+          "holdout": {
+            "start": "2025-01-01T00:00:00",
+            "end": "2026-06-12T00:44:12.055028",
+            "years": 1.4428473648186173,
+            "trades": 19,
+            "win_rate": 0.47368421052631576,
+            "total_return": 0.4327699146680961,
+            "sharpe": 1.541490473681925,
+            "max_drawdown": 0.4230384618428544
+          },
+          "holdout_reasons": [
+            "DD 42%>25%"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "WDC",
+      "members": [
+        "WDC"
+      ],
+      "volatility": {
+        "WDC": 0.4997
+      },
+      "candidates_evaluated": 144,
+      "candidates_eligible": 0,
+      "winner_name": null,
+      "winner_hash": null,
+      "winner_config": null,
+      "winner_train_score": null,
+      "verdicts": []
+    }
+  ]
+}

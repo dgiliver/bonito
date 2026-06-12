@@ -217,3 +217,77 @@ class TestResearchAndApply:
         store = self.research_store()
         report = run_cluster_research(universe, store, START, HOLDOUT, END, grid=self.tiny_grid())
         assert report.assignments() == {}
+
+
+class TestPerSymbolMode:
+    def tiny_grid(self) -> GridSpec:
+        return GridSpec(
+            ema_pairs=[(10, 26), (20, 50)], rsi_max=[68.0], atr_mult=[2.0], take_profit=[None]
+        )
+
+    def research_store(self, n: int = 700) -> "FakeStore":
+        spy_start = START - timedelta(days=400)
+        return FakeStore(
+            {
+                "CALM": make_bars("CALM", trending_closes(n, 0.004, drift=0.001, seed=1)),
+                "WILD": make_bars("WILD", trending_closes(n, 0.06, drift=0.002, seed=2)),
+                "SPY": make_bars(
+                    "SPY", trending_closes(n + 400, 0.002, drift=0.001, seed=3), start=spy_start
+                ),
+            }
+        )
+
+    def test_each_symbol_is_a_singleton_cluster(self, universe):
+        store = self.research_store()
+        report = run_cluster_research(
+            universe, store, START, HOLDOUT, END, grid=self.tiny_grid(), per_symbol=True
+        )
+        assert [c.name for c in report.clusters] == ["CALM", "WILD"]
+        assert all(c.members == [c.name] for c in report.clusters)
+        # A singleton's verdicts cover at most its own symbol.
+        for cluster in report.clusters:
+            assert all(v.symbol == cluster.name for v in cluster.verdicts)
+
+    def test_winners_can_differ_across_symbols(self, universe):
+        store = self.research_store()
+        report = run_cluster_research(
+            universe, store, START, HOLDOUT, END, grid=self.tiny_grid(), per_symbol=True
+        )
+        # Each singleton picks its own winner from the grid; with two
+        # candidates and very different vol profiles the choice is per
+        # symbol (both may coincide, but the structure allows divergence).
+        winners = {c.name: c.winner_name for c in report.clusters if c.winner_name}
+        assert set(winners) <= {"CALM", "WILD"}
+
+    def test_symbol_without_data_excluded(self, universe):
+        store = FakeStore(
+            {
+                "CALM": make_bars("CALM", trending_closes(700, 0.004, drift=0.001, seed=1)),
+                "SPY": make_bars(
+                    "SPY",
+                    trending_closes(1100, 0.002, drift=0.001, seed=3),
+                    start=START - timedelta(days=400),
+                ),
+            }
+        )
+        report = run_cluster_research(
+            universe, store, START, HOLDOUT, END, grid=self.tiny_grid(), per_symbol=True
+        )
+        assert [c.name for c in report.clusters] == ["CALM"]
+
+    def test_determinism(self, universe):
+        store = self.research_store()
+        kwargs = {"grid": self.tiny_grid(), "per_symbol": True}
+        r1 = run_cluster_research(universe, store, START, HOLDOUT, END, **kwargs)
+        r2 = run_cluster_research(universe, store, START, HOLDOUT, END, **kwargs)
+        assert [c.winner_hash for c in r1.clusters] == [c.winner_hash for c in r2.clusters]
+
+    def test_assignments_respect_holdout_gate(self, universe):
+        store = self.research_store()
+        report = run_cluster_research(
+            universe, store, START, HOLDOUT, END, grid=self.tiny_grid(), per_symbol=True
+        )
+        for symbol, cluster in report.assignments().items():
+            assert cluster.name == symbol
+            assert symbol in cluster.passing_symbols
+            assert cluster.winner_hash != report.default_strategy_hash

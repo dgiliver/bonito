@@ -42,7 +42,10 @@
     "CORZ"
   ],
   "strategy_path": "strategies/deployed_strategy.json",
-  "symbol_strategies": {},
+  "symbol_strategies": {
+    "AAPL": "strategies/cluster_AAPL_54746177d5a1.json",
+    "GOOGL": "strategies/cluster_GOOGL_7fa6fdd674c8.json"
+  },
   "data": {
     "timeframe": "1d",
     "start_date": "2022-01-01"

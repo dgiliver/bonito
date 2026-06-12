@@ -15,7 +15,8 @@ Overfitting guardrails, in order of importance:
 - The search space is deliberately small (~144 configs) and structured;
   the regime filter is always on (structural risk decision, not a knob).
 - Assignments are written per symbol only where the winner passes the
-  holdout kill filter for that symbol. Everything else keeps the default.
+  holdout kill filter for that symbol AND made money in the holdout.
+  Everything else keeps the default.
 
 The whole sweep is deterministic — same data in, same assignments out —
 and the full report is written to livetrade/research/ for audit.
@@ -285,12 +286,17 @@ def research_cluster(
         if result is None:
             continue
         hold = window_metrics(result, holdout, end)
+        reasons = kill_verdict(hold)
+        # Assignment-specific gate on top of the kill filter: never switch a
+        # symbol off the default onto a config that LOST money out-of-sample.
+        if hold.total_return <= 0:
+            reasons.append(f"holdout return {hold.total_return * 100:+.1f}%≤0")
         cluster.verdicts.append(
             MemberVerdict(
                 symbol=symbol,
                 train=window_metrics(result, start, train_end),
                 holdout=hold,
-                holdout_reasons=kill_verdict(hold),
+                holdout_reasons=reasons,
             )
         )
     return cluster
@@ -304,9 +310,19 @@ def run_cluster_research(
     end: datetime,
     grid: GridSpec | None = None,
     progress=None,
+    per_symbol: bool = False,
 ) -> ResearchReport:
-    """Full sweep: cluster the universe, research each cluster independently."""
+    """Full sweep: cluster the universe, research each cluster independently.
+
+    With per_symbol=True every ticker becomes its own singleton cluster, so
+    each symbol gets the grid winner ranked on ITS OWN train window. The
+    cross-sectional sanity vote degenerates to 1-of-1 — the holdout kill
+    filter is then the only out-of-sample protection, so treat per-symbol
+    assignments with more suspicion than cluster-level ones.
+    """
     clusters, vols = cluster_universe(universe, store, start, end)
+    if per_symbol:
+        clusters = {s: [s] for s in sorted(vols)}
     candidates = candidate_grid(grid)
     results = [
         research_cluster(
