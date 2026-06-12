@@ -144,6 +144,7 @@ class ClosedTrade(BaseModel):
     quantity: float
     pnl: float
     reason: str
+    strategy_name: str = ""
 
 
 class AccountBacktestResult(BaseModel):
@@ -454,13 +455,15 @@ def _build_result(
 
 def _closed_trades(ledger: PaperLedger) -> list[ClosedTrade]:
     """Pair each sell fill with its entry (one position per symbol at a time)."""
-    entries: dict[str, tuple[datetime, float]] = {}
+    entries: dict[str, tuple[datetime, float, str]] = {}
     trades: list[ClosedTrade] = []
     for fill in ledger.fills:
         if fill.side == "buy":
-            entries[fill.symbol] = (fill.filled_at, fill.price)
+            entries[fill.symbol] = (fill.filled_at, fill.price, fill.strategy_name)
         else:
-            entry_date, entry_price = entries.pop(fill.symbol, (fill.filled_at, fill.price))
+            entry_date, entry_price, strategy_name = entries.pop(
+                fill.symbol, (fill.filled_at, fill.price, fill.strategy_name)
+            )
             trades.append(
                 ClosedTrade(
                     symbol=fill.symbol,
@@ -471,6 +474,7 @@ def _closed_trades(ledger: PaperLedger) -> list[ClosedTrade]:
                     quantity=fill.quantity,
                     pnl=(fill.price - entry_price) * fill.quantity,
                     reason=fill.reason,
+                    strategy_name=strategy_name,
                 )
             )
     return trades
