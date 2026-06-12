@@ -584,6 +584,29 @@ class TestEntryAllowlist:
         assert not [i for i in intents if i.side == "buy"]
 
 
+class TestEntryBlocklist:
+    def test_benched_symbols_skip_entries(self, universe):
+        universe.entry_blocklist = ["aaa", "BBB"]  # case-insensitive
+        store = uptrend_store(universe.symbols)
+        ledger = PaperLedger(cash=150.0, starting_cash=150.0)
+
+        intents, _ = generate_intents(universe, store, ledger, as_of=AS_OF)
+
+        bought = {i.symbol for i in intents if i.side == "buy"}
+        assert "AAA" not in bought and "BBB" not in bought
+        assert bought  # the rest of the universe still enters
+
+    def test_exits_never_gated_by_blocklist(self, universe):
+        universe.entry_blocklist = ["AAA"]
+        store = uptrend_store(universe.symbols)
+        ledger = PaperLedger(cash=150.0, starting_cash=150.0)
+        _open_position(ledger, "AAA", quantity=0.5, entry_price=200.0)  # stop breach
+
+        intents, _ = generate_intents(universe, store, ledger, as_of=AS_OF)
+
+        assert [i.symbol for i in intents if i.side == "sell"] == ["AAA"]
+
+
 class TestComputePositionAtrs:
     def test_atr_computed_for_atr_stop_positions_only(self, universe, tmp_path):
         from bonito.trading.live_runner import compute_position_atrs

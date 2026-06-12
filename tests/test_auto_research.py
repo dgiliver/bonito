@@ -43,6 +43,7 @@ def fake_result(
     holdout_sharpe: float,
     train_failures: list[str] | None = None,
     holdout_failures: list[str] | None = None,
+    per_symbol_pnl: dict[str, float] | None = None,
 ) -> AccountBacktestResult:
     """An AccountBacktestResult whose window methods return canned values."""
     result = AccountBacktestResult(
@@ -68,7 +69,7 @@ def fake_result(
         halt_date=None,
         halt_reason="",
         open_positions={},
-        per_symbol_pnl={},
+        per_symbol_pnl=per_symbol_pnl or {},
         rejected_intents=0,
     )
 
@@ -161,7 +162,11 @@ class TestDecideAdoption:
         assert adopted
 
 
-def make_report(assignments: dict[str, dict], researched: list[str]) -> ResearchReport:
+def make_report(
+    assignments: dict[str, dict],
+    researched: list[str],
+    eligible: dict[str, int] | None = None,
+) -> ResearchReport:
     """Report with one singleton cluster per researched symbol."""
     clusters = []
     for symbol in researched:
@@ -170,7 +175,7 @@ def make_report(assignments: dict[str, dict], researched: list[str]) -> Research
             members=[symbol],
             volatility={symbol: 0.3},
             candidates_evaluated=1,
-            candidates_eligible=1,
+            candidates_eligible=(eligible or {}).get(symbol, 1),
         )
         if symbol in assignments:
             cluster.winner_name = f"win_{symbol}"
@@ -238,8 +243,17 @@ class TestBuildCandidateMap:
         assert candidate == {"CCC": "strategies/keep_ccc.json"}
 
 
-class TestRunAutoResearch:
-    """Orchestration with the sweep and replay monkeypatched."""
+class AutoResearchHarness:
+    """Shared setup: universe on disk, sweep + replays monkeypatched."""
+
+    @pytest.fixture(autouse=True)
+    def _guard_real_live_config(self):
+        """Fail loudly if a test ever mutates the repo's real live config."""
+        real = Path("config/universe.live.json")
+        before = real.read_text() if real.exists() else None
+        yield
+        after = real.read_text() if real.exists() else None
+        assert before == after, "test leaked into the real config/universe.live.json"
 
     def setup_universe(self, tmp_path, symbol_strategies=None) -> Path:
         strategy_path = tmp_path / "default.json"
@@ -259,13 +273,22 @@ class TestRunAutoResearch:
         )
         return universe_path
 
-    def patch_pipeline(self, monkeypatch, report, baseline, candidate):
+    def patch_pipeline(self, monkeypatch, report, baseline, *candidates, swap=None):
+        """Stub the sweep + replays. `candidates` are consumed by successive
+        bundle replays (graded fallback); `swap` stubs propose_default_swap."""
         monkeypatch.setattr(auto_research, "run_cluster_research", lambda *a, **k: report)
+        monkeypatch.setattr(
+            auto_research, "propose_default_swap", lambda *a, **k: swap or (None, None, None)
+        )
         monkeypatch.setattr(
             auto_research.ReplayStore, "from_store", classmethod(lambda cls, *a, **k: cls({}))
         )
-        results = iter([baseline, candidate])
+        results = iter([baseline, *candidates])
         monkeypatch.setattr(auto_research, "backtest_account", lambda *a, **k: next(results))
+
+
+class TestRunAutoResearch(AutoResearchHarness):
+    """Core orchestration paths."""
 
     def test_adopt_writes_universe(self, tmp_path, monkeypatch):
         universe_path = self.setup_universe(tmp_path)
@@ -281,6 +304,7 @@ class TestRunAutoResearch:
             apply=True,
             strategies_dir=tmp_path / "strategies",
             research_dir=tmp_path / "research",
+            live_path=tmp_path / "universe.live.json",
         )
 
         assert result.outcome == "adopted"
@@ -304,6 +328,7 @@ class TestRunAutoResearch:
             apply=True,
             strategies_dir=tmp_path / "strategies",
             research_dir=tmp_path / "research",
+            live_path=tmp_path / "universe.live.json",
         )
 
         assert result.outcome == "rejected"
@@ -315,6 +340,9 @@ class TestRunAutoResearch:
         universe_path = self.setup_universe(tmp_path)
         report = make_report({}, researched=["AAA", "BBB"])
         monkeypatch.setattr(auto_research, "run_cluster_research", lambda *a, **k: report)
+        monkeypatch.setattr(
+            auto_research, "propose_default_swap", lambda *a, **k: (None, None, None)
+        )
 
         def boom(*a, **k):
             raise AssertionError("replay must not run when the map is unchanged")
@@ -328,6 +356,7 @@ class TestRunAutoResearch:
             apply=True,
             strategies_dir=tmp_path / "strategies",
             research_dir=tmp_path / "research",
+            live_path=tmp_path / "universe.live.json",
         )
         assert result.outcome == "unchanged"
 
@@ -348,6 +377,7 @@ class TestRunAutoResearch:
             apply=True,
             strategies_dir=tmp_path / "strategies",
             research_dir=tmp_path / "research",
+            live_path=tmp_path / "universe.live.json",
         )
 
         assert result.outcome == "adopted"
@@ -358,6 +388,9 @@ class TestRunAutoResearch:
         universe_path = self.setup_universe(tmp_path)
         report = make_report({}, researched=["AAA", "BBB"])
         monkeypatch.setattr(auto_research, "run_cluster_research", lambda *a, **k: report)
+        monkeypatch.setattr(
+            auto_research, "propose_default_swap", lambda *a, **k: (None, None, None)
+        )
 
         run_auto_research(
             universe_path,
@@ -365,7 +398,279 @@ class TestRunAutoResearch:
             end=END,
             strategies_dir=tmp_path / "strategies",
             research_dir=tmp_path / "research",
+            live_path=tmp_path / "universe.live.json",
         )
         digests = list((tmp_path / "research").glob("auto_research_*.json"))
         assert len(digests) == 1
         assert json.loads(digests[0].read_text())["outcome"] == "unchanged"
+
+
+class TestBenching(AutoResearchHarness):
+    def test_zero_eligible_symbol_gets_benched(self, tmp_path, monkeypatch):
+        universe_path = self.setup_universe(tmp_path)
+        report = make_report({}, researched=["AAA", "BBB"], eligible={"BBB": 0})
+        # First bundle (assignments+bench) passes the gate.
+        self.patch_pipeline(monkeypatch, report, fake_result(1.0, 1.5), fake_result(1.0, 1.6))
+
+        result = run_auto_research(
+            universe_path,
+            store=None,
+            end=END,
+            apply=True,
+            strategies_dir=tmp_path / "strategies",
+            research_dir=tmp_path / "research",
+            live_path=tmp_path / "universe.live.json",
+        )
+
+        assert result.outcome == "adopted"
+        assert result.benched == ["BBB"]
+        assert json.loads(universe_path.read_text())["entry_blocklist"] == ["BBB"]
+
+    def test_profitable_volatile_symbol_never_benched(self, tmp_path, monkeypatch):
+        # Zero eligible candidates (fails per-symbol filters at 100% capital)
+        # but a top account-level contributor — must NOT be proposed for the
+        # bench, so the cycle is a no-op without burning a bundle replay.
+        universe_path = self.setup_universe(tmp_path)
+        report = make_report({}, researched=["AAA", "BBB"], eligible={"BBB": 0})
+        self.patch_pipeline(
+            monkeypatch,
+            report,
+            fake_result(1.0, 1.5, per_symbol_pnl={"BBB": 1247.0}),
+        )
+
+        result = run_auto_research(
+            universe_path,
+            store=None,
+            end=END,
+            apply=True,
+            strategies_dir=tmp_path / "strategies",
+            research_dir=tmp_path / "research",
+            live_path=tmp_path / "universe.live.json",
+        )
+
+        assert result.outcome == "unchanged"
+        assert result.benched == []
+        assert "entry_blocklist" not in json.loads(universe_path.read_text())
+
+    def test_bad_bench_falls_back_to_assignments_only(self, tmp_path, monkeypatch):
+        # Bench bundle degrades holdout (an IREN-style false positive);
+        # the assignments-only fallback passes, so benching is dropped.
+        universe_path = self.setup_universe(tmp_path)
+        report = make_report(
+            {"AAA": {"hash": "aaa111", "config": BASE_STRATEGY}},
+            researched=["AAA", "BBB"],
+            eligible={"BBB": 0},
+        )
+        self.patch_pipeline(
+            monkeypatch,
+            report,
+            fake_result(1.0, 1.5),
+            fake_result(1.2, 1.0),  # assignments+bench: holdout degrades
+            fake_result(1.2, 1.7),  # assignments-only: passes
+        )
+
+        result = run_auto_research(
+            universe_path,
+            store=None,
+            end=END,
+            apply=True,
+            strategies_dir=tmp_path / "strategies",
+            research_dir=tmp_path / "research",
+            live_path=tmp_path / "universe.live.json",
+        )
+
+        assert result.outcome == "adopted"
+        assert result.adopted_bundle == "assignments-only"
+        assert result.benched == []
+        config = json.loads(universe_path.read_text())
+        assert config["entry_blocklist"] == []
+        assert "AAA" in config["symbol_strategies"]
+
+    def test_healed_symbol_is_unbenched(self, tmp_path, monkeypatch):
+        strategy_path = tmp_path / "default.json"
+        strategy_path.write_text(json.dumps(BASE_STRATEGY))
+        universe_path = tmp_path / "universe.json"
+        universe_path.write_text(
+            json.dumps(
+                {
+                    "name": "auto-test",
+                    "symbols": ["AAA", "BBB"],
+                    "strategy_path": str(strategy_path),
+                    "entry_blocklist": ["BBB"],
+                    "data": {"timeframe": "1d", "start_date": "2022-01-01"},
+                    "risk": {"starting_cash_usd": 5000.0},
+                }
+            )
+        )
+        report = make_report({}, researched=["AAA", "BBB"])  # BBB eligible again
+        self.patch_pipeline(monkeypatch, report, fake_result(1.0, 1.5), fake_result(1.1, 1.6))
+
+        result = run_auto_research(
+            universe_path,
+            store=None,
+            end=END,
+            apply=True,
+            strategies_dir=tmp_path / "strategies",
+            research_dir=tmp_path / "research",
+            live_path=tmp_path / "universe.live.json",
+        )
+
+        assert result.outcome == "adopted"
+        assert result.unbenched == ["BBB"]
+        assert json.loads(universe_path.read_text())["entry_blocklist"] == []
+
+
+class TestDefaultSwap(AutoResearchHarness):
+    def test_gated_default_swap_rewrites_strategy_path(self, tmp_path, monkeypatch):
+        universe_path = self.setup_universe(tmp_path)
+        new_default = tmp_path / "strategies" / "auto_default_new123.json"
+        new_default.parent.mkdir(parents=True, exist_ok=True)
+        new_default.write_text(json.dumps({**BASE_STRATEGY, "name": "new_default"}))
+        report = make_report({}, researched=["AAA", "BBB"])
+        self.patch_pipeline(
+            monkeypatch,
+            report,
+            fake_result(1.0, 1.5),
+            fake_result(1.3, 1.8),  # swap bundle passes immediately
+            swap=("new_default", str(new_default), None),
+        )
+
+        result = run_auto_research(
+            universe_path,
+            store=None,
+            end=END,
+            apply=True,
+            strategies_dir=tmp_path / "strategies",
+            research_dir=tmp_path / "research",
+            live_path=tmp_path / "universe.live.json",
+        )
+
+        assert result.outcome == "adopted"
+        assert result.default_swapped
+        assert result.default_swap == "new_default"
+        assert json.loads(universe_path.read_text())["strategy_path"] == str(new_default)
+
+    def test_bad_swap_falls_back_to_current_default(self, tmp_path, monkeypatch):
+        universe_path = self.setup_universe(tmp_path)
+        original = json.loads(universe_path.read_text())["strategy_path"]
+        new_default = tmp_path / "strategies" / "auto_default_new123.json"
+        new_default.parent.mkdir(parents=True, exist_ok=True)
+        new_default.write_text(json.dumps({**BASE_STRATEGY, "name": "new_default"}))
+        report = make_report(
+            {"AAA": {"hash": "aaa111", "config": BASE_STRATEGY}}, researched=["AAA", "BBB"]
+        )
+        self.patch_pipeline(
+            monkeypatch,
+            report,
+            fake_result(1.0, 1.5),
+            fake_result(1.4, 1.2),  # swap+assignments: holdout degrades
+            fake_result(1.1, 1.6),  # assignments-only: passes
+            swap=("new_default", str(new_default), None),
+        )
+
+        result = run_auto_research(
+            universe_path,
+            store=None,
+            end=END,
+            apply=True,
+            strategies_dir=tmp_path / "strategies",
+            research_dir=tmp_path / "research",
+            live_path=tmp_path / "universe.live.json",
+        )
+
+        assert result.outcome == "adopted"
+        assert not result.default_swapped
+        assert result.default_swap is None  # cleared: the swap did not ship
+        config = json.loads(universe_path.read_text())
+        assert config["strategy_path"] == original
+        assert "AAA" in config["symbol_strategies"]
+
+
+class TestSyncLiveConfig:
+    def test_structure_synced_human_levers_untouched(self, tmp_path):
+        paper = tmp_path / "universe.json"
+        live = tmp_path / "universe.live.json"
+        paper.write_text(
+            json.dumps(
+                {
+                    "name": "paper",
+                    "symbols": ["AAA", "BBB"],
+                    "strategy_path": "strategies/new_default.json",
+                    "symbol_strategies": {"AAA": "strategies/auto_AAA_x.json"},
+                    "entry_blocklist": ["BBB"],
+                    "risk": {"starting_cash_usd": 5000.0, "max_position_usd": 2500.0},
+                }
+            )
+        )
+        live.write_text(
+            json.dumps(
+                {
+                    "name": "live",
+                    "mode": "live",
+                    "live_enabled": False,
+                    "symbols": ["OLD"],
+                    "strategy_path": "strategies/old.json",
+                    "symbol_strategies": {},
+                    "entry_allowlist": ["COST"],
+                    "risk": {"starting_cash_usd": 150.0, "max_position_usd": 30.0},
+                }
+            )
+        )
+
+        changed = auto_research.sync_live_config(paper, live)
+
+        assert changed
+        synced = json.loads(live.read_text())
+        assert synced["symbols"] == ["AAA", "BBB"]
+        assert synced["strategy_path"] == "strategies/new_default.json"
+        assert synced["entry_blocklist"] == ["BBB"]
+        # Human-only levers preserved exactly.
+        assert synced["mode"] == "live"
+        assert synced["live_enabled"] is False
+        assert synced["entry_allowlist"] == ["COST"]
+        assert synced["risk"]["max_position_usd"] == 30.0
+
+    def test_missing_live_config_is_noop(self, tmp_path):
+        paper = tmp_path / "universe.json"
+        paper.write_text(json.dumps({"symbols": ["AAA"]}))
+        assert not auto_research.sync_live_config(paper, tmp_path / "nope.json")
+
+
+class TestGridEdgeFlags:
+    def winner_config(self, fast=10, slow=26, rsi=68.0, atr=2.0):
+        return {
+            "indicators": [
+                {"type": "ema", "name": "ema_fast", "params": {"period": fast}},
+                {"type": "ema", "name": "ema_slow", "params": {"period": slow}},
+                {"type": "rsi", "name": "rsi_14", "params": {"period": 14}},
+            ],
+            "entry_rules": [
+                {
+                    "conditions": [
+                        {"left": "ema_fast", "comparison": "gt", "right": "ema_slow"},
+                        {"left": "rsi_14", "comparison": "lt", "right": rsi},
+                    ]
+                }
+            ],
+            "stop_loss": {"type": "trailing_atr", "value": atr, "atr_period": 14},
+        }
+
+    def report_with_winner(self, config) -> ResearchReport:
+        report = make_report({"AAA": {"hash": "h1", "config": config}}, researched=["AAA"])
+        return report
+
+    def test_edge_winner_flagged(self):
+        report = self.report_with_winner(self.winner_config(fast=8, slow=21, atr=1.5, rsi=60.0))
+        flags = auto_research.grid_edge_flags(report)
+        assert len(flags) == 1
+        assert "AAA" in flags[0]
+        assert "atr=1.5" in flags[0] and "rsi<60" in flags[0] and "ema=(8, 21)" in flags[0]
+
+    def test_interior_winner_not_flagged(self):
+        report = self.report_with_winner(self.winner_config(fast=10, slow=26, atr=2.0, rsi=68.0))
+        assert auto_research.grid_edge_flags(report) == []
+
+    def test_non_passing_winner_not_flagged(self):
+        report = self.report_with_winner(self.winner_config(atr=1.5))
+        report.clusters[0].verdicts[0].holdout_reasons = ["DD 40%>25%"]
+        assert auto_research.grid_edge_flags(report) == []

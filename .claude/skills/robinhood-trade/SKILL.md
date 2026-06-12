@@ -109,12 +109,22 @@ outcome in the experiment log either way.
 ## Strategy research (AUTOMATED weekly — manual runs optional)
 
 The `Weekly strategy research` workflow (`.github/workflows/weekly-research.yml`)
-runs `bonito research auto --apply` every Saturday: rolling-holdout
-per-symbol sweep → stateless symbol_strategies rebuild → account-replay
-gate (adopt only if neither train nor holdout degrades). It commits a
-digest every cycle and opens an issue when anything changed or was
-rejected; silent weeks mean "unchanged". It never touches mode,
-live_enabled, or risk caps. A REJECTED cycle is the gate working, not a
+runs `bonito research auto --apply` every Saturday. One cycle re-validates
+EVERYTHING that can go stale: rolling-holdout per-symbol sweep, stateless
+symbol_strategies rebuild, cross-sectional re-validation of the DEFAULT
+strategy (swap proposal when a better one emerges), benching of symbols
+that are both unsound (zero eligible grid candidates) and unprofitable in
+the baseline replay (entry_blocklist; exits never gated), and grid-edge
+flags when winners sit on a search boundary (human cue to extend the
+grid — it never auto-grows). Candidate bundles go through the
+account-replay gate with graded fallback (swap+assignments+bench →
+swap+assignments → assignments+bench → assignments-only); the first
+bundle where neither train nor holdout degrades ships. On adoption the
+validated structure is synced into universe.live.json (symbols,
+strategy_path, symbol_strategies, entry_blocklist — NEVER mode,
+live_enabled, risk caps, or entry_allowlist). It commits a digest every
+cycle and opens an issue when anything changed or was rejected; silent
+weeks mean "unchanged". A REJECTED cycle is the gate working, not a
 failure — do not force-apply a rejected bundle.
 
 Manual sweeps remain available: `bonito research auto` (dry run digest),

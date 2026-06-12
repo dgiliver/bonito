@@ -548,12 +548,15 @@ def research_auto(
         )
 
     color = {"adopted": "green", "rejected": "yellow", "unchanged": "dim"}[result.outcome]
+    bundle = f" via {result.adopted_bundle}" if result.adopted_bundle else ""
     console.print(
         Panel.fit(
-            f"[bold {color}]Auto research — {result.outcome.upper()}[/bold {color}]\n"
+            f"[bold {color}]Auto research — {result.outcome.upper()}{bundle}[/bold {color}]\n"
             f"Train: {result.start:%Y-%m-%d} → {result.holdout:%Y-%m-%d} | "
             f"Holdout: {result.holdout:%Y-%m-%d} → {result.end:%Y-%m-%d} (rolling)\n"
-            f"Assignments: +{len(result.added)} ~{len(result.updated)} -{len(result.removed)}",
+            f"Assignments: +{len(result.added)} ~{len(result.updated)} -{len(result.removed)} | "
+            f"benched: {len(result.benched)} unbenched: {len(result.unbenched)} | "
+            f"default swap: {'yes' if result.default_swapped else 'no'}",
             border_style=color,
         )
     )
@@ -561,9 +564,13 @@ def research_auto(
         ("added", result.added),
         ("updated", result.updated),
         ("removed", result.removed),
+        ("benched", result.benched),
+        ("unbenched", result.unbenched),
     ):
         if symbols:
             console.print(f"  {change}: {', '.join(symbols)}")
+    if result.default_swap:
+        console.print(f"  default → [bold]{result.default_swap}[/bold]")
     for c in result.comparisons:
         console.print(
             f"  {c.window}: Sharpe {c.baseline_sharpe:.2f} → {c.candidate_sharpe:.2f}, "
@@ -571,6 +578,8 @@ def research_auto(
         )
     for reason in result.reasons:
         console.print(f"  [yellow]{reason}[/yellow]")
+    for flag in result.grid_edge_flags:
+        console.print(f"  [cyan]grid edge: {flag}[/cyan]")
     if result.outcome == "adopted" and not apply:
         console.print("[dim]Dry run — re-run with --apply to write the adopted bundle.[/dim]")
 

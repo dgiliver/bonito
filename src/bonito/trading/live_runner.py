@@ -78,6 +78,13 @@ class UniverseConfig(BaseModel):
         description="If set, only these symbols may open NEW positions (exits are "
         "never gated). Pre-live lever: restrict entries to kill-filter passers.",
     )
+    entry_blocklist: list[str] = Field(
+        default_factory=list,
+        description="Symbols benched from NEW entries (exits are never gated). "
+        "Managed by the weekly auto-research: a symbol lands here when no grid "
+        "candidate passes its train kill filter AND benching it survives the "
+        "account-replay gate; it is unbenched the same way when it heals.",
+    )
     strategy_path: str
     symbol_strategies: dict[str, str] = Field(
         default_factory=dict,
@@ -281,6 +288,9 @@ def generate_intents(
     )
     if allowset is not None:
         logger.info(f"entry allowlist active: {sorted(allowset)}")
+    blockset = {s.upper() for s in universe.entry_blocklist}
+    if blockset:
+        logger.info(f"entry blocklist active: {sorted(blockset)}")
 
     # Universe-list order decides slot competition — a TESTED choice, not an
     # accident: momentum-ranked competition collapsed the holdout (-20%) and
@@ -293,6 +303,8 @@ def generate_intents(
         if symbol in ledger.positions:
             continue
         if allowset is not None and symbol.upper() not in allowset:
+            continue
+        if symbol.upper() in blockset:
             continue
 
         pct = universe.risk.position_pct_equity
