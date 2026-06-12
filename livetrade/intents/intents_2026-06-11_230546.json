@@ -1,0 +1,35 @@
+[
+  {
+    "symbol": "ARM",
+    "side": "sell",
+    "dollar_amount": null,
+    "quantity": 2.9038815902580066,
+    "reason": "take profit triggered",
+    "signal_price": 342.2300109863281,
+    "signal_date": "2026-06-11T04:00:00",
+    "strategy_name": "ema_cross_rsi_atr_regime",
+    "generated_at": "2026-06-11T23:05:46.043377Z"
+  },
+  {
+    "symbol": "SNDK",
+    "side": "buy",
+    "dollar_amount": 1000.0,
+    "quantity": null,
+    "reason": "entry rule matched: ema_fast gt ema_slow, close gt ema_slow, rsi_14 lt 68.0",
+    "signal_price": 1881.510009765625,
+    "signal_date": "2026-06-11T04:00:00",
+    "strategy_name": "ema_cross_rsi_atr_regime",
+    "generated_at": "2026-06-11T23:05:46.117013Z"
+  },
+  {
+    "symbol": "IREN",
+    "side": "buy",
+    "dollar_amount": 125.31,
+    "quantity": null,
+    "reason": "entry rule matched: ema_fast gt ema_slow, close gt ema_slow, rsi_14 lt 68.0",
+    "signal_price": 56.709999084472656,
+    "signal_date": "2026-06-11T04:00:00",
+    "strategy_name": "ema_cross_rsi_atr_regime",
+    "generated_at": "2026-06-11T23:05:46.122207Z"
+  }
+]
