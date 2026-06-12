@@ -96,6 +96,16 @@ during RTH via /loop:
   have done". Run it after any change to live_runner/strategy/caps and
   compare against the previous saved result in `livetrade/research/`.
 
+## Optimization experiments (periodic — NOT part of the daily cycle)
+
+Before proposing ANY pipeline/strategy optimization, read
+`docs/EXPERIMENT_LOG.md` — it records adopted AND rejected ideas with
+evidence (e.g. momentum-ranked entries and exit-rule removal are both
+tested rejections; do not re-propose from attribution tables). Protocol:
+pre-register the criterion (train improves AND holdout doesn't degrade),
+judge only via `bonito live backtest-account`, one shot per idea, log the
+outcome in the experiment log either way.
+
 ## Strategy research (periodic — NOT part of the daily cycle)
 
 `.venv/bin/bonito research clusters` sweeps a fixed 144-candidate grid per

@@ -282,6 +282,9 @@ def generate_intents(
     if allowset is not None:
         logger.info(f"entry allowlist active: {sorted(allowset)}")
 
+    # Universe-list order decides slot competition — a TESTED choice, not an
+    # accident: momentum-ranked competition collapsed the holdout (-20%) and
+    # tripped the kill switch. See docs/EXPERIMENT_LOG.md (2026-06-12).
     for symbol in universe.symbols:
         if buys >= universe.risk.max_daily_buys:
             break

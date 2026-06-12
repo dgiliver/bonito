@@ -1,6 +1,6 @@
 {
   "name": "robinhood-agentic-live-DRAFT",
-  "description": "DRAFT live config for the $150 Agentic cash account. NOT ACTIVE: live_enabled stays false until explicit user sign-off (pre-live checklist in tasks/todo.md). Re-verify entry_allowlist against the latest backtest-universe holdout passers at flip time.",
+  "description": "DRAFT live config for the $150 Agentic cash account. NOT ACTIVE: live_enabled stays false until explicit user sign-off (pre-live checklist in tasks/todo.md). Structure synced 2026-06-12 with replay-validated paper config (8 slots x 12.5% equity, NVDA dropped, per-symbol strategies) \u2014 see docs/EXPERIMENT_LOG.md. Re-verify entry_allowlist against the latest backtest-universe holdout passers at flip time.",
   "broker": "robinhood",
   "account_nickname": "Agentic",
   "mode": "live",
@@ -15,7 +15,6 @@
     "ARM",
     "IREN",
     "NOW",
-    "NVDA",
     "AMD",
     "COST",
     "HOOD",
@@ -30,11 +29,28 @@
     "ASML",
     "AVGO",
     "MRVL",
-    "LLY"
+    "LLY",
+    "AMAT",
+    "KLAC",
+    "LRCX",
+    "AAPL",
+    "GOOGL",
+    "META",
+    "AMZN",
+    "AXON",
+    "CORZ"
   ],
-  "entry_allowlist": ["COST", "MSFT", "TSM"],
+  "entry_allowlist": [
+    "COST",
+    "MSFT",
+    "TSM"
+  ],
   "strategy_path": "strategies/deployed_strategy.json",
-  "symbol_strategies": {},
+  "symbol_strategies": {
+    "AAPL": "strategies/cluster_AAPL_54746177d5a1.json",
+    "GOOGL": "strategies/cluster_GOOGL_7fa6fdd674c8.json",
+    "IREN": "strategies/iren_ema8-21_rsi68_atr1.5_tpnone.json"
+  },
   "data": {
     "timeframe": "1d",
     "start_date": "2022-01-01"
@@ -42,10 +58,11 @@
   "risk": {
     "starting_cash_usd": 150.0,
     "max_position_usd": 30.0,
-    "max_positions": 5,
+    "max_positions": 8,
     "max_daily_buys": 3,
     "min_cash_buffer_usd": 5.0,
     "allow_short": false,
-    "max_drawdown_halt": 0.25
+    "max_drawdown_halt": 0.25,
+    "position_pct_equity": 0.125
   }
 }

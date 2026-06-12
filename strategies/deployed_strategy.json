@@ -1,6 +1,6 @@
 {
   "name": "ema_cross_rsi_atr_regime",
-  "description": "EMA 10/26 cross + RSI<68, 2.0x ATR(14) trailing stop, 10% TP, SPY>SMA200 regime gate",
+  "description": "EMA 10/26 cross + RSI<68, 2.0x ATR(14) trailing stop, 10% TP, SPY>SMA200 regime gate. Exit rule VALIDATED 2026-06-12: removing it degrades the account replay despite negative raw attribution (docs/EXPERIMENT_LOG.md) \u2014 do not strip it without fresh replay evidence.",
   "version": "2.0",
   "symbols": [
     "SPY"
