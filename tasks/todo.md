@@ -81,9 +81,12 @@ intraday sweep modeled from daily OHLC, not 15-min quotes.
 - [ ] Re-run `bonito research clusters` with the longer holdout; apply any
       passing per-symbol assignments.
 - [ ] Review universe.live.json caps against actual account balance.
-- [ ] Live MCP rehearsal on the Agentic account (••••8597, NEVER margin):
-      reconcile → review_equity_order ($1–2) → place → record-fill →
-      reconcile → sell. Verifies the full order path before real sizing.
+- [x] Live MCP rehearsal on the Agentic account (••••8597, NEVER margin) —
+      DONE 2026-06-12: RIVN 1-share round trip. Buy limit $15.75 → filled
+      $15.7478 (~200ms); sell limit $15.74 → filled $15.7501 (price
+      improvement). Zero fees, placed_agent=agentic on both legs, book
+      flat after. Order IDs 6a2c3437-…f16d (buy), 6a2c345b-…8dfc (sell).
+      Margin account rejected by API design (agentic_allowed=false). ✅
 - [ ] USER SIGN-OFF, then flip `live_enabled: true` in universe.live.json
       and point the daily session at it. Live placement stays in Claude
       sessions via MCP — the Actions workflows are paper-only by guard.
