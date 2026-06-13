@@ -11,7 +11,7 @@ make web              # Start frontend (port 3000)
 make dashboard        # Live-trading dashboard, read-only (port 8050)
 make chat             # CLI agent chat
 make research         # Run autonomous strategy research (SPY, 1000 iterations)
-make ingest-universe  # Ingest 12-symbol universe into DuckDB
+make ingest-universe  # Ingest 33-symbol universe into DuckDB
 make test             # Run all tests
 make test-fast        # Skip slow tests
 make lint             # Run ruff linter
@@ -24,6 +24,22 @@ make docker-down      # Stop containers
 
 # Data
 bonito ingest SPY AAPL --start 2020-01-01 --end 2024-12-01
+
+# Live trading pipeline (paper or live)
+bonito live refresh [-u config/universe.live.json]       # Pull latest price data
+bonito live preflight [-u config/universe.live.json]     # Fail-closed gate (kill switch, flags, data)
+bonito live run [--no-refresh] [-u ...]                  # Generate intents; auto-fills in paper mode
+bonito live reconcile '<{"SYMBOL":qty}>' [-u ...]        # Check broker positions vs ledger
+bonito live record-fill SYMBOL buy PRICE --dollars N     # Record a live fill
+bonito live status [-u ...]                              # Print current positions + P&L
+bonito live sweep [--execute] [-u ...]                   # Intraday stop sweep
+bonito live tracking [-u ...]                            # Paper-vs-replay fidelity check
+bonito live backtest-universe [-u ...]                   # Per-symbol strategy validation
+bonito live backtest-account [-u ...]                    # Full account-level replay
+
+# Strategy research
+bonito research auto [--apply] [-u ...]                  # Weekly: rolling holdout, graded bundles, sync live config
+bonito research clusters [--per-symbol] [--apply] [-u ...]  # One-shot cluster search
 ```
 
 ## Project Structure
@@ -33,7 +49,8 @@ src/bonito/
 ├── agent/          # LLM agent (Claude integration, orchestrator, tools)
 ├── backtest/       # Vectorized backtest engine, indicators, strategy DSL
 ├── data/           # DuckDB market data storage
-├── research/       # Autonomous strategy research (Karpathy-style mutation loop)
+├── research/       # Strategy research: cluster search + autonomous weekly loop
+├── trading/        # Live trading pipeline (runner, portfolio backtest, tracking)
 ├── tools/          # Agent tools (backtest, data, strategy, chart control)
 ├── api/            # FastAPI REST API with SSE streaming
 └── cli.py          # Typer CLI
@@ -41,7 +58,10 @@ src/bonito/
 web/                # Next.js 16 frontend (React 19, TypeScript, lightweight-charts)
 tests/              # pytest test suite
 docs/               # Architecture, roadmaps, design docs
-strategies/         # Example strategy JSON files
+strategies/         # JSON strategy configs (deployed + per-symbol)
+config/             # universe.json (paper) + universe.live.json (live, mode/live_enabled human-only)
+livetrade/          # Paper ledger, live ledger, intents, and research artifacts (git-tracked)
+.github/workflows/  # paper-trading, intraday-stops, weekly-research CI
 ```
 
 ## Code Style
@@ -117,31 +137,56 @@ Test files:
 | `src/bonito/backtest/indicators.py` | All technical indicators (SMA, RSI, MACD, pandas-ta) |
 | `src/bonito/backtest/strategy.py` | Strategy DSL Pydantic models |
 | `src/bonito/research/autoresearch_trading.py` | Karpathy-style autonomous strategy mutation loop |
+| `src/bonito/research/auto_research.py` | Weekly rolling-holdout + graded-bundle adoption loop |
+| `src/bonito/research/cluster_research.py` | Cluster / per-symbol grid search (450 candidates) |
+| `src/bonito/trading/live_runner.py` | Intent generation, risk caps, kill switch, preflight |
+| `src/bonito/trading/portfolio_backtest.py` | Account-level replay (ReplayStore, strategy attribution) |
+| `src/bonito/trading/tracking.py` | Paper-vs-replay fidelity (fill gaps, equity drift) |
 | `src/bonito/tools/` | All agent tools |
 | `web/src/components/analysis/` | Chart components, indicator panels |
 | `web/src/contexts/AnalysisContext.tsx` | Chart state management |
+| `config/universe.json` | Paper trading config (33 symbols, 8 slots, dynamic sizing) |
+| `config/universe.live.json` | Live config — synced by research; mode/live_enabled human-only |
+| `docs/EXPERIMENT_LOG.md` | Canonical record of adopted/rejected optimizations |
+| `docs/AUTONOMOUS_LIVE_ROUTINE.md` | How to run the live cycle unattended via Claude Routines |
+| `tasks/todo.md` | Pre-live checklist + current task tracking |
+| `tasks/lessons.md` | Hard-won lessons (prevent repeated mistakes) |
 
-## Current State (v0.9.1)
+## Current State (v1.0 — Autonomous Trading)
 
-**Completed:**
+**Core platform (complete):**
 - MVP (Phases 0-5): data layer, backtest engine, tools, agent, API, frontend
-- Phase 3 post-MVP: Agent chart control, trade spotlight, crosshair labels
+- Agent chart control, trade spotlight, crosshair labels
 - pandas-ta integration (60+ indicators)
-- Trailing stops (percent and ATR-based)
-- F020: Short selling support ✅
-- F022: Rolling lookback conditions ✅
-- F002: Strategy plugin interface ✅
-- Dynamic panel ordering (panels render in user add order)
-- Panel re-initialization fix (panels survive height changes)
+- Trailing stops (percent and ATR-based), short selling, rolling lookback conditions
+- Dynamic panel ordering; panel re-initialization fix
 
-**In Progress:**
-- Drawing tools (trendlines, annotations) - see `drawing-tools` agent
-- Additional indicator panels (ADX, CCI, ATR)
+**Live trading pipeline (complete):**
+- Paper + live ledger, intent-based execution (sells-before-buys), kill switch (25% drawdown halt)
+- Dynamic position sizing: `position_pct_equity` scales slots with equity; $2,500 hard cap
+- 33-symbol universe, 8 slots, per-symbol strategies (AAPL/GOOGL/IREN assigned)
+- Entry blocklist (`entry_blocklist`) for benched symbols; exits never gated
+- `bonito live preflight`: fail-closed gate (kill switch, flag mismatch, total data outage)
+- `bonito live tracking`: paper-vs-replay fidelity (fill bps gap, decision divergences, equity drift)
+- `bonito live backtest-account`: full account-level replay; structurally prevents look-ahead
 
-**Next Up:**
-- Authentication (Supabase)
-- Real-time data (WebSocket price feeds)
-- Production deployment
+**Autonomous research (complete):**
+- Weekly rolling-holdout research (`bonito research auto --apply`) — runs unattended every Saturday
+- Per-symbol grid search: 450 candidates (extended from 144); profitable-holdout gate
+- Graded fallback bundles: (swap+assignments+bench) → ... → assignments-only; first passing ships
+- Grid-edge flags: winners at search boundary surfaced in digest as human cue to extend
+- `sync_live_config()`: mirrors validated structure into universe.live.json; NEVER touches mode/live_enabled/risk caps
+- Experiment log (`docs/EXPERIMENT_LOG.md`) — canonical record of adopted/rejected optimizations; pre-register criterion before running
+
+**Autonomous execution (complete):**
+- GitHub Actions: paper shadow daily + intraday stop sweeps (never real orders)
+- Claude Code Routine: scheduled live cycle (reconcile → preflight → run → place → record → commit)
+- Robinhood MCP wired as claude.ai connector; Agentic account (••••8597) only
+- Broker-side GTC stop orders: intraday protection 24/7 without a running session
+
+**In progress / next:**
+- Drawing tools (trendlines, annotations)
+- ≥2 weeks paper-vs-replay tracking OK → user sign-off → flip live_enabled (see `tasks/todo.md`)
 
 ## Agent & Skill Architecture
 
@@ -174,6 +219,7 @@ Bonito uses a comprehensive swarm architecture for development:
 | `/review` | Code review before commit |
 | `/explore-ui` | Start servers and explore UI |
 | `/autoresearch` | Karpathy-style autonomous iteration loop (any metric) |
+| `/robinhood-trade` | Daily trading cycle or intraday sweep via Robinhood MCP |
 
 ### Ralph Wiggum Loops
 For autonomous iterative development:
@@ -193,6 +239,8 @@ All detailed docs in `/docs/`:
 - `HIGH_PRIORITY_PLAN.md` - Detailed feature implementation plans
 - `AGENT_CHART_SYNTHESIS.md` - Chart-agent integration rules
 - `LAUNCH_PLAN.md` - Go-to-market strategy
+- `EXPERIMENT_LOG.md` - Adopted/rejected optimization registry (pre-register before running)
+- `AUTONOMOUS_LIVE_ROUTINE.md` - How to run the live cycle unattended via Claude Code Routines
 
 ## Environment
 
@@ -262,6 +310,26 @@ Panels must render in user add order via `activePanels.map()`:
 - No drawing manager in ChartContainer
 - Missing localStorage persistence layer for UI state
 
+## Autonomous Trading Stack
+
+The system runs with zero daily intervention once live:
+
+| Layer | Mechanism | Frequency | Human touch |
+|-------|-----------|-----------|-------------|
+| **Paper shadow** | GitHub Actions (`paper-trading.yml`) | Daily 3:50pm ET | None |
+| **Intraday stops** | GitHub Actions (`intraday-stops.yml`) | Every 15 min, 9:30–16:00 ET | None |
+| **Weekly research** | GitHub Actions (`weekly-research.yml`) | Saturday 13:00 UTC | GitHub issue on adoption/rejection |
+| **Live cycle** | Claude Code Routine (`/schedule weekdays at 3:45pm ET`) | Daily 3:45pm ET | None after sign-off |
+| **Intraday live stops** | Broker-side GTC stop orders | 24/7 | Cancel/replace daily via Routine |
+
+**Human-only controls (never automated):**
+- `mode` and `live_enabled` in `config/universe.live.json`
+- Risk caps (`max_position_usd`, `position_pct_equity`, `max_positions`)
+- `bonito live resume` after a kill-switch halt
+- Creating the Routine (`/schedule` from a local Claude Code terminal)
+
+**Pre-live checklist:** `tasks/todo.md` — gated on ≥2 weeks paper-vs-replay tracking OK + explicit sign-off.
+
 ## Recommended Swarms by Task
 
 ### Adding New Indicator
@@ -307,36 +375,38 @@ Panels must render in user add order via `activePanels.map()`:
 3. /doc-cleanup --consolidate      # Merge redundant docs
 ```
 
-## MCP Plugins to Consider
+### Live Trading Cycle
+```
+1. /robinhood-trade daily          # Full daily cycle (paper or live)
+2. /robinhood-trade monitor        # One intraday stop sweep
+3. bonito live tracking            # Paper-vs-replay fidelity
+4. bonito live backtest-account    # Account replay after any pipeline change
+```
 
-For enhancing Bonito's capabilities, consider these MCP integrations:
+### Strategy Optimization
+```
+1. Read docs/EXPERIMENT_LOG.md     # Check what's already been tried
+2. Pre-register criterion          # train+holdout both must improve
+3. bonito research clusters --per-symbol --apply  # One-shot per-symbol grid
+4. bonito research auto --apply    # Full weekly research pass
+5. Log outcome in EXPERIMENT_LOG.md (adopted OR rejected — both matter)
+```
 
-### High Priority (Immediate Value)
+## MCP Integrations
+
+### Active
+| Plugin | Purpose | Notes |
+|--------|---------|-------|
+| **Robinhood MCP** | Live order execution | Connected as claude.ai connector; Agentic account only (••••8597) |
+| **GitHub MCP** | Issue/PR visibility | Weekly research opens issues on adoption/rejection/tracking WARN |
+
+### Future
 | Plugin | Purpose | Why |
 |--------|---------|-----|
-| **Alpaca MCP** | Paper/live trading | Bridges backtest → live execution |
 | **Alpha Vantage MCP** | Real-time market data | Better than Yahoo Finance for live data |
 | **Financial Datasets MCP** | Fundamentals | Income statements, balance sheets for factor strategies |
-
-### Medium Priority (Future Enhancement)
-| Plugin | Purpose | Why |
-|--------|---------|-----|
 | **Memory MCP** | Persistent knowledge | Remember user preferences, past strategies |
-| **GitHub MCP** | Issue/PR integration | Track feature requests from within Claude |
 | **PostgreSQL MCP** | Production database | When moving beyond DuckDB |
-
-### Integration Pattern
-```python
-# MCP tools follow same protocol as Bonito tools
-class AlpacaMCPTool(Tool):
-    name = "alpaca_place_order"
-    description = "Place a paper/live trade via Alpaca"
-    parameters = {...}
-
-    async def execute(self, symbol: str, qty: int, side: str) -> ToolResult:
-        # MCP handles the actual API call
-        return await mcp_client.call("alpaca", "place_order", {...})
-```
 
 ### State-of-the-Art Setup Recommendations
 1. **Git worktrees** - Each Claude session in isolated checkout
