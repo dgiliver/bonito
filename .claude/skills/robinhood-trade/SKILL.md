@@ -42,6 +42,12 @@ git pull origin <current-branch>   # pick up latest ledger state
    - If Yahoo is blocked ("Host not in allowlist"), STOP and tell the user
      to add `query1.finance.yahoo.com` / `query2.finance.yahoo.com` to the
      environment's network allowlist. Never trade on stale data.
+1b. **Preflight gate**: `.venv/bin/bonito live preflight`
+   - Non-zero exit = ABORT (latched kill switch, total data outage, or a
+     `live`/`live_enabled` mismatch). STOP and report — do not trade.
+     Stale individual symbols / stale regime are warnings, not aborts.
+     This matters most for unattended runs, where a silent no-op would
+     otherwise be indistinguishable from "no signals today".
 2. **Run the cycle**: `.venv/bin/bonito live run --no-refresh`
    - Paper mode (`mode: "paper"` in universe.json): intents fill into
      `livetrade/paper_ledger.json` automatically. Done — go to step 4.

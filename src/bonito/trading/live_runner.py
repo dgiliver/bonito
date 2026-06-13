@@ -553,6 +553,112 @@ class ReconcileReport(BaseModel):
         return "\n".join(lines)
 
 
+class PreflightReport(BaseModel):
+    """Result of the pre-trade safety gate (see `preflight`)."""
+
+    ok: bool = Field(..., description="False means ABORT — do not trade this cycle")
+    reasons: list[str] = Field(default_factory=list, description="Hard failures that set ok=False")
+    warnings: list[str] = Field(
+        default_factory=list, description="Soft issues; proceed but surface them"
+    )
+    mode: str
+    live_enabled: bool
+    halted: bool
+    halt_reason: str = ""
+    fresh_symbols: list[str] = Field(default_factory=list)
+    stale_symbols: list[str] = Field(default_factory=list)
+    missing_symbols: list[str] = Field(default_factory=list)
+    stale_regime: list[str] = Field(default_factory=list)
+
+    def describe(self) -> str:
+        head = "PREFLIGHT OK" if self.ok else "PREFLIGHT ABORT"
+        lines = [f"{head} (mode={self.mode}, live_enabled={self.live_enabled})"]
+        lines += [f"  ABORT: {r}" for r in self.reasons]
+        lines += [f"  warn: {w}" for w in self.warnings]
+        lines.append(
+            f"  data: {len(self.fresh_symbols)} fresh, "
+            f"{len(self.stale_symbols)} stale, {len(self.missing_symbols)} missing"
+        )
+        return "\n".join(lines)
+
+
+def preflight(
+    universe: UniverseConfig,
+    ledger: PaperLedger,
+    store: MarketDataStore,
+    as_of: datetime | None = None,
+) -> PreflightReport:
+    """Fail-closed gate that must pass before any UNATTENDED cycle.
+
+    The daily pipeline already fails *safe* — stale symbols are skipped and
+    stale regime data reads risk-off — but a routine running with no human
+    can't tell "did nothing because of a data outage" from "no signals
+    today". This gate converts those silent no-ops into a loud abort so an
+    autonomous run stops and notifies instead of trading on bad state.
+
+    Checks only what needs no broker data (config consistency, kill switch,
+    data freshness); reconciliation against the broker is a separate step.
+
+    Hard failures (ok=False, abort): live-flag inconsistency, a latched kill
+    switch, or zero fresh symbols (a total data outage). Individually stale
+    symbols and stale regime data are warnings — the run should still
+    proceed so exits and stops process — surfaced for the run summary.
+    """
+    as_of = as_of or datetime.now(UTC).replace(tzinfo=None)
+    reasons: list[str] = []
+    warnings: list[str] = []
+
+    if universe.mode == "live" and not universe.live_enabled:
+        reasons.append("mode is 'live' but live_enabled is false")
+
+    if ledger.halted:
+        reasons.append(f"kill switch latched: {ledger.halt_reason or 'drawdown halt'}")
+
+    start = datetime.strptime(universe.data.start_date, "%Y-%m-%d")
+    fresh: list[str] = []
+    stale: list[str] = []
+    missing: list[str] = []
+    for symbol in universe.symbols:
+        data = store.get_bars(symbol, start, as_of, universe.data.timeframe)
+        if data is None or len(data) == 0:
+            missing.append(symbol)
+        elif _is_stale(data.timestamps[-1], as_of):
+            stale.append(symbol)
+        else:
+            fresh.append(symbol)
+    if not fresh:
+        reasons.append(
+            f"no fresh market data for any of {len(universe.symbols)} symbols (data outage?)"
+        )
+    elif stale:
+        warnings.append(f"{len(stale)} symbol(s) stale, will be skipped: {stale}")
+    if missing:
+        warnings.append(f"{len(missing)} symbol(s) missing data: {missing}")
+
+    regime_start = start - timedelta(days=REGIME_WARMUP_DAYS)
+    stale_regime: list[str] = []
+    for symbol in sorted(universe.regime_symbols()):
+        data = store.get_bars(symbol, regime_start, as_of, universe.data.timeframe)
+        if data is None or len(data) == 0 or _is_stale(data.timestamps[-1], as_of):
+            stale_regime.append(symbol)
+    if stale_regime:
+        warnings.append(f"regime data stale/missing {stale_regime}: entries forced risk-off")
+
+    return PreflightReport(
+        ok=not reasons,
+        reasons=reasons,
+        warnings=warnings,
+        mode=universe.mode,
+        live_enabled=universe.live_enabled,
+        halted=ledger.halted,
+        halt_reason=ledger.halt_reason,
+        fresh_symbols=fresh,
+        stale_symbols=stale,
+        missing_symbols=missing,
+        stale_regime=stale_regime,
+    )
+
+
 def reconcile_positions(
     ledger: PaperLedger,
     broker_positions: dict[str, float],

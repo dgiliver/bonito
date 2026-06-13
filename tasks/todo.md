@@ -103,6 +103,12 @@ intraday sweep modeled from daily OHLC, not 15-min quotes.
 - [ ] USER SIGN-OFF, then flip `live_enabled: true` in universe.live.json
       and point the daily session at it. Live placement stays in Claude
       sessions via MCP — the Actions workflows are paper-only by guard.
+- [ ] (Optional, fully hands-off) Create the scheduled live Routine per
+      docs/AUTONOMOUS_LIVE_ROUTINE.md: Robinhood as a claude.ai connector,
+      `/schedule` weekdays ~3:45pm ET, prompt runs reconcile → preflight →
+      run → place → record → commit. Dogfood on paper / live_enabled:false
+      first (proves container-on-schedule + connector auth, places nothing).
+      This removes the last human checkpoint, so it comes AFTER sign-off.
 
 # Per-Cluster Strategy Research (2026-06-10/11)
 

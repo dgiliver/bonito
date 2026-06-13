@@ -1019,6 +1019,30 @@ def live_reconcile(
     raise typer.Exit(1)
 
 
+@live_app.command("preflight")
+def live_preflight(
+    universe_path: str = typer.Option("config/universe.json", "--universe", "-u"),
+) -> None:
+    """Fail-closed safety gate for unattended cycles.
+
+    Exits non-zero (ABORT) on a latched kill switch, live-flag
+    inconsistency, or a total market-data outage, so an autonomous routine
+    stops and notifies instead of trading on bad state. Stale individual
+    symbols and stale regime data are warnings, not aborts. Run this
+    immediately after `bonito live refresh` and before reconcile/run.
+    """
+    from bonito.trading.live_runner import preflight
+
+    universe = _load_universe(universe_path)
+    ledger = _load_ledger(universe)
+    report = preflight(universe, ledger, _get_store())
+
+    border = "green" if report.ok else "red"
+    console.print(Panel.fit(report.describe(), border_style=border))
+    if not report.ok:
+        raise typer.Exit(1)
+
+
 @live_app.command("status")
 def live_status(
     universe_path: str = typer.Option("config/universe.json", "--universe", "-u"),

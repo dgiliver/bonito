@@ -11,6 +11,7 @@ from bonito.trading.live_runner import (
     check_stops,
     execute_paper,
     generate_intents,
+    preflight,
     save_intents,
 )
 from bonito.trading.paper import PaperLedger
@@ -692,3 +693,88 @@ class TestRefreshSubset:
         store = self.RecordingStore()
         refresh_data(universe, store)
         assert store.ingested == [*universe.symbols, "SPY"]
+
+
+class TestPreflight:
+    """The fail-closed gate for unattended cycles."""
+
+    def fresh_store(self, symbols, regime=None):
+        bars = {s: make_bars(s, [100.0 + i for i in range(30)]) for s in symbols}
+        if regime:
+            bars[regime] = make_bars(regime, [100.0 + i for i in range(250)])
+        return FakeStore(bars)
+
+    def test_clean_state_passes(self, universe):
+        store = self.fresh_store(universe.symbols)
+        ledger = PaperLedger(cash=150.0, starting_cash=150.0)
+
+        report = preflight(universe, ledger, store, as_of=AS_OF)
+
+        assert report.ok
+        assert report.reasons == []
+        assert set(report.fresh_symbols) == set(universe.symbols)
+
+    def test_latched_kill_switch_aborts(self, universe):
+        store = self.fresh_store(universe.symbols)
+        ledger = PaperLedger(cash=150.0, starting_cash=150.0)
+        ledger.halt("drawdown 25% >= 25% cap")
+
+        report = preflight(universe, ledger, store, as_of=AS_OF)
+
+        assert not report.ok
+        assert any("kill switch" in r for r in report.reasons)
+
+    def test_live_flag_inconsistency_aborts(self, universe):
+        universe.mode = "live"
+        universe.live_enabled = False
+        store = self.fresh_store(universe.symbols)
+        ledger = PaperLedger(cash=150.0, starting_cash=150.0)
+
+        report = preflight(universe, ledger, store, as_of=AS_OF)
+
+        assert not report.ok
+        assert any("live_enabled is false" in r for r in report.reasons)
+
+    def test_total_data_outage_aborts(self, universe):
+        stale = datetime(2026, 5, 1)  # >5 days before AS_OF
+        store = FakeStore({s: make_bars(s, [100.0, 101.0], end=stale) for s in universe.symbols})
+        ledger = PaperLedger(cash=150.0, starting_cash=150.0)
+
+        report = preflight(universe, ledger, store, as_of=AS_OF)
+
+        assert not report.ok
+        assert any("no fresh market data" in r for r in report.reasons)
+        assert set(report.stale_symbols) == set(universe.symbols)
+
+    def test_partial_staleness_is_a_warning_not_abort(self, universe):
+        stale = datetime(2026, 5, 1)
+        fresh = [100.0 + i for i in range(30)]
+        bars = {s: make_bars(s, fresh) for s in universe.symbols[:2]}
+        bars.update({s: make_bars(s, [100.0, 101.0], end=stale) for s in universe.symbols[2:]})
+        ledger = PaperLedger(cash=150.0, starting_cash=150.0)
+
+        report = preflight(universe, ledger, FakeStore(bars), as_of=AS_OF)
+
+        assert report.ok  # some fresh data → proceed (exits/stops still run)
+        assert any("stale" in w for w in report.warnings)
+
+    def test_stale_regime_warns_but_proceeds(self, universe, tmp_path):
+        gated = {
+            **ALWAYS_ENTER_STRATEGY,
+            "name": "gated",
+            "regime_filter": {"symbol": "SPY", "sma_period": 200},
+        }
+        path = tmp_path / "gated.json"
+        path.write_text(json.dumps(gated))
+        universe.strategy_path = str(path)
+        universe._strategy_cache.clear()
+
+        bars = {s: make_bars(s, [100.0 + i for i in range(30)]) for s in universe.symbols}
+        bars["SPY"] = make_bars("SPY", [100.0, 101.0], end=datetime(2026, 5, 1))  # stale
+        ledger = PaperLedger(cash=150.0, starting_cash=150.0)
+
+        report = preflight(universe, ledger, FakeStore(bars), as_of=AS_OF)
+
+        assert report.ok  # exits must still process despite a risk-off regime
+        assert report.stale_regime == ["SPY"]
+        assert any("risk-off" in w for w in report.warnings)
