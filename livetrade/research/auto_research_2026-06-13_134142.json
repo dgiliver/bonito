@@ -1,0 +1,55 @@
+{
+  "generated_at": "2026-06-13T13:41:42.220205",
+  "universe_path": "config/universe.json",
+  "start": "2022-01-01T00:00:00",
+  "holdout": "2024-12-20T13:31:12.530898",
+  "end": "2026-06-13T13:31:12.530898",
+  "outcome": "rejected",
+  "adopted_bundle": null,
+  "reasons": [
+    "[assignments+bench] holdout Sharpe degrades: 2.161 < 2.271",
+    "[assignments-only] holdout Sharpe degrades: 2.164 < 2.271"
+  ],
+  "previous_assignments": {
+    "AAPL": "strategies/cluster_AAPL_54746177d5a1.json",
+    "GOOGL": "strategies/cluster_GOOGL_7fa6fdd674c8.json",
+    "IREN": "strategies/iren_ema8-21_rsi68_atr1.5_tpnone.json"
+  },
+  "candidate_assignments": {
+    "AAPL": "strategies/auto_AAPL_f82d3d17366e.json",
+    "GOOGL": "strategies/auto_GOOGL_7fa6fdd674c8.json",
+    "META": "strategies/auto_META_9dfc85e38e1c.json",
+    "MSFT": "strategies/auto_MSFT_1c854de83a94.json"
+  },
+  "added": [
+    "META",
+    "MSFT"
+  ],
+  "removed": [
+    "IREN"
+  ],
+  "updated": [
+    "AAPL",
+    "GOOGL"
+  ],
+  "default_swap": null,
+  "default_swapped": false,
+  "benched": [
+    "CORZ",
+    "INTC",
+    "KLAC",
+    "ORCL",
+    "PLTR"
+  ],
+  "unbenched": [],
+  "grid_edge_flags": [
+    "AAPL: winner at grid edge (ema=(5, 13))",
+    "GOOGL: winner at grid edge (ema=(20, 50))",
+    "META: winner at grid edge (atr=1)",
+    "MSFT: winner at grid edge (ema=(20, 50), atr=1)"
+  ],
+  "comparisons": [],
+  "baseline_final_equity": 26733.48,
+  "candidate_final_equity": null,
+  "report_path": "livetrade/research/cluster_report_2026-06-13_133617.json"
+}
