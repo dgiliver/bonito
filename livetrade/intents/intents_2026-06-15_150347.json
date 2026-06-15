@@ -1,0 +1,35 @@
+[
+  {
+    "symbol": "DELL",
+    "side": "sell",
+    "dollar_amount": null,
+    "quantity": 2.6759431825921274,
+    "reason": "take profit triggered (intraday)",
+    "signal_price": 413.4599914550781,
+    "signal_date": "2026-06-15T15:03:47.871029Z",
+    "strategy_name": "ema_cross_rsi_atr_regime",
+    "generated_at": "2026-06-15T15:03:47.871165Z"
+  },
+  {
+    "symbol": "MU",
+    "side": "sell",
+    "dollar_amount": null,
+    "quantity": 1.0988648372105252,
+    "reason": "take profit triggered (intraday)",
+    "signal_price": 1074.22998046875,
+    "signal_date": "2026-06-15T15:03:47.871029Z",
+    "strategy_name": "ema_cross_rsi_atr_regime",
+    "generated_at": "2026-06-15T15:03:47.871248Z"
+  },
+  {
+    "symbol": "SNDK",
+    "side": "sell",
+    "dollar_amount": null,
+    "quantity": 0.5314880042145338,
+    "reason": "take profit triggered (intraday)",
+    "signal_price": 2097.97998046875,
+    "signal_date": "2026-06-15T15:03:47.871029Z",
+    "strategy_name": "ema_cross_rsi_atr_regime",
+    "generated_at": "2026-06-15T15:03:47.871307Z"
+  }
+]
