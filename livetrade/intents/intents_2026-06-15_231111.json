@@ -1,0 +1,35 @@
+[
+  {
+    "symbol": "MU",
+    "side": "buy",
+    "dollar_amount": 696.71,
+    "quantity": null,
+    "reason": "entry rule matched: ema_fast gt ema_slow, close gt ema_slow, rsi_14 lt 68.0",
+    "signal_price": 1087.989990234375,
+    "signal_date": "2026-06-15T04:00:00",
+    "strategy_name": "ema_cross_rsi_atr_regime",
+    "generated_at": "2026-06-15T23:11:11.003342Z"
+  },
+  {
+    "symbol": "DELL",
+    "side": "buy",
+    "dollar_amount": 696.71,
+    "quantity": null,
+    "reason": "entry rule matched: ema_fast gt ema_slow, close gt ema_slow, rsi_14 lt 68.0",
+    "signal_price": 409.07000732421875,
+    "signal_date": "2026-06-15T04:00:00",
+    "strategy_name": "ema_cross_rsi_atr_regime",
+    "generated_at": "2026-06-15T23:11:11.010589Z"
+  },
+  {
+    "symbol": "ARM",
+    "side": "buy",
+    "dollar_amount": 696.71,
+    "quantity": null,
+    "reason": "entry rule matched: ema_fast gt ema_slow, close gt ema_slow, rsi_14 lt 68.0",
+    "signal_price": 412.54998779296875,
+    "signal_date": "2026-06-15T04:00:00",
+    "strategy_name": "ema_cross_rsi_atr_regime",
+    "generated_at": "2026-06-15T23:11:11.014175Z"
+  }
+]
