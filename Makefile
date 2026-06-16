@@ -132,6 +132,9 @@ live-run:
 live-status:
 	$(PYTHON) -m bonito.cli live status
 
+live-performance:
+	$(PYTHON) -m bonito.cli live performance
+
 live-sweep:
 	$(PYTHON) -m bonito.cli live sweep --execute
 

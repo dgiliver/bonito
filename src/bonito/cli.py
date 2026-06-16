@@ -1096,6 +1096,87 @@ def _print_status(ledger, prices: dict[str, float]) -> None:
         console.print(table)
 
 
+@live_app.command("performance")
+def live_performance(
+    universe_path: str = typer.Option("config/universe.json", "--universe", "-u"),
+    benchmark: str = typer.Option("SPY", "--benchmark", help="Symbol to compute alpha against"),
+    no_quotes: bool = typer.Option(
+        False, "--no-quotes", help="Skip live quote fetch; mark open positions at last close"
+    ),
+) -> None:
+    """Trailing-period performance: 1D/1W/since-inception returns, benchmark alpha, trade stats.
+
+    Reconstructs the daily equity curve from ledger fills (same source the
+    tracking gate uses), then swaps in a live mark-to-market for the final
+    point so the headline number reflects right-now prices.
+    """
+    from datetime import UTC as _UTC
+    from datetime import datetime as _dt
+
+    from bonito.data.quotes import fetch_latest_quotes
+    from bonito.trading.performance import build_performance_report
+
+    universe = _load_universe(universe_path)
+    ledger = _load_ledger(universe)
+    store = _get_store()
+
+    prices: dict[str, float] = {}
+    if not no_quotes and ledger.positions:
+        prices = fetch_latest_quotes(sorted(ledger.positions))
+
+    end = _dt.now(_UTC).replace(tzinfo=None)
+    report = build_performance_report(universe, ledger, store, prices, end, benchmark)
+
+    if not report.periods:
+        console.print("[dim]No fills yet — nothing to report.[/dim]")
+        return
+
+    table = Table(title="Trailing Performance")
+    table.add_column("Period")
+    table.add_column("Return", justify="right")
+    table.add_column(f"{benchmark}", justify="right")
+    table.add_column("Alpha", justify="right")
+    for p in report.periods:
+        bench = f"{p.benchmark_return_pct:+.2f}%" if p.benchmark_return_pct is not None else "n/a"
+        alpha = f"{p.alpha_pct:+.2f}pts" if p.alpha_pct is not None else "n/a"
+        style = "green" if p.return_pct >= 0 else "red"
+        table.add_row(p.label, f"[{style}]{p.return_pct:+.2f}%[/{style}]", bench, alpha)
+    console.print(table)
+
+    stats_bits = []
+    if report.win_rate_pct is not None:
+        stats_bits.append(f"win rate {report.win_rate_pct:.0f}%")
+    if report.profit_factor is not None:
+        stats_bits.append(f"profit factor {report.profit_factor:.2f}")
+    stats_bits.append(f"{len(report.closed_trades)} closed trade(s)")
+    console.print(
+        Panel.fit(
+            f"Equity: ${report.current_equity:,.2f} | Realized: ${report.realized_pnl:+,.2f} | "
+            f"Unrealized: ${report.unrealized_pnl:+,.2f}\n" + " | ".join(stats_bits),
+            border_style="cyan",
+        )
+    )
+
+    if report.closed_trades:
+        ct_table = Table(title="Closed Trades")
+        for col in ("Symbol", "Qty", "Entry", "Exit", "Return", "P&L", "Reason"):
+            ct_table.add_column(col, justify="right" if col != "Reason" else "left")
+        for t in report.closed_trades:
+            style = "green" if t.pnl >= 0 else "red"
+            ct_table.add_row(
+                t.symbol,
+                f"{t.quantity:.4f}",
+                f"${t.entry_price:.2f}",
+                f"${t.exit_price:.2f}",
+                f"[{style}]{t.return_pct:+.1f}%[/{style}]",
+                f"[{style}]${t.pnl:+.2f}[/{style}]",
+                t.reason[:40],
+            )
+        console.print(ct_table)
+
+    _print_status(ledger, prices)
+
+
 @live_app.command("record-fill")
 def live_record_fill(
     symbol: str = typer.Argument(...),
