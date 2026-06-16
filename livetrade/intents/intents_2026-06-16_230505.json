@@ -1,0 +1,35 @@
+[
+  {
+    "symbol": "SNDK",
+    "side": "buy",
+    "dollar_amount": 683.75,
+    "quantity": null,
+    "reason": "entry rule matched: ema_fast gt ema_slow, close gt ema_slow, rsi_14 lt 68.0",
+    "signal_price": 1991.550048828125,
+    "signal_date": "2026-06-16T04:00:00",
+    "strategy_name": "ema_cross_rsi_atr_regime",
+    "generated_at": "2026-06-16T23:05:05.976924Z"
+  },
+  {
+    "symbol": "AMD",
+    "side": "buy",
+    "dollar_amount": 683.75,
+    "quantity": null,
+    "reason": "entry rule matched: ema_fast gt ema_slow, close gt ema_slow, rsi_14 lt 68.0",
+    "signal_price": 507.2900085449219,
+    "signal_date": "2026-06-16T04:00:00",
+    "strategy_name": "ema_cross_rsi_atr_regime",
+    "generated_at": "2026-06-16T23:05:05.986878Z"
+  },
+  {
+    "symbol": "HOOD",
+    "side": "buy",
+    "dollar_amount": 683.75,
+    "quantity": null,
+    "reason": "entry rule matched: ema_fast gt ema_slow, close gt ema_slow, rsi_14 lt 68.0",
+    "signal_price": 96.70999908447266,
+    "signal_date": "2026-06-16T04:00:00",
+    "strategy_name": "ema_cross_rsi_atr_regime",
+    "generated_at": "2026-06-16T23:05:05.996767Z"
+  }
+]
