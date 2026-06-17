@@ -42,7 +42,6 @@ PANDAS_TA_INDICATORS = {
     # Volatility / Channels
     "donchian",
     "kc",
-    "massi",
     "natr",
     "pdist",
     "rvi",
@@ -57,7 +56,6 @@ PANDAS_TA_INDICATORS = {
     "mom",
     "ppo",
     "roc",
-    "rsi_pandas",
     "stochrsi",
     "trix",
     "tsi",
@@ -65,7 +63,6 @@ PANDAS_TA_INDICATORS = {
     "willr",
     # Overlap
     "dema",
-    "ema_pandas",
     "fwma",
     "hma",
     "kama",
@@ -75,7 +72,6 @@ PANDAS_TA_INDICATORS = {
     "pwma",
     "rma",
     "sinwma",
-    "sma_pandas",
     "ssf",
     "swma",
     "t3",

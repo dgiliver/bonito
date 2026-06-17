@@ -566,7 +566,7 @@ class TestEdgeCases(TestPandasTAIntegration):
             compute_indicators(sample_bar_data, indicators)
 
 
-class TestIndicatorTypeExtension:
+class TestIndicatorTypeExtension(TestPandasTAIntegration):
     """Test that IndicatorType enum or validation handles new types."""
 
     def test_string_indicator_types_accepted(self):
@@ -582,6 +582,30 @@ class TestIndicatorTypeExtension:
         """Enum types should still work for backward compatibility."""
         config = IndicatorConfig(type=IndicatorType.SMA, name="sma", params={"period": 20})
         assert config.type == IndicatorType.SMA
+
+    def test_every_pandas_ta_indicator_entry_is_actually_dispatchable(self, sample_bar_data):
+        """Every name in PANDAS_TA_INDICATORS must resolve to a real pandas-ta
+        function so it doesn't pass Pydantic validation only to raise at
+        compute time. Regression for rsi_pandas/ema_pandas/sma_pandas, which
+        validated cleanly but had no matching pandas_ta attribute and always
+        raised ValueError("Unknown pandas-ta indicator: ...") in
+        compute_indicators().
+        """
+        from bonito.backtest.indicators import compute_indicators
+        from bonito.backtest.strategy import PANDAS_TA_INDICATORS
+
+        failures = []
+        for indicator_name in sorted(PANDAS_TA_INDICATORS):
+            config = IndicatorConfig(type=indicator_name, name="x")
+            try:
+                compute_indicators(sample_bar_data, [config])
+            except Exception as e:  # noqa: BLE001 - we want to collect all failures
+                failures.append(f"{indicator_name}: {type(e).__name__}: {e}")
+
+        assert not failures, (
+            "PANDAS_TA_INDICATORS contains entries that validate but cannot "
+            f"be computed:\n" + "\n".join(failures)
+        )
 
 
 class TestPerformance:
