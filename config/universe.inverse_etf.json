@@ -1,0 +1,21 @@
+{
+  "name": "inverse-etf-bear-market-stress-test",
+  "description": "Inverse-ETF proxies for short exposure (no margin/short-selling required on a cash account). Tests whether buying inverse ETFs during downtrends is a viable substitute for shorting through historic bear markets (GFC, COVID crash, 2022). Not a trading universe — analysis only.",
+  "broker": "none",
+  "mode": "paper",
+  "live_enabled": false,
+  "symbols": [
+    "SH",
+    "PSQ",
+    "SDS",
+    "SQQQ"
+  ],
+  "strategy_path": "strategies/ema_cross_rsi_atr_noregime.json",
+  "data": {
+    "timeframe": "1d",
+    "start_date": "2006-06-19"
+  },
+  "risk": {
+    "starting_cash_usd": 100000.0
+  }
+}
