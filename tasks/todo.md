@@ -1,3 +1,117 @@
+# Widen Strategy Discovery (2026-06-17) — bridge wide-net + multi-template grid
+
+Two tracks, both additive (no existing code path changes behavior unless a
+new candidate actually clears the existing gates).
+
+## Track A — bridge `bonito research run` into the real adoption gate
+
+Today `autoresearch_trading.py` (32 indicator types, LLM-mutated, one change
+at a time) only checks its own train/2024-validation split with a soft
+overfit rule (val ≥ 0.5×train) and writes the rolling winner to
+`research_output/<symbol>/best_strategy.json`. It never touches the 2025+
+holdout, never runs the project's real kill filter
+(`trading/validation.py::kill_verdict`, which differs from this loop's own
+looser internal constants — `MIN_TRADES=30` total vs. the rest of the
+system's `MIN_TRADES_PER_YEAR=7.0`), and never runs account-level replay.
+`strategies/adx_trend_strategy.json` + `adx_momentum_aapl.json` (both
+2025-12-09, `last_backtest: null`, unreferenced by any universe file) are
+proof this has produced candidates with no path to promotion before.
+
+- [ ] New `src/bonito/research/wide_net_bridge.py`: `validate_wide_net_candidate()`
+      — load `best_strategy.json` (unwrap `{"config": {...}}` like
+      `load_seed_strategy` does), backtest the full range, slice with
+      `window_metrics()` using `auto_research.py`'s `rolling_windows()`
+      cutpoints (not the loop's own 2024 cutoff), gate with `kill_verdict()`.
+      Reject silently (log + stop) on failure — nothing written.
+- [ ] On pass: build a `Bundle` exactly like `propose_default_swap()` does
+      (write candidate JSON to `strategies/`, propose as default-strategy
+      swap or per-symbol assignment) and feed it into the EXISTING graded
+      bundle loop in `run_auto_research()` alongside narrow-grid bundles.
+      `decide_adoption()`, `backtest_account()`, `sync_live_config()` —
+      all untouched, all reused as-is.
+- [ ] New explicit CLI: `bonito research promote-wide-net <path>` (dry-run
+      report by default, `--apply` to write) — deliberately A SEPARATE,
+      MANUAL command, not folded into the unattended Saturday cron. An
+      LLM-discovered structural change is exactly the kind of decision that
+      should stay a reviewed action.
+- [ ] Tests: fixture `best_strategy.json` with known metrics; pass/fail
+      paths through `validate_wide_net_candidate`; `Bundle` composition.
+- [ ] Once a real run produces a candidate worth keeping, log it in
+      `docs/EXPERIMENT_LOG.md` with a pre-registered criterion (existing
+      protocol) — same bar as any narrow-grid adoption.
+
+`autoresearch_trading.py`'s internal mutation loop is not modified at all —
+zero risk to the existing tool.
+
+## Track B — widen `cluster_research.py` beyond the EMA-cross template
+
+`GridSpec` + `candidate_grid()` (`cluster_research.py:55-66,159-220`)
+generate all ~450 candidates from ONE structural template (EMA-cross entry
++ RSI<X filter + EMA-cross exit + ATR trailing stop + mandatory
+SPY>SMA200 regime gate), varying only 3 numeric axes. This is the actual
+search space for both `bonito research clusters` and the weekly
+`bonito research auto` — it has never tried ADX, MACD, Bollinger, or any
+of the other 28+ indicator types the wide-net loop is allowed to use.
+
+- [ ] Split `candidate_grid()` into named template builders, each small on
+      purpose (~30-50 candidates, not 450×N):
+      `_build_ema_cross_candidates()` (today's loop, moved verbatim),
+      `_build_adx_trend_candidates()` (ADX(14)>threshold entry gate),
+      `_build_macd_cross_candidates()` (MACD/signal crossover),
+      `_build_bbands_meanrev_candidates()` (close crosses lower/upper band
+      — the one genuinely mean-reverting family, structurally different
+      from the other three trend-following templates).
+- [ ] Every new template MUST still set
+      `regime_filter={"symbol": "SPY", "sma_period": 200}` unconditionally
+      — preserves the documented invariant ("regime filter is always on,
+      a structural risk decision, not a knob").
+- [ ] `candidate_grid()` becomes the concatenation of all template builders.
+      Same return type (`list[StrategyConfig]`), so `research_cluster()`,
+      `run_auto_research()`, `decide_adoption()`, `sync_live_config()`, and
+      the `cli.py:629` candidate count need ZERO changes — they're already
+      template-agnostic.
+- [ ] Extend `GridSpec` with one small nested spec per new template
+      (e.g. `adx: ADXGridSpec | None = None`, `None` = template disabled —
+      useful to stay conservative on `--apply` runs while new templates
+      are still being sanity-checked).
+- [ ] Tests in `tests/test_cluster_research.py`: one per new template
+      (right indicator types only, regime_filter always present, candidate
+      count matches sub-grid combinatorics) + a total-count regression test.
+- [ ] Dry-run `bonito research clusters --per-symbol` (no `--apply`) once
+      to check wall-clock at the new candidate count before ever applying.
+
+Zero Anthropic API cost — pure vectorized backtesting like today. Only
+wall-clock scales (candidates × cluster members).
+
+**Sequencing**: Track B first — lower-risk (offline, deterministic, easy
+to test), and its templates give Track A's bridge something to sanity-check
+LLM output against once ADX/MACD/BBands structures exist locally.
+
+## API credits — do you need to add any?
+
+- **Track B / existing `research auto`/`research clusters`: no.** Zero LLM
+  calls anywhere in `cluster_research.py` or `auto_research.py` — pure
+  NumPy backtesting. Confirmed via grep (no `anthropic`/`openai` imports).
+- **Track A's input, `bonito research run` (= `make research`): yes.**
+  `autoresearch_trading.py` instantiates its own `anthropic.Anthropic(api_key=...)`
+  client from `ANTHROPIC_API_KEY` and calls `claude-sonnet-4-20250514`
+  directly (`autoresearch_trading.py:19,31,247-248,522`) — this is metered
+  API spend on console.anthropic.com, **separate from any Claude Code /
+  Claude.ai subscription**, even though it's the same env var.
+  - Volume: default `--iterations 1000`, 5 mutations/call (`MUTATIONS_PER_BATCH`)
+    → ~200 API calls per full run (fewer if it converges early).
+  - Each call: ~2-4K input tokens (rules + full StrategyConfig JSON schema,
+    re-sent every call — no prompt caching configured) + up to 4,096 output
+    tokens (5 full strategy JSONs). Rough estimate at current Sonnet-class
+    pricing: **~$5-15 per 1000-iteration run.** Check console.anthropic.com
+    for exact current per-token rates before relying on this figure.
+  - This tool has run before (it's what produced the orphaned ADX
+    strategies) — not new in kind, just confirming the key needs a funded
+    balance to run again. A recurring cadence (e.g. weekly) would run
+    roughly $20-60/month.
+  - Recommend topping up modestly (~$20) to comfortably cover several
+    validation runs while Track A's bridge is being built and tested.
+
 # Account-Level Backtest (2026-06-11) — "backtest the account, not the strategy"
 
 - [x] `trading/portfolio_backtest.py`: day-by-day replay through the REAL
