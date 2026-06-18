@@ -138,7 +138,8 @@ Test files:
 | `src/bonito/backtest/strategy.py` | Strategy DSL Pydantic models |
 | `src/bonito/research/autoresearch_trading.py` | Karpathy-style autonomous strategy mutation loop |
 | `src/bonito/research/auto_research.py` | Weekly rolling-holdout + graded-bundle adoption loop |
-| `src/bonito/research/cluster_research.py` | Cluster / per-symbol grid search (450 candidates) |
+| `src/bonito/research/cluster_research.py` | Cluster / per-symbol grid search (450 EMA candidates; opt-in ADX/MACD/BBands templates via `--templates`) |
+| `src/bonito/research/regime_sweep.py` | Slices one backtest into fixed historical regimes (GFC/COVID/2022 bear/AI bull) vs. buy-and-hold — `bonito research regime-sweep <strategy.json>` |
 | `src/bonito/trading/live_runner.py` | Intent generation, risk caps, kill switch, preflight |
 | `src/bonito/trading/portfolio_backtest.py` | Account-level replay (ReplayStore, strategy attribution) |
 | `src/bonito/trading/tracking.py` | Paper-vs-replay fidelity (fill gaps, equity drift) |
