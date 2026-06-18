@@ -1,0 +1,29 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  quality:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+      - name: Install
+        run: pip install -e ".[dev]"
+      - name: Lint (ruff)
+        run: ruff check src/ tests/
+      - name: Typecheck (mypy)
+        run: mypy src/
+        continue-on-error: true  # TODO(P1-2): 157 pre-existing errors; tighten once baseline cleared
+      - name: Tests (fast)
+        run: pytest tests/ -v -m "not slow"
