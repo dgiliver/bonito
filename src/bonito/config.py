@@ -36,5 +36,15 @@ class Settings(BaseSettings):
     )
     default_commission: float = Field(default=0.001, description="Default commission rate (0.1%)")
 
+    # Live trading safety (Alpaca bot-deploy path)
+    alpaca_live_trading_enabled: bool = Field(
+        default=False,
+        description="Human-only master switch for real-money Alpaca bot deployment "
+        "(mode='live'). Off by default - application code must never set this; only "
+        "an operator setting ALPACA_LIVE_TRADING_ENABLED=true in the environment can "
+        "enable it. No BONITO_ prefix - this Settings class has none configured "
+        "(matches ANTHROPIC_API_KEY, OPENAI_API_KEY, etc.).",
+    )
+
 
 settings = Settings()

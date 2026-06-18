@@ -1,4 +1,129 @@
-# Widen Strategy Discovery (2026-06-17) — bridge wide-net + multi-template grid
+# Full Codebase + Docs Audit (2026-06-18) — tech-lead pass, pending sign-off
+
+Full audit across architecture, backend, frontend, security, docs/CI (5
+parallel agent passes + direct verification of the top finding). Nothing
+below has been fixed yet — this is the plan, awaiting direction on scope
+and the two items that need a product/business decision (flagged ⚠️).
+Full findings with file:line and severity rationale are in chat, not
+duplicated here in full to avoid making this file worse (see the Medium
+finding below about this file's own size).
+
+## Phase 0 — stop-the-bleeding (DONE 2026-06-18)
+- [x] RESOLVED: `api/routes/trading.py` `deploy_bot` + `trading/bot.py` (the
+      Alpaca path) stays — it's the separate "smart trader" product surface,
+      not the personal Robinhood pipeline. Hardened to match the Robinhood
+      pipeline's safety architecture: daily-loss kill switch (`TradingBot.
+      _check_kill_switch()` — flattens positions + halts on breach, new
+      `"halted"` status, only resumable via deliberate human action since
+      `resume()` rejects non-`"paused"` bots), a `live_enabled`-style
+      human-only flag (`settings.alpaca_live_trading_enabled`, default
+      `False`, gated at both the API route and the agent tool with a 403/
+      `ToolResult(success=False)`), and a risk-acknowledgment parity fix
+      (`DeployBotTool` was missing the `acknowledge_risks` gate the API
+      route already had — closed). 9 new tests (5 kill-switch, 4 master-
+      switch); full suite 721 passed / 1 skipped / 0 failed.
+- [x] Strategy DSL indicator-type allowlist (`backtest/strategy.py:97-117`)
+      was decorative — any string fell through to
+      `getattr(pandas_ta, indicator_type)` in `indicators.py:68` with zero
+      enforcement against `PANDAS_TA_INDICATORS`. `_validate_indicator_type`
+      now raises `ValueError` on anything outside `PANDAS_TA_INDICATORS` /
+      `ROLLING_INDICATOR_TYPES` / the builtin enum, and
+      `_compute_pandas_ta_indicator` re-checks defensively before the
+      `getattr` in case a config bypasses pydantic validation entirely.
+- [x] RESOLVED: License is Proprietary. Fixed `README.md` badge + License
+      section to match `pyproject.toml` (was MIT — contradiction).
+- [x] Removed production debug `fetch()`/`console.log` instrumentation
+      (`hypothesisId`/`sessionId:"debug-session"` → `127.0.0.1:7242`) from
+      `BaseChartPanel.ts`, `PanelChartPanel.tsx`, `PriceChartPanel.tsx`,
+      `IntelligentChartV2.tsx`, `CrosshairSync.ts`, `ChartContainer.tsx` —
+      was firing on every render/data-update/crosshair-move.
+- [x] `_CREDENTIAL_PASSWORD` hardcoded fallback (`"dev-password-change-in-
+      prod"`) removed. New `get_credential_password()` raises `RuntimeError`
+      if `BONITO_CREDENTIAL_PASSWORD` is unset instead of silently encrypting
+      broker secrets with a key that lives in source control.
+
+Verified clean: ruff and mypy show zero *new* issues anywhere in the tree
+(confirmed via `git stash`/`git stash pop` against every touched file —
+remaining findings are pre-existing: enum-inheritance `UP042` style nits,
+one `F541`, numpy/pandas assignment narrowing in `indicators.py`, and
+`AlpacaCredentials` `SecretStr` arg-type errors in `api/routes/trading.py`,
+none introduced by this pass).
+
+Scope for this pass was Phase 0 only, per sign-off. Phases 1-3 stay queued
+below until a future pass.
+
+## Phase 1 — process guardrails (this week)
+- [ ] No CI workflow runs tests/lint/types on PRs or general pushes — only
+      cron trading jobs + one push-to-main workflow that excludes a test
+      file and one test by name. Add a real `ci.yml`: pytest -m "not slow" +
+      ruff + mypy, on every PR/push.
+- [ ] mypy is commented out of `.pre-commit-config.yaml` despite CLAUDE.md
+      claiming it runs — re-enable or fix the doc.
+- [ ] De-duplicate kill-filter/`strategy_hash` logic: `autoresearch_trading.py`
+      reimplements `trading/validation.py`'s `kill_verdict`/`strategy_hash`
+      with a different, inconsistent threshold (`MIN_TRADES=30` absolute vs.
+      `MIN_TRADES_PER_YEAR=7.0` rate). Import the shared one; reconcile
+      thresholds deliberately.
+- [ ] `rsi()`/`atr()` share the exact "assumes index 0 is valid" precondition
+      that caused the MACD signal-line NaN bug (fixed this week in `ema()`)
+      — not yet triggered by any current call site, but unguarded. Apply the
+      same fix + a NaN-prefixed-input regression test.
+- [ ] Add a CLI-level smoke test (`typer.testing.CliRunner`) running
+      `bonito backtest` on a regime-filtered strategy end-to-end — this is
+      exactly the blind spot that let the missing-`regime_data` bug ship
+      undetected.
+- [ ] Backfill `docs/EXPERIMENT_LOG.md` with this week's findings: the MACD
+      bug, the CLI `regime_data` bug, and the deployed-strategy kill-filter
+      failure (see the 2026-06-18 review above) — discipline has slipped to
+      adoption/rejection-only, contradicting its "canonical record" charter.
+
+## Phase 2 — near-term hardening
+- [ ] Test `trading/monitor.py` (P&L/drawdown — zero coverage today) and
+      `autoresearch_trading.py`'s pure functions (`split_data`,
+      `validate_no_lookahead`, `apply_kill_filters`).
+- [ ] Add `broker_order_id` to `PaperFill`/`TradeIntent`; require it for
+      live-mode fills; reject `record-fill` in paper mode.
+- [ ] Add a confirmation requirement to `PaperLedger.resume()` (currently
+      human-only by convention, not by any enforced precondition).
+- [ ] Document the Robinhood account-scoping boundary (••••8597, cash-only)
+      explicitly as non-code-enforceable in `docs/AUTONOMOUS_LIVE_ROUTINE.md`;
+      add a runbook check if the MCP exposes account identity.
+- [ ] Frontend: delete dead `IntelligentChart.tsx` V1 (2,587 lines, zero live
+      importers) + its test + the `index.ts` re-export. Align the
+      `PanelChartPanel`/`PriceChartPanel` init `useEffect` dependency arrays
+      to the documented `[height, config]` pattern (or explicitly document
+      the resize-based alternative). Type the `any` usage concentrated in
+      `ChartContainer.tsx`/`BaseChartPanel.ts`. Fix ~8 default-export
+      violations (`AdvancedChart`, `EquityChart`, `Chat`, `Sidebar`, etc.).
+- [ ] Zero Playwright tests exist despite tooling/skill references implying
+      otherwise — scaffold a minimal config + 1-2 smoke specs, or correct
+      the docs.
+
+## Phase 3 — housekeeping
+- [ ] Archive this file's fully-completed session sections to
+      `tasks/archive/` — single 500+ line file mixing active and long-done
+      work, flagged by the docs audit as already unwieldy.
+- [ ] Archive/remove 9 orphaned `strategies/*.json` files not referenced by
+      any universe config.
+- [ ] Backfill `CHANGELOG.md` (stale at 0.5.0 vs. actual 0.9.0) or deprecate
+      it explicitly in favor of `EXPERIMENT_LOG.md`/this file.
+- [ ] Fix `.claude/rules/architecture.md`'s dependency-direction rule — it's
+      stated backwards vs. reality (`agent` imports `tools`, not the reverse;
+      otherwise accurate and clean).
+- [ ] Compute `avg_exposure` properly in `backtest/engine.py` instead of the
+      hardcoded `0.5` placeholder; check whether research grading silently
+      treats it as real.
+- [ ] Extract `UniverseConfig` out of `trading/live_runner.py` into its own
+      module — `research/` currently imports `live_runner` purely for this,
+      coupling research to the live runner.
+- [ ] Misc low-severity: `StochasticPanel` missing live crosshair value
+      display (RSI/MACD have it), `preflight()` has no top-level
+      try/except (unhandled exception ≠ clean `PreflightReport(ok=False)`),
+      `ingest_data` API has no input validation/length limit on symbol list,
+      `credential_store.py` silently swallows decrypt failures with no
+      logging.
+
+
 
 Two tracks, both additive (no existing code path changes behavior unless a
 new candidate actually clears the existing gates).

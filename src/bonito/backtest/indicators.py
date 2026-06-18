@@ -6,7 +6,7 @@ Supports both built-in indicators and pandas-ta indicators.
 import numpy as np
 import pandas as pd
 
-from bonito.backtest.strategy import IndicatorConfig, IndicatorType
+from bonito.backtest.strategy import PANDAS_TA_INDICATORS, IndicatorConfig, IndicatorType
 from bonito.data.models import BarData
 
 # Lazy import for pandas_ta to avoid startup overhead
@@ -61,6 +61,12 @@ def _compute_pandas_ta_indicator(
     Returns:
         Dictionary of indicator name -> numpy array
     """
+    # Defense-in-depth: only dispatch to the curated allowlist, even if a
+    # config bypassed StrategyConfig's pydantic validation (e.g. constructed
+    # directly rather than parsed). Never probe arbitrary pandas_ta attributes.
+    if indicator_type not in PANDAS_TA_INDICATORS:
+        raise ValueError(f"Unknown pandas-ta indicator: {indicator_type}")
+
     ta = _get_pandas_ta()
     results = {}
 

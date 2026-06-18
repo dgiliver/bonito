@@ -168,19 +168,8 @@ export const ChartContainer = forwardRef<
 
   // Update price chart crosshair mode when snapToPrice changes
   useEffect(() => {
-    console.log(
-      "[DEBUG] snapToPrice effect triggered:",
-      snapToPrice,
-      "priceChartRef exists:",
-      !!priceChartRef.current,
-    );
     if (priceChartRef.current) {
       const mode = snapToPrice ? CrosshairMode.Magnet : CrosshairMode.Normal;
-      console.log(
-        "[DEBUG] Calling setCrosshairMode with mode:",
-        mode,
-        "(Magnet=1, Normal=0)",
-      );
       priceChartRef.current.setCrosshairMode(mode);
     }
   }, [snapToPrice]);

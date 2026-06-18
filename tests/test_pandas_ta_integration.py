@@ -560,13 +560,15 @@ class TestEdgeCases(TestPandasTAIntegration):
         assert "obv" in result
 
     def test_unknown_indicator_type_raises_error(self, sample_bar_data):
-        """Unknown indicator type should raise appropriate error."""
-        from bonito.backtest.indicators import compute_indicators
+        """Unknown indicator type should raise appropriate error.
 
-        indicators = [IndicatorConfig(type="nonexistent_indicator_xyz", name="test")]
-
+        Now raises at IndicatorConfig construction (pydantic ValidationError,
+        a ValueError subclass) rather than later at compute_indicators - the
+        allowlist actually rejects invalid types instead of deferring to
+        getattr(pandas_ta, ...).
+        """
         with pytest.raises((ValueError, KeyError, AttributeError)):
-            compute_indicators(sample_bar_data, indicators)
+            IndicatorConfig(type="nonexistent_indicator_xyz", name="test")
 
 
 class TestIndicatorTypeExtension(TestPandasTAIntegration):
@@ -607,7 +609,7 @@ class TestIndicatorTypeExtension(TestPandasTAIntegration):
 
         assert not failures, (
             "PANDAS_TA_INDICATORS contains entries that validate but cannot "
-            f"be computed:\n" + "\n".join(failures)
+            "be computed:\n" + "\n".join(failures)
         )
 
 

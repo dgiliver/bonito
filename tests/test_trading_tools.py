@@ -42,7 +42,7 @@ def reset_registry():
 
 
 @pytest.fixture(autouse=True)
-def setup_credentials():
+def setup_credentials(credential_password):
     """Setup mock credentials for all tests."""
     os.environ["BONITO_USE_MOCK_ALPACA_API"] = "true"
 
@@ -53,8 +53,7 @@ def setup_credentials():
         secret_key="A" * 44,
         is_paper=True,
     )
-    password = os.environ.get("BONITO_CREDENTIAL_PASSWORD", "dev-password-change-in-prod")
-    store.store_credentials(credentials, password)
+    store.store_credentials(credentials, os.environ["BONITO_CREDENTIAL_PASSWORD"])
 
     yield
 
@@ -69,7 +68,7 @@ class TestDeployBotTool:
         tool = DeployBotTool()
         result = await tool.execute(
             strategy_name="momentum",
-            strategy_config=VALID_STRATEGY_CONFIG,
+            strategy_config=STRATEGY_WITH_STOP_LOSS,
             execution_model="scheduled",
             mode="paper",
         )
@@ -84,10 +83,11 @@ class TestDeployBotTool:
         tool = DeployBotTool()
         result = await tool.execute(
             strategy_name="risky_strategy",
-            strategy_config=VALID_STRATEGY_CONFIG,
+            strategy_config=STRATEGY_WITH_STOP_LOSS,
             execution_model="continuous",
-            mode="live",
+            mode="paper",
             max_position_pct=95.0,
+            acknowledge_risks=True,
         )
 
         assert result.success is True
@@ -113,13 +113,46 @@ class TestDeployBotTool:
         tool = DeployBotTool()
         result = await tool.execute(
             strategy_name="protected",
-            strategy_config=VALID_STRATEGY_CONFIG,
+            strategy_config=STRATEGY_WITH_STOP_LOSS,
             execution_model="event_driven",
             max_daily_loss_pct=3.0,
         )
 
         assert result.success is True
         assert "bot_id" in result.data
+
+    @pytest.mark.asyncio
+    async def test_deploy_live_blocked_by_default(self):
+        """Live trading requires an operator to set ALPACA_LIVE_TRADING_ENABLED."""
+        tool = DeployBotTool()
+        result = await tool.execute(
+            strategy_name="risky",
+            strategy_config=STRATEGY_WITH_STOP_LOSS,
+            execution_model="continuous",
+            mode="live",
+            acknowledge_risks=True,
+        )
+
+        assert result.success is False
+        assert "Live trading is disabled" in result.error
+
+    @pytest.mark.asyncio
+    async def test_deploy_live_allowed_when_enabled(self, monkeypatch):
+        from bonito.tools import trading_tools
+
+        monkeypatch.setattr(trading_tools.settings, "alpaca_live_trading_enabled", True)
+
+        tool = DeployBotTool()
+        result = await tool.execute(
+            strategy_name="risky",
+            strategy_config=STRATEGY_WITH_STOP_LOSS,
+            execution_model="continuous",
+            mode="live",
+            acknowledge_risks=True,
+        )
+
+        assert result.success is True
+        assert result.data["mode"] == "live"
 
 
 class TestListBotsTool:
@@ -138,7 +171,7 @@ class TestListBotsTool:
         deploy = DeployBotTool()
         await deploy.execute(
             strategy_name="test",
-            strategy_config=VALID_STRATEGY_CONFIG,
+            strategy_config=STRATEGY_WITH_STOP_LOSS,
             execution_model="scheduled",
         )
 
@@ -158,7 +191,7 @@ class TestListBotsTool:
         for i in range(3):
             await deploy.execute(
                 strategy_name=f"strategy_{i}",
-                strategy_config=VALID_STRATEGY_CONFIG,
+                strategy_config=STRATEGY_WITH_STOP_LOSS,
                 execution_model="scheduled",
             )
 
@@ -175,7 +208,7 @@ class TestListBotsTool:
         deploy = DeployBotTool()
         deploy_result = await deploy.execute(
             strategy_name="test1",
-            strategy_config=VALID_STRATEGY_CONFIG,
+            strategy_config=STRATEGY_WITH_STOP_LOSS,
             execution_model="scheduled",
         )
         bot_id = deploy_result.data["bot_id"]
@@ -197,12 +230,12 @@ class TestListBotsTool:
         deploy = DeployBotTool()
         result1 = await deploy.execute(
             strategy_name="test1",
-            strategy_config=VALID_STRATEGY_CONFIG,
+            strategy_config=STRATEGY_WITH_STOP_LOSS,
             execution_model="scheduled",
         )
         await deploy.execute(
             strategy_name="test2",
-            strategy_config=VALID_STRATEGY_CONFIG,
+            strategy_config=STRATEGY_WITH_STOP_LOSS,
             execution_model="scheduled",
         )
 
@@ -232,7 +265,7 @@ class TestBotStatusTool:
         deploy = DeployBotTool()
         deploy_result = await deploy.execute(
             strategy_name="test",
-            strategy_config=VALID_STRATEGY_CONFIG,
+            strategy_config=STRATEGY_WITH_STOP_LOSS,
             execution_model="scheduled",
         )
         bot_id = deploy_result.data["bot_id"]
@@ -254,10 +287,11 @@ class TestBotStatusTool:
         deploy = DeployBotTool()
         deploy_result = await deploy.execute(
             strategy_name="risky",
-            strategy_config=VALID_STRATEGY_CONFIG,
+            strategy_config=STRATEGY_WITH_STOP_LOSS,
             execution_model="continuous",
-            mode="live",
+            mode="paper",
             max_position_pct=80.0,
+            acknowledge_risks=True,
         )
         bot_id = deploy_result.data["bot_id"]
 
@@ -285,7 +319,7 @@ class TestPauseBotTool:
         deploy = DeployBotTool()
         deploy_result = await deploy.execute(
             strategy_name="test",
-            strategy_config=VALID_STRATEGY_CONFIG,
+            strategy_config=STRATEGY_WITH_STOP_LOSS,
             execution_model="scheduled",
         )
         bot_id = deploy_result.data["bot_id"]
@@ -304,7 +338,7 @@ class TestPauseBotTool:
         deploy = DeployBotTool()
         deploy_result = await deploy.execute(
             strategy_name="test",
-            strategy_config=VALID_STRATEGY_CONFIG,
+            strategy_config=STRATEGY_WITH_STOP_LOSS,
             execution_model="scheduled",
         )
         bot_id = deploy_result.data["bot_id"]
@@ -333,7 +367,7 @@ class TestResumeBotTool:
         deploy = DeployBotTool()
         deploy_result = await deploy.execute(
             strategy_name="test",
-            strategy_config=VALID_STRATEGY_CONFIG,
+            strategy_config=STRATEGY_WITH_STOP_LOSS,
             execution_model="scheduled",
         )
         bot_id = deploy_result.data["bot_id"]
@@ -354,7 +388,7 @@ class TestResumeBotTool:
         deploy = DeployBotTool()
         deploy_result = await deploy.execute(
             strategy_name="test",
-            strategy_config=VALID_STRATEGY_CONFIG,
+            strategy_config=STRATEGY_WITH_STOP_LOSS,
             execution_model="scheduled",
         )
         bot_id = deploy_result.data["bot_id"]
@@ -381,7 +415,7 @@ class TestStopBotTool:
         deploy = DeployBotTool()
         deploy_result = await deploy.execute(
             strategy_name="test",
-            strategy_config=VALID_STRATEGY_CONFIG,
+            strategy_config=STRATEGY_WITH_STOP_LOSS,
             execution_model="scheduled",
         )
         bot_id = deploy_result.data["bot_id"]
@@ -404,7 +438,7 @@ class TestStopBotTool:
         deploy = DeployBotTool()
         deploy_result = await deploy.execute(
             strategy_name="test",
-            strategy_config=VALID_STRATEGY_CONFIG,
+            strategy_config=STRATEGY_WITH_STOP_LOSS,
             execution_model="scheduled",
         )
         bot_id = deploy_result.data["bot_id"]
@@ -422,7 +456,7 @@ class TestStopBotTool:
         deploy = DeployBotTool()
         deploy_result = await deploy.execute(
             strategy_name="test",
-            strategy_config=VALID_STRATEGY_CONFIG,
+            strategy_config=STRATEGY_WITH_STOP_LOSS,
             execution_model="scheduled",
         )
         bot_id = deploy_result.data["bot_id"]
@@ -450,7 +484,7 @@ class TestModifyBotTool:
         deploy = DeployBotTool()
         deploy_result = await deploy.execute(
             strategy_name="test",
-            strategy_config=VALID_STRATEGY_CONFIG,
+            strategy_config=STRATEGY_WITH_STOP_LOSS,
             execution_model="scheduled",
             max_position_pct=10.0,
         )
@@ -470,7 +504,7 @@ class TestModifyBotTool:
         deploy = DeployBotTool()
         deploy_result = await deploy.execute(
             strategy_name="test",
-            strategy_config=VALID_STRATEGY_CONFIG,
+            strategy_config=STRATEGY_WITH_STOP_LOSS,
             execution_model="scheduled",
         )
         bot_id = deploy_result.data["bot_id"]
@@ -488,7 +522,7 @@ class TestModifyBotTool:
         deploy = DeployBotTool()
         deploy_result = await deploy.execute(
             strategy_name="test",
-            strategy_config=VALID_STRATEGY_CONFIG,
+            strategy_config=STRATEGY_WITH_STOP_LOSS,
             execution_model="scheduled",
         )
         bot_id = deploy_result.data["bot_id"]

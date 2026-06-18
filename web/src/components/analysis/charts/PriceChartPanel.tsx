@@ -204,29 +204,6 @@ class PriceChartPanelImpl extends BaseChartPanel {
     if (data.overlays) {
       this.updateOverlays(data.overlays);
     }
-
-    // #region agent log
-    const visibleRange = this.chart?.timeScale().getVisibleLogicalRange();
-    const timeRange = this.chart?.timeScale().getVisibleRange();
-    fetch("http://127.0.0.1:7242/ingest/3d78da6f-49c7-481a-bafb-b1cb31305326", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        location: "PriceChartPanel.ts:updateData",
-        message: "Price data updated",
-        data: {
-          candleCount: data.candles.length,
-          firstTime: data.candles[0]?.time,
-          lastTime: data.candles[data.candles.length - 1]?.time,
-          visibleLogicalRange: visibleRange,
-          visibleTimeRange: timeRange,
-        },
-        timestamp: Date.now(),
-        sessionId: "debug-session",
-        hypothesisId: "H14",
-      }),
-    }).catch(() => {});
-    // #endregion
   }
 
   private updateOverlays(overlays: OverlayIndicatorData[]): void {

@@ -1,7 +1,7 @@
 """Tests for trading bot lifecycle management."""
 
 import asyncio
-from datetime import datetime
+from datetime import datetime, timedelta
 
 import pytest
 
@@ -284,6 +284,110 @@ async def test_bot_run_loop_paused(trading_bot):
 
     # Cleanup
     await trading_bot.stop()
+
+
+# Kill Switch Tests (daily-loss enforcement, TradingConfig.max_daily_loss_pct)
+
+
+def _bot_with_daily_loss_limit(mock_broker, max_daily_loss_pct: float | None = 5.0):
+    config = BotConfig(
+        id="kill_switch_bot",
+        name="Kill Switch Bot",
+        strategy_name="test_strategy",
+        strategy_config={
+            "name": "test_strategy",
+            "symbols": ["SPY"],
+            "entry_rules": [
+                {
+                    "conditions": [
+                        {"left": "close", "comparison": "crosses_above", "right": "sma_20"}
+                    ]
+                }
+            ],
+        },
+        trading_config=TradingConfig(
+            broker="alpaca",
+            mode="paper",
+            execution_model=ExecutionModel.CONTINUOUS,
+            max_daily_loss_pct=max_daily_loss_pct,
+        ),
+        created_at=datetime.utcnow(),
+    )
+    return TradingBot(config=config, broker=mock_broker)
+
+
+@pytest.mark.asyncio
+async def test_kill_switch_noop_without_limit(mock_broker):
+    """No max_daily_loss_pct configured means the kill switch never trips."""
+    bot = _bot_with_daily_loss_limit(mock_broker, max_daily_loss_pct=None)
+
+    tripped = await bot._check_kill_switch(50_000.0)  # 50% "loss" from nothing set yet
+
+    assert tripped is False
+    assert bot.status != "halted"
+
+
+@pytest.mark.asyncio
+async def test_kill_switch_noop_within_limit(mock_broker):
+    """Equity dipping less than the configured limit should not halt the bot."""
+    bot = _bot_with_daily_loss_limit(mock_broker, max_daily_loss_pct=5.0)
+
+    await bot._check_kill_switch(100_000.0)  # establishes today's baseline
+    tripped = await bot._check_kill_switch(97_000.0)  # 3% down, under the 5% limit
+
+    assert tripped is False
+    assert bot.status != "halted"
+
+
+@pytest.mark.asyncio
+async def test_kill_switch_trips_and_closes_positions(mock_broker):
+    """Breaching max_daily_loss_pct halts the bot and flattens positions."""
+    bot = _bot_with_daily_loss_limit(mock_broker, max_daily_loss_pct=5.0)
+    mock_broker._positions = [
+        Position(
+            symbol="SPY",
+            qty=10,
+            side="long",
+            entry_price=400.0,
+            current_price=380.0,
+            unrealized_pnl=-200.0,
+            market_value=3800.0,
+        )
+    ]
+
+    await bot._check_kill_switch(100_000.0)  # establishes today's baseline
+    tripped = await bot._check_kill_switch(94_000.0)  # 6% down, breaches the 5% limit
+
+    assert tripped is True
+    assert bot.status == "halted"
+    assert "daily loss" in bot._halt_reason
+    assert mock_broker._positions == []  # close_all_positions was called
+
+
+@pytest.mark.asyncio
+async def test_kill_switch_resets_baseline_on_new_day(mock_broker):
+    """A new UTC day resets the daily-loss baseline instead of halting forever."""
+    bot = _bot_with_daily_loss_limit(mock_broker, max_daily_loss_pct=5.0)
+
+    await bot._check_kill_switch(100_000.0)
+    bot._daily_start_date -= timedelta(days=1)  # simulate yesterday's baseline
+
+    tripped = await bot._check_kill_switch(94_000.0)  # would have breached yesterday's baseline
+
+    assert tripped is False
+    assert bot._daily_start_equity == 94_000.0  # rebaselined to today's equity
+
+
+@pytest.mark.asyncio
+async def test_kill_switch_halted_bot_cannot_resume(mock_broker):
+    """A halted bot is not resumable the way a paused bot is - it needs a fresh deploy."""
+    bot = _bot_with_daily_loss_limit(mock_broker, max_daily_loss_pct=5.0)
+    await bot._check_kill_switch(100_000.0)
+    await bot._check_kill_switch(90_000.0)
+    assert bot.status == "halted"
+
+    with pytest.raises(RuntimeError, match="Can only resume a paused bot"):
+        await bot.resume()
 
 
 # BotRegistry Tests

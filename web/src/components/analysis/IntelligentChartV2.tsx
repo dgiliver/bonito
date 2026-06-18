@@ -255,29 +255,6 @@ export default function IntelligentChartV2() {
 
         setCandleData(candles);
 
-        // #region agent log
-        fetch(
-          "http://127.0.0.1:7242/ingest/3d78da6f-49c7-481a-bafb-b1cb31305326",
-          {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
-              location: "IntelligentChartV2.tsx:fetchData",
-              message: "Candle data loaded",
-              data: {
-                candleCount: candles.length,
-                firstTime: candles[0]?.time,
-                lastTime: candles[candles.length - 1]?.time,
-                activePanelsCount: activePanels.length,
-              },
-              timestamp: Date.now(),
-              sessionId: "debug-session",
-              hypothesisId: "H14",
-            }),
-          },
-        ).catch(() => {});
-        // #endregion
-
         // Update chart with new data
         if (chartContainerRef.current) {
           chartContainerRef.current.updatePriceData({ candles });

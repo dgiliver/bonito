@@ -1,20 +1,18 @@
 """Trading tools for agent-assisted bot management."""
 
-import os
 import uuid
 from datetime import UTC, datetime
 from typing import Any
 
+from bonito.config import settings
 from bonito.tools.base import Tool, ToolResult
 from bonito.trading.alpaca_broker import AlpacaBroker
 from bonito.trading.bot import TradingBot
 from bonito.trading.bot_registry import BotRegistry
-from bonito.trading.credential_store import CredentialStore
+from bonito.trading.credential_store import CredentialStore, get_credential_password
 from bonito.trading.models import BotConfig, ExecutionModel, TradingConfig
-from bonito.trading.risk import calculate_risk_score
+from bonito.trading.risk import calculate_risk_score, should_require_acknowledgment
 
-# Initialize credential store with password from environment
-_CREDENTIAL_PASSWORD = os.environ.get("BONITO_CREDENTIAL_PASSWORD", "dev-password-change-in-prod")
 _credential_store = CredentialStore()
 
 
@@ -40,6 +38,7 @@ Args:
     schedule: Cron expression for scheduled execution (optional)
     max_position_pct: Maximum position size as % of portfolio (default: 10)
     max_daily_loss_pct: Daily loss limit as % to auto-stop (optional)
+    acknowledge_risks: Must be true if the computed risk score is high/extreme
 
 Returns:
     Bot ID and deployment status with risk warnings"""
@@ -81,14 +80,33 @@ Returns:
                     "type": "number",
                     "description": "Optional circuit breaker for daily losses",
                 },
+                "acknowledge_risks": {
+                    "type": "boolean",
+                    "default": False,
+                    "description": "Must be true to deploy a bot with high/extreme risk score",
+                },
             },
             "required": ["strategy_name", "strategy_config", "execution_model"],
         }
 
     async def execute(self, **kwargs: Any) -> ToolResult:
         try:
+            mode = kwargs.get("mode", "paper")
+            if mode == "live" and not settings.alpaca_live_trading_enabled:
+                return ToolResult(
+                    success=False,
+                    error="Live trading is disabled. An operator must set "
+                    "ALPACA_LIVE_TRADING_ENABLED=true in the environment before "
+                    "real-money bots can be deployed.",
+                )
+
             # Load credentials from store
-            credentials = _credential_store.load_credentials(_CREDENTIAL_PASSWORD)
+            if not _credential_store.has_credentials():
+                return ToolResult(
+                    success=False,
+                    error="No credentials linked. Please link your Alpaca account first using the /api/trading/account/link endpoint.",
+                )
+            credentials = _credential_store.load_credentials(get_credential_password())
             if not credentials:
                 return ToolResult(
                     success=False,
@@ -97,7 +115,7 @@ Returns:
 
             # Create trading config
             trading_config = TradingConfig(
-                mode=kwargs.get("mode", "paper"),
+                mode=mode,
                 execution_model=ExecutionModel(kwargs["execution_model"]),
                 schedule=kwargs.get("schedule"),
                 max_position_pct=kwargs.get("max_position_pct", 10.0),
@@ -118,6 +136,15 @@ Returns:
             risk_score, warnings = calculate_risk_score(bot_config)
             bot_config.risk_score = risk_score
             bot_config.risk_warnings = warnings
+
+            if should_require_acknowledgment(risk_score) and not kwargs.get(
+                "acknowledge_risks", False
+            ):
+                return ToolResult(
+                    success=False,
+                    error=f"Risk acknowledgment required (risk_score={risk_score}). "
+                    f"Warnings: {'; '.join(warnings)}. Pass acknowledge_risks=true to proceed.",
+                )
 
             # Create broker with real credentials
             broker = AlpacaBroker(

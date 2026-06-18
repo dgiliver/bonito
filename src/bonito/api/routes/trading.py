@@ -9,10 +9,11 @@ from typing import Literal
 from fastapi import APIRouter, HTTPException, status
 from pydantic import BaseModel, Field
 
+from bonito.config import settings
 from bonito.trading.alpaca_broker import AlpacaBroker
 from bonito.trading.bot import TradingBot
 from bonito.trading.bot_registry import BotRegistry
-from bonito.trading.credential_store import CredentialStore
+from bonito.trading.credential_store import CredentialStore, get_credential_password
 from bonito.trading.credential_validator import CredentialValidator
 from bonito.trading.credentials import AlpacaCredentials
 from bonito.trading.models import BotConfig, ExecutionModel, TradingConfig
@@ -20,9 +21,6 @@ from bonito.trading.risk import calculate_risk_score, should_require_acknowledgm
 
 logger = logging.getLogger(__name__)
 
-# Initialize credential store with password from environment
-# In development, use a default password. In production, MUST set BONITO_CREDENTIAL_PASSWORD
-_CREDENTIAL_PASSWORD = os.environ.get("BONITO_CREDENTIAL_PASSWORD", "dev-password-change-in-prod")
 _credential_store = CredentialStore()
 
 # Cache for account info (not credentials)
@@ -31,10 +29,12 @@ _account_info: dict | None = None
 
 def get_credentials() -> AlpacaCredentials | None:
     """Get stored credentials from encrypted store or environment."""
-    # Try loading from encrypted store first
-    credentials = _credential_store.load_credentials(_CREDENTIAL_PASSWORD)
-    if credentials:
-        return credentials
+    # Try loading from encrypted store first (only if one exists, so users who
+    # rely solely on plain env vars below aren't forced to set a passphrase)
+    if _credential_store.has_credentials():
+        credentials = _credential_store.load_credentials(get_credential_password())
+        if credentials:
+            return credentials
 
     # Fallback to environment variables (for backward compatibility)
     api_key = os.environ.get("ALPACA_PAPER_API_KEY") or os.environ.get("ALPACA_API_KEY")
@@ -149,6 +149,14 @@ class AccountInfoResponse(BaseModel):
 @router.post("/bots", response_model=DeployBotResponse, status_code=status.HTTP_201_CREATED)
 async def deploy_bot(request: DeployBotRequest):
     """Deploy a new trading bot."""
+    if request.mode == "live" and not settings.alpaca_live_trading_enabled:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Live trading is disabled. An operator must set "
+            "ALPACA_LIVE_TRADING_ENABLED=true in the environment before "
+            "real-money bots can be deployed.",
+        )
+
     # Load credentials from store
     credentials = get_credentials()
     if not credentials:
@@ -274,6 +282,7 @@ async def get_bot(bot_id: str):
         risk={
             "score": state.config.risk_score,
             "warnings": state.config.risk_warnings,
+            "halt_reason": state.halt_reason,
         },
     )
 
@@ -451,7 +460,7 @@ async def link_account(request: LinkAccountRequest):
             raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=result.error)
 
         # Store credentials in encrypted store
-        _credential_store.store_credentials(credentials, _CREDENTIAL_PASSWORD)
+        _credential_store.store_credentials(credentials, get_credential_password())
 
         # Cache account info
         _account_info = {
@@ -465,6 +474,10 @@ async def link_account(request: LinkAccountRequest):
         return AccountInfoResponse(**_account_info)
     except ValueError as e:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e)) from None
+    except RuntimeError as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=str(e)
+        ) from None
 
 
 @router.delete("/account/link")

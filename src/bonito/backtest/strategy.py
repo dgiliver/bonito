@@ -93,9 +93,19 @@ PANDAS_TA_INDICATORS = {
     "zscore",
 }
 
+# Rolling lookback indicators implemented directly in compute_indicators()
+# (not part of pandas-ta) - see backtest/indicators.py.
+ROLLING_INDICATOR_TYPES = {
+    "rolling_max",
+    "rolling_min",
+    "rolling_mean",
+    "rolling_std",
+    "percentile",
+}
+
 
 def _validate_indicator_type(value: str | IndicatorType) -> str | IndicatorType:
-    """Validate indicator type - accepts enum or string for pandas-ta indicators."""
+    """Validate indicator type - accepts enum, pandas-ta, or rolling lookback types."""
     if isinstance(value, IndicatorType):
         return value
 
@@ -108,13 +118,15 @@ def _validate_indicator_type(value: str | IndicatorType) -> str | IndicatorType:
     except ValueError:
         pass
 
-    # Check if it's a valid pandas-ta indicator
-    if str_value in PANDAS_TA_INDICATORS:
+    # Check if it's a valid pandas-ta indicator or rolling lookback type
+    if str_value in PANDAS_TA_INDICATORS or str_value in ROLLING_INDICATOR_TYPES:
         return str_value
 
-    # Allow any string for flexibility (pandas-ta has 130+ indicators)
-    # The compute_indicators function will raise if truly invalid
-    return str_value
+    raise ValueError(
+        f"Unknown indicator type {value!r}. Must be a built-in type "
+        f"({', '.join(sorted(BUILTIN_INDICATOR_TYPES))}), a pandas-ta indicator, "
+        f"or a rolling lookback type ({', '.join(sorted(ROLLING_INDICATOR_TYPES))})."
+    )
 
 
 # Type that accepts either IndicatorType enum or string for pandas-ta
