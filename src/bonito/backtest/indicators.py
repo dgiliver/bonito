@@ -338,17 +338,28 @@ def sma(prices: np.ndarray, period: int) -> np.ndarray:
 
 
 def ema(prices: np.ndarray, period: int) -> np.ndarray:
-    """Exponential Moving Average."""
+    """Exponential Moving Average.
+
+    Seeds from the first window of `period` valid values rather than
+    assuming index 0 is valid, so this also works on derived series that
+    start with a run of NaN (e.g. MACD's signal line, which is an EMA of
+    the MACD line — itself NaN for its slow-EMA warm-up period). Without
+    this, a NaN seed propagates through every later value via the
+    recursive update below and never recovers.
+    """
     result = np.full_like(prices, np.nan)
-    if len(prices) < period:
+    valid = np.flatnonzero(~np.isnan(prices))
+    if len(valid) == 0 or len(prices) - valid[0] < period:
         return result
+    start = valid[0]
     multiplier = 2 / (period + 1)
 
-    # Initialize with SMA
-    result[period - 1] = np.mean(prices[:period])
+    # Initialize with SMA over the first `period` valid values
+    seed = start + period - 1
+    result[seed] = np.mean(prices[start : start + period])
 
     # Calculate EMA
-    for i in range(period, len(prices)):
+    for i in range(seed + 1, len(prices)):
         result[i] = (prices[i] * multiplier) + (result[i - 1] * (1 - multiplier))
 
     return result

@@ -224,11 +224,29 @@ class TestMACD:
         prices = np.array([float(100 + i + np.sin(i / 5) * 10) for i in range(100)])
         macd_line, signal_line, histogram = macd(prices, 12, 26, 9)
 
-        # Check at a point where both are valid
         idx = 50
-        if not np.isnan(macd_line[idx]) and not np.isnan(signal_line[idx]):
-            expected = macd_line[idx] - signal_line[idx]
-            assert histogram[idx] == pytest.approx(expected, rel=0.01)
+        assert not np.isnan(macd_line[idx])
+        assert not np.isnan(signal_line[idx])
+        expected = macd_line[idx] - signal_line[idx]
+        assert histogram[idx] == pytest.approx(expected, rel=0.01)
+
+    def test_signal_line_is_not_all_nan(self):
+        """Regression test: signal line is an EMA of the MACD line, which
+
+        itself starts with `slow_period - 1` leading NaN (its own EMA
+        warm-up). A naive EMA seeded from index 0 would seed on all-NaN
+        data and propagate NaN forever. The signal line must recover and
+        produce real values once the MACD line itself is populated.
+        """
+        prices = np.array([float(100 + i + np.sin(i / 5) * 10) for i in range(200)])
+        _, signal_line, histogram = macd(prices, 12, 26, 9)
+
+        assert not np.isnan(signal_line[-1])
+        assert not np.isnan(histogram[-1])
+        # NaN should be confined to the combined fast/slow/signal warm-up,
+        # not bleed into the rest of the series.
+        assert np.isnan(signal_line).sum() == 26 - 1 + 9 - 1
+        assert not np.isnan(signal_line[33:]).any()
 
 
 class TestBollingerBands:
@@ -391,6 +409,11 @@ class TestComputeIndicators:
         assert "macd_line" in result
         assert "macd_signal" in result
         assert "macd_hist" in result
+        # All three must have real (non-NaN) values once warm-up passes,
+        # not just exist as all-NaN arrays.
+        assert not np.isnan(result["macd_line"][-1])
+        assert not np.isnan(result["macd_signal"][-1])
+        assert not np.isnan(result["macd_hist"][-1])
 
     def test_bbands_creates_three_outputs(self, sample_bar_data):
         """Bollinger Bands should create upper, middle, lower."""

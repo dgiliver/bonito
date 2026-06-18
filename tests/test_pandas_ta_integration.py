@@ -432,6 +432,9 @@ class TestBackwardCompatibility(TestPandasTAIntegration):
         assert "macd_line" in result
         assert "macd_signal" in result
         assert "macd_hist" in result
+        assert not np.isnan(result["macd_line"][-1])
+        assert not np.isnan(result["macd_signal"][-1])
+        assert not np.isnan(result["macd_hist"][-1])
 
     def test_existing_bbands_still_works(self, sample_bar_data):
         """Bollinger Bands should still produce three outputs."""
