@@ -148,6 +148,53 @@ class TestRSI:
         # RSI should be around 50
         assert 40 < result[-1] < 60
 
+    def test_rsi_propagates_leading_nan_run(self):
+        """Regression: a leading NaN run (e.g. a derived series, or real bars
+
+        with a gap at the start) must stay NaN through the run, not silently
+        resolve to a wrong non-NaN number. Before the fix,
+        `np.where(deltas > 0, deltas, 0)` evaluated `NaN > 0` as False and
+        zeroed leading NaN deltas instead of propagating them, corrupting the
+        seed average with wrong, non-NaN numbers instead of surfacing NaN.
+        """
+        valid_prices = np.array([float(i) for i in range(1, 30)])
+        prices = np.concatenate([[np.nan] * 5, valid_prices])
+        result = rsi(prices, period=14)
+
+        # The leading NaN run (and the first delta computed across the
+        # boundary, which is also NaN since prices[4] is NaN) must remain NaN.
+        assert np.all(np.isnan(result[:6]))
+
+    def test_rsi_leading_nan_matches_freshly_seeded_array(self):
+        """Regression: the fix must produce the *correct* number after the
+
+        gap, not just avoid corrupting it. RSI computed on a price series
+        with a leading NaN run must exactly match RSI computed on the same
+        valid prices as a fresh array starting at index 0 (shifted by the
+        gap length) - this is the cross-check that catches the "fails
+        silently with wrong numbers" bug, which a bounds-only check would miss.
+        """
+        np.random.seed(7)
+        valid_prices = 100 + np.cumsum(np.random.randn(100))
+        gap = 5
+        prices_with_gap = np.concatenate([[np.nan] * gap, valid_prices])
+
+        result_with_gap = rsi(prices_with_gap, period=14)
+        result_fresh = rsi(valid_prices, period=14)
+
+        # Values after the gap must line up exactly with the fresh-array result.
+        shifted = result_with_gap[gap:]
+        both_nan = np.isnan(shifted) & np.isnan(result_fresh)
+        assert np.array_equal(np.isnan(shifted), np.isnan(result_fresh))
+        np.testing.assert_allclose(
+            shifted[~both_nan], result_fresh[~both_nan], rtol=1e-10, atol=1e-10
+        )
+
+        # And the post-warmup values must be numerically sane (within bounds).
+        valid = shifted[~np.isnan(shifted)]
+        assert len(valid) > 0
+        assert all(0 <= v <= 100 for v in valid)
+
 
 class TestATR:
     """Tests for Average True Range."""
@@ -197,6 +244,27 @@ class TestATR:
 
         # ATR at end should be higher than at middle
         assert result[-1] > result[19]
+
+    def test_atr_with_leading_nan_is_not_all_nan(self):
+        """Regression: a leading NaN run (e.g. real bars with a gap at the
+
+        start) used to poison the seed mean and make the entire output NaN
+        forever, since the recursive update never recovers from a NaN seed.
+        After the fix, ATR must still produce real values once past the gap
+        plus warmup, not fail silently with a 100%-NaN array.
+        """
+        gap = 5
+        high = np.concatenate([[np.nan] * gap, np.array([102.0] * 20)])
+        low = np.concatenate([[np.nan] * gap, np.array([100.0] * 20)])
+        close = np.concatenate([[np.nan] * gap, np.array([101.0] * 20)])
+
+        result = atr(high, low, close, period=14)
+
+        valid = result[~np.isnan(result)]
+        assert len(valid) > 0, "ATR output must not be 100% NaN after a leading gap"
+        # And the values it does produce should still be numerically sane -
+        # converging to the constant range (~2), same as test_atr_basic.
+        assert valid[-1] == pytest.approx(2.0, rel=0.1)
 
 
 class TestMACD:
