@@ -39,6 +39,7 @@ class PaperFill(BaseModel):
     reason: str
     filled_at: datetime
     strategy_name: str = ""
+    broker_order_id: str | None = None
 
 
 class PaperPosition(BaseModel):
@@ -178,6 +179,7 @@ class PaperLedger(BaseModel):
             reason=intent.reason,
             filled_at=now,
             strategy_name=intent.strategy_name,
+            broker_order_id=intent.broker_order_id,
         )
         self.fills.append(fill)
         logger.info(
@@ -215,6 +217,7 @@ class PaperLedger(BaseModel):
             reason=intent.reason,
             filled_at=datetime.now(UTC),
             strategy_name=intent.strategy_name or pos.strategy_name,
+            broker_order_id=intent.broker_order_id,
         )
         self.fills.append(fill)
         logger.info(
@@ -247,8 +250,13 @@ class PaperLedger(BaseModel):
         self.halt_reason = reason
         logger.error(f"LEDGER HALTED: {reason}")
 
-    def resume(self) -> None:
+    def resume(self, *, confirm: bool = False) -> None:
         """Clear the kill switch (explicit human action only)."""
+        if confirm is not True:
+            raise ValueError(
+                "PaperLedger.resume() requires confirm=True — kill-switch clearance is a "
+                "human-only action (see bonito live resume)"
+            )
         self.halted = False
         self.halt_reason = ""
 

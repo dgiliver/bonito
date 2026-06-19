@@ -281,9 +281,7 @@ def run_tracking(
             reasons.append(f"mean fill gap {np.mean(deltas):.0f}bps > {MAX_MEAN_FILL_BPS:.0f}bps")
         if divergence > MAX_DECISION_DIVERGENCE:
             status = "WARN"
-            reasons.append(
-                f"decision divergence {divergence:.0%} > {MAX_DECISION_DIVERGENCE:.0%}"
-            )
+            reasons.append(f"decision divergence {divergence:.0%} > {MAX_DECISION_DIVERGENCE:.0%}")
         if abs(equity_gap_pct) > MAX_EQUITY_GAP_PCT:
             status = "WARN"
             reasons.append(

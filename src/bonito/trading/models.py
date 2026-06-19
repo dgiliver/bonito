@@ -1,13 +1,13 @@
 """Pydantic models for trading infrastructure."""
 
 from datetime import datetime
-from enum import Enum
+from enum import StrEnum
 from typing import Literal
 
 from pydantic import BaseModel, Field
 
 
-class ExecutionModel(str, Enum):
+class ExecutionModel(StrEnum):
     """Execution model for trading bots."""
 
     SCHEDULED = "scheduled"

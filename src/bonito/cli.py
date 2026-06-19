@@ -831,7 +831,16 @@ def research_regime_sweep(
     )
 
     table = Table()
-    for col in ("Regime", "Window", "Sharpe", "MaxDD%", "CAGR%", "Trades", "Verdict", "Bench CAGR%"):
+    for col in (
+        "Regime",
+        "Window",
+        "Sharpe",
+        "MaxDD%",
+        "CAGR%",
+        "Trades",
+        "Verdict",
+        "Bench CAGR%",
+    ):
         table.add_column(col, justify="right" if col not in ("Regime", "Window") else "left")
 
     for row in rows:
@@ -1363,6 +1372,9 @@ def live_record_fill(
     price: float = typer.Argument(..., help="Actual fill price from Robinhood"),
     dollar_amount: float = typer.Option(None, "--dollars", help="Notional for buys"),
     reason: str = typer.Option("live fill", "--reason"),
+    broker_order_id: str = typer.Option(
+        ..., "--broker-order-id", help="Robinhood order id from get_equity_orders"
+    ),
     universe_path: str = typer.Option("config/universe.json", "--universe", "-u"),
 ) -> None:
     """Record a real Robinhood fill into the ledger (live mode bookkeeping)."""
@@ -1373,6 +1385,14 @@ def live_record_fill(
     from bonito.trading.signals import TradeIntent
 
     universe = _load_universe(universe_path)
+
+    if universe.mode == "paper":
+        console.print(
+            "[red]record-fill is live-mode bookkeeping; paper fills are produced "
+            "automatically by `bonito live run`.[/red]"
+        )
+        raise typer.Exit(1)
+
     ledger = _load_ledger(universe)
     symbol = symbol.upper()
 
@@ -1390,6 +1410,7 @@ def live_record_fill(
         signal_price=price,
         signal_date=_dt.now(_UTC),
         strategy_name="live",
+        broker_order_id=broker_order_id,
     )
     strategies = {symbol: universe.load_strategy_for(symbol)} if side == "buy" else None
     fills, errors = execute_paper(ledger, [intent], {symbol: price}, strategies=strategies)
@@ -1428,7 +1449,7 @@ def live_resume(
         console.print("[dim]Ledger is not halted.[/dim]")
         return
     reason = ledger.halt_reason
-    ledger.resume()
+    ledger.resume(confirm=True)
     ledger.save()
     console.print(f"[green]Halt cleared[/green] (was: {reason})")
 

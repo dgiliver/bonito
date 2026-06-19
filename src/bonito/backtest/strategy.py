@@ -1,12 +1,12 @@
 """Strategy configuration models - the DSL for defining strategies."""
 
-from enum import Enum
+from enum import StrEnum
 from typing import Annotated, Literal
 
 from pydantic import BaseModel, BeforeValidator, Field
 
 
-class IndicatorType(str, Enum):
+class IndicatorType(StrEnum):
     """Built-in indicator types (legacy - maintained for backward compatibility)."""
 
     SMA = "sma"
@@ -155,7 +155,7 @@ class IndicatorConfig(BaseModel):
     model_config = {"extra": "forbid"}
 
 
-class Comparison(str, Enum):
+class Comparison(StrEnum):
     """Comparison operators for rules."""
 
     GT = "gt"
@@ -212,7 +212,7 @@ class Rule(BaseModel):
     )
 
 
-class PositionSizeType(str, Enum):
+class PositionSizeType(StrEnum):
     """Position sizing methods."""
 
     FIXED_QUANTITY = "fixed_quantity"
@@ -227,7 +227,7 @@ class PositionSizeConfig(BaseModel):
     value: float = Field(..., description="Size value (quantity, dollars, or percentage)")
 
 
-class StopLossType(str, Enum):
+class StopLossType(StrEnum):
     """Stop loss types."""
 
     # Fixed stops (set at entry, never move)
@@ -288,7 +288,7 @@ class RegimeFilterConfig(BaseModel):
     sma_period: int = Field(default=200, ge=2, description="SMA period on the reference symbol")
 
 
-class TakeProfitType(str, Enum):
+class TakeProfitType(StrEnum):
     """Take profit types."""
 
     PERCENT = "percent"

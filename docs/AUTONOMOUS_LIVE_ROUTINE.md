@@ -47,6 +47,14 @@ Routine until that sign-off.
    (`query1.finance.yahoo.com`, `query2.finance.yahoo.com`) for the data
    refresh. Robinhood MCP traffic routes through Anthropic and needs no
    domain allowlisting.
+5. The ••••8597 cash-only account scoping is **NOT enforced by any code in
+   `src/bonito/`** — Bonito's own pipeline never contacts Robinhood at all;
+   it only emits intents (`livetrade/intents/*.json`). The Robinhood MCP
+   calls happen entirely inside the Claude session/Routine, outside this
+   codebase. The only enforcement is (a) Robinhood's own API rejecting the
+   margin account for agentic trading (`agentic_allowed: false` on that
+   account), and (b) the Routine prompt's own discipline (step 1 below). A
+   reviewer must not assume `src/bonito/` guards this boundary.
 
 ## The safety chain inside each run
 
@@ -105,7 +113,10 @@ Setup:
 
 1. Resolve the account: Robinhood get_accounts → the one with
    agentic_allowed: true (nickname "Agentic", ••••8597). NEVER the margin
-   account (••••7982).
+   account (••••7982). Assert ALL THREE of: masked number ends in 8597 AND
+   agentic_allowed == true AND nickname == "Agentic". If any check fails,
+   STOP immediately, place nothing, and report the mismatch — this is the
+   same fail-closed posture as every other step below.
 2. Reconcile: get_equity_positions for that account → build
    {"SYMBOL": qty} JSON ({} if flat) → `.venv/bin/bonito live reconcile
    '<json>' -u config/universe.live.json`. Non-zero exit = drift: STOP,

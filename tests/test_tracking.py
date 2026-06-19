@@ -147,9 +147,7 @@ class TestPaperEquityCurve:
 
     def test_empty_ledger(self, tmp_path):
         ledger = PaperLedger(cash=1000.0, starting_cash=1000.0)
-        dates, equity = paper_equity_curve(
-            ledger, FakeStore({}), self.universe(tmp_path), day(3)
-        )
+        dates, equity = paper_equity_curve(ledger, FakeStore({}), self.universe(tmp_path), day(3))
         assert dates == [] and equity == []
 
 

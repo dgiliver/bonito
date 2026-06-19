@@ -50,7 +50,7 @@ dev = [
     "pytest-cov>=4.1.0",
 
     # Linting & Formatting
-    "ruff>=0.8.0",
+    "ruff>=0.15.0",
     "mypy>=1.8.0",
 
     # Pre-commit
@@ -80,12 +80,6 @@ line-length = 100
 select = ["E", "F", "I", "N", "W", "UP", "B", "C4", "SIM"]
 ignore = [
     "E501",  # Line too long - handled by formatter
-    # str+Enum -> StrEnum migration (7 pre-existing call sites in backtest/trading
-    # models). Ruff offers no safe autofix here because StrEnum changes str()
-    # formatting (plain value instead of "ClassName.MEMBER"), a real behavior
-    # change across widely-used domain enums - needs a deliberate, reviewed
-    # migration, not a CI-unblocking edit. Tracked as follow-up tech debt.
-    "UP042",
 ]
 
 [tool.mypy]

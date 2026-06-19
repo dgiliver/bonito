@@ -162,9 +162,7 @@ class TestTemplateFamilies:
         bbands_grid = GridSpec(bbands=BBandsMeanRevGrid())
 
         assert len(candidate_grid(adx_grid)) == base + len(_adx_trend_candidates(adx_grid.adx))
-        assert len(candidate_grid(macd_grid)) == base + len(
-            _macd_cross_candidates(macd_grid.macd)
-        )
+        assert len(candidate_grid(macd_grid)) == base + len(_macd_cross_candidates(macd_grid.macd))
         assert len(candidate_grid(bbands_grid)) == base + len(
             _bbands_meanrev_candidates(bbands_grid.bbands)
         )

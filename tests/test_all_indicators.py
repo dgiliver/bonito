@@ -193,17 +193,17 @@ def count_valid(arr: np.ndarray) -> int:
 def assert_bounds(arr: np.ndarray, min_val: float, max_val: float, name: str):
     """Assert all valid values are within bounds."""
     valid = arr[~np.isnan(arr)]
-    assert all(
-        min_val <= v <= max_val for v in valid
-    ), f"{name} values outside [{min_val}, {max_val}]"
+    assert all(min_val <= v <= max_val for v in valid), (
+        f"{name} values outside [{min_val}, {max_val}]"
+    )
 
 
 def assert_has_valid_values(arr: np.ndarray, min_count: int, name: str):
     """Assert array has minimum number of valid values."""
     valid_count = count_valid(arr)
-    assert (
-        valid_count >= min_count
-    ), f"{name} has only {valid_count} valid values, expected >= {min_count}"
+    assert valid_count >= min_count, (
+        f"{name} has only {valid_count} valid values, expected >= {min_count}"
+    )
 
 
 # =============================================================================
