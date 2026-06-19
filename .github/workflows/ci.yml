@@ -26,4 +26,7 @@ jobs:
         run: mypy src/
         continue-on-error: true  # TODO(P1-2): 157 pre-existing errors; tighten once baseline cleared
       - name: Tests (fast)
-        run: pytest tests/ -v -m "not slow"
+        # test_full_flow_create_and_backtest_trailing needs real ingested SPY data
+        # (data/market_data.duckdb is gitignored, absent on a clean checkout) - same
+        # exclusion deploy-bot.yml already applies, for the same reason.
+        run: pytest tests/ -v -m "not slow" -k "not test_full_flow_create_and_backtest_trailing"
