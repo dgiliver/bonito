@@ -400,6 +400,12 @@ export const PanelChartPanel = forwardRef<
   );
 
   // Create and initialize panel when container is ready
+  // NOTE: config.height is intentionally excluded from these deps. Height
+  // changes are handled by the separate resize effect below, which calls
+  // .resize() on the existing chart instance instead of destroying and
+  // recreating it. Do not "fix" this by adding height/config here (that's
+  // the panels/ pattern, e.g. RSIPanel/MACDPanel) — doing so would
+  // reintroduce destroy/recreate thrash on every height change.
   useEffect(() => {
     if (!containerRef.current) return;
 

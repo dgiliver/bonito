@@ -376,6 +376,13 @@ export const PriceChartPanel = forwardRef<
   const [initialized, setInitialized] = useState(false);
 
   // Create panel instance and initialize when container is ready
+  // NOTE: height is intentionally excluded from these deps (showTimeScale is
+  // excluded too, see comment below). Height changes are handled by the
+  // separate resize effect below, which calls .resize() on the existing
+  // chart instance instead of destroying and recreating it. Do not "fix"
+  // this by adding height to these deps (that's the panels/ pattern, e.g.
+  // RSIPanel/MACDPanel) — doing so would reintroduce destroy/recreate
+  // thrash on every height change.
   useEffect(() => {
     if (!containerRef.current) return;
 
