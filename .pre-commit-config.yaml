@@ -48,16 +48,19 @@ repos:
         files: ^web/.*\.(ts|tsx)$
         pass_filenames: false
 
-  # Type checking with mypy (disabled for MVP - run manually with `make typecheck`)
-  # - repo: https://github.com/pre-commit/mirrors-mypy
-  #   rev: v1.13.0
-  #   hooks:
-  #     - id: mypy
-  #       additional_dependencies:
-  #         - pydantic>=2.5.0
-  #         - types-requests
-  #       args: [--ignore-missing-imports]
-  #       files: ^src/
+  # Type checking with mypy - advisory/report-only, never blocks a commit.
+  # Reuses the project's .venv mypy directly (not mirrors-mypy's isolated
+  # env/deps) so output matches `make typecheck` exactly. There are 157
+  # pre-existing mypy errors as of this writing; `|| true` ensures this
+  # hook always exits 0 regardless of findings.
+  - repo: local
+    hooks:
+      - id: mypy
+        name: mypy (advisory, report-only)
+        entry: bash -c '.venv/bin/mypy src/ || true'
+        language: system
+        files: ^src/.*\.py$
+        pass_filenames: false
 
   # General file hygiene
   - repo: https://github.com/pre-commit/pre-commit-hooks

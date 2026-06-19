@@ -82,7 +82,7 @@ livetrade/          # Paper ledger, live ledger, intents, and research artifacts
 ### Commits
 - Use conventional commits: `feat:`, `fix:`, `chore:`, `docs:`, `refactor:`, `test:`
 - Run `make pre-commit` before committing
-- Pre-commit hooks run: ruff, mypy, ESLint, Prettier, TypeScript checks
+- Pre-commit hooks run: ruff, ESLint, Prettier, TypeScript checks (blocking); mypy runs too but is advisory/report-only — it never blocks a commit
 
 ## Architecture Decisions
 

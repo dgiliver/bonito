@@ -8,7 +8,6 @@ Usage:
     python -m bonito.research.autoresearch_trading --symbol SPY --iterations 1000
 """
 
-import hashlib
 import json
 import logging
 import sys
@@ -23,6 +22,7 @@ from bonito.backtest.models import BacktestConfig, BacktestResult
 from bonito.backtest.strategy import StrategyConfig
 from bonito.data.models import BarData
 from bonito.data.store import MarketDataStore
+from bonito.trading.validation import kill_verdict, strategy_hash, window_metrics
 
 logger = logging.getLogger(__name__)
 
@@ -38,11 +38,9 @@ HISTORY_SUMMARY_SIZE = 20  # older N mutations as summaries
 DEFAULT_SEED_PATH = Path("strategies/ema_cross_rsi_optimized.json")
 DEFAULT_OUTPUT_DIR = Path("research_output")
 
-# Kill filter thresholds
-MIN_TRADES = 30
-MAX_DRAWDOWN = 0.25
+# Kill filter thresholds (trade count / drawdown / Sharpe ceiling enforced by
+# validation.kill_verdict(); indicator-count complexity is autoresearch-specific)
 MAX_INDICATORS = 3
-MAX_SHARPE = 3.0  # Overfitting ceiling
 
 # Train/validation split dates
 TRAIN_END = "2023-12-31"
@@ -134,29 +132,24 @@ def validate_no_lookahead(strategy: StrategyConfig, data_length: int) -> str | N
     return None
 
 
-def apply_kill_filters(result: BacktestResult, strategy: StrategyConfig) -> str | None:
+def apply_kill_filters(
+    result: BacktestResult, strategy: StrategyConfig, start: datetime, end: datetime
+) -> str | None:
     """Apply kill filters to reject bad strategies.
+
+    Trade-count/drawdown/Sharpe checks delegate to the canonical
+    validation.kill_verdict() (rate-based trade threshold, comparable across
+    window lengths, rather than this loop's own fixed-window absolute count).
+    Indicator-count complexity stays local since it's autoresearch-specific.
 
     Returns rejection reason (string) or None if strategy passes.
     """
-    m = result.metrics
-
-    if m.total_trades < MIN_TRADES:
-        return f"too_few_trades ({m.total_trades} < {MIN_TRADES})"
-    if m.max_drawdown > MAX_DRAWDOWN:
-        return f"excessive_drawdown ({m.max_drawdown:.1%} > {MAX_DRAWDOWN:.0%})"
     if len(strategy.indicators) > MAX_INDICATORS:
         return f"too_many_indicators ({len(strategy.indicators)} > {MAX_INDICATORS})"
-    if m.sharpe_ratio > MAX_SHARPE:
-        return f"suspiciously_high_sharpe ({m.sharpe_ratio:.2f} > {MAX_SHARPE})"
 
-    return None
-
-
-def strategy_hash(strategy: StrategyConfig) -> str:
-    """Generate a short hash for a strategy config."""
-    config_str = strategy.model_dump_json(exclude={"name", "description", "version"})
-    return hashlib.sha256(config_str.encode()).hexdigest()[:12]
+    metrics = window_metrics(result, start, end)
+    reasons = kill_verdict(metrics)
+    return "; ".join(reasons) if reasons else None
 
 
 def build_system_prompt(schema: dict, n_mutations: int = MUTATIONS_PER_BATCH) -> str:
@@ -666,7 +659,9 @@ def run(
                 continue
 
             # Apply kill filters on train result
-            filter_reason = apply_kill_filters(train_result, strategy)
+            filter_reason = apply_kill_filters(
+                train_result, strategy, train_data.timestamps[0], train_data.timestamps[-1]
+            )
             if filter_reason:
                 logger.debug("Filtered (iter %d): %s", iteration, filter_reason)
                 log_iteration(
