@@ -286,6 +286,17 @@ useEffect(() => {
 ```
 Empty deps cause panel to not re-initialize when height changes (new panels added).
 
+This `[height, config]` recreate-on-resize pattern applies to **`panels/`** components
+(`RSIPanel.tsx`, `MACDPanel.tsx`, `StochasticPanel.tsx`) — they destroy and recreate
+their chart instance when height changes.
+
+**`charts/`** components (`PanelChartPanel.tsx`, `PriceChartPanel.tsx`) intentionally use
+a DIFFERENT pattern instead: their init `useEffect` excludes height from its deps, and a
+separate resize `useEffect` calls `.resize()` on the existing chart instance when height
+changes, rather than destroying/recreating it. This avoids visual thrash on every height
+change. This is intentional, not a bug — do not "fix" `charts/` components by copying the
+`panels/` recreate-on-resize pattern.
+
 ### Dynamic Panel Rendering
 Panels must render in user add order via `activePanels.map()`:
 ```tsx
