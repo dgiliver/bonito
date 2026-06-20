@@ -11,6 +11,7 @@
 import type {
   IChartApi,
   ISeriesApi,
+  SeriesType,
   Time,
   MouseEventParams,
   LogicalRange,
@@ -40,7 +41,29 @@ export type TimeRangeChangeCallback = (
   sourcePanel: string,
 ) => void;
 
-export abstract class BaseChartPanel {
+/**
+ * Minimal structural shape of a lightweight-charts series data point as seen
+ * from `MouseEventParams.seriesData` - candlestick/area points expose
+ * `close`, line/histogram points expose `value`.
+ */
+interface SeriesDataPoint {
+  close?: number;
+  value?: number;
+}
+
+/**
+ * BaseChartPanel is generic over each subclass's actual data/value/legend
+ * shapes so abstract method signatures can be precisely typed instead of
+ * `any`, without forcing every panel into a shared shape they don't use:
+ * - TData: the parameter shape `updateData` accepts (e.g. PanelIndicatorData[])
+ * - TCrosshairValue: the return shape of `getCrosshairValue`
+ * - TLegendData: the return shape of `getLegendData` (must include `time`)
+ */
+export abstract class BaseChartPanel<
+  TData = unknown,
+  TCrosshairValue = unknown,
+  TLegendData extends { time: Time | null } = { time: Time | null },
+> {
   protected chart: IChartApi | null = null;
   protected container: HTMLDivElement | null = null;
   protected panelId: string;
@@ -154,7 +177,7 @@ export abstract class BaseChartPanel {
       if (param.seriesData && param.seriesData.size > 0) {
         const firstSeries = param.seriesData.entries().next().value;
         if (firstSeries && firstSeries[1]) {
-          const data = firstSeries[1] as any;
+          const data = firstSeries[1] as SeriesDataPoint;
           crosshairData.price = data.close ?? data.value ?? null;
         }
       }
@@ -375,23 +398,23 @@ export abstract class BaseChartPanel {
   /**
    * Get the main series for this panel (used for crosshair sync)
    */
-  abstract getMainSeries(): ISeriesApi<any> | null;
+  abstract getMainSeries(): ISeriesApi<SeriesType> | null;
 
   /**
    * Update the panel with new data
    */
-  abstract updateData(data: any): void;
+  abstract updateData(data: TData): void;
 
   /**
    * Get the current value at the crosshair position
    */
-  abstract getCrosshairValue(time: Time): any;
+  abstract getCrosshairValue(time: Time): TCrosshairValue;
 
   /**
    * Get legend data for display
    * Returns an object with panel-specific legend information
    */
-  abstract getLegendData(time: Time): any;
+  abstract getLegendData(time: Time): TLegendData;
 }
 
 export default BaseChartPanel;
