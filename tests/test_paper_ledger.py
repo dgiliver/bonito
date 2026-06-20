@@ -274,9 +274,16 @@ class TestKillSwitchState:
         ledger = PaperLedger(cash=150.0, starting_cash=150.0)
         ledger.halt("test")
         assert ledger.halted
-        ledger.resume()
+        ledger.resume(confirm=True)
         assert not ledger.halted
         assert ledger.halt_reason == ""
+
+    def test_resume_without_confirm_raises(self):
+        ledger = PaperLedger(cash=150.0, starting_cash=150.0)
+        ledger.halt("test")
+        with pytest.raises(ValueError, match="confirm=True"):
+            ledger.resume()
+        assert ledger.halted  # halt state untouched by the rejected call
 
     def test_halt_state_survives_save_load(self, tmp_path):
         path = tmp_path / "ledger.json"
