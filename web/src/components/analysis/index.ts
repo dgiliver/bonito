@@ -1,4 +1,4 @@
-export { default as AnalysisView } from "./AnalysisView";
+export { AnalysisView } from "./AnalysisView";
 export {
   AnalysisProvider,
   useAnalysis,

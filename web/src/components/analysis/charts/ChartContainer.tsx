@@ -646,5 +646,3 @@ export const ChartContainer = forwardRef<
     </div>
   );
 });
-
-export default ChartContainer;

@@ -140,5 +140,3 @@ export class CrosshairSync {
     this.lastCrosshairData = null;
   }
 }
-
-export default CrosshairSync;

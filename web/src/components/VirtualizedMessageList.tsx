@@ -18,7 +18,7 @@ interface VirtualizedMessageListProps {
   height?: number;
 }
 
-export default function VirtualizedMessageList({
+export function VirtualizedMessageList({
   messages,
   height,
 }: VirtualizedMessageListProps) {

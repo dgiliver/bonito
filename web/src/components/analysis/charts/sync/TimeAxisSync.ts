@@ -154,5 +154,3 @@ export class TimeAxisSync {
     this.isSyncing = false;
   }
 }
-
-export default TimeAxisSync;

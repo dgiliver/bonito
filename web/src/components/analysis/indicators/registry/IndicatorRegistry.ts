@@ -15,7 +15,7 @@ import type {
   IndicatorContext,
   IndicatorAnalysis,
 } from "../base/BaseIndicator";
-import IndicatorFactory from "./IndicatorFactory";
+import { IndicatorFactory } from "./IndicatorFactory";
 
 export class IndicatorRegistry {
   private overlayIndicators = new Map<string, BaseIndicator>();

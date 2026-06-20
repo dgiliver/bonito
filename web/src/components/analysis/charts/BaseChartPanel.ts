@@ -417,5 +417,4 @@ export abstract class BaseChartPanel<
   abstract getLegendData(time: Time): TLegendData;
 }
 
-export default BaseChartPanel;
 export { CrosshairMode };

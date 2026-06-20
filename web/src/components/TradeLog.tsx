@@ -21,7 +21,7 @@ interface TradeLogProps {
   className?: string;
 }
 
-export default function TradeLog({
+export function TradeLog({
   trades = [],
   className = "",
 }: TradeLogProps) {

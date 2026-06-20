@@ -13,7 +13,7 @@
 
 import { describe, it, expect } from "vitest";
 import { render, screen, fireEvent, waitFor } from "@testing-library/react";
-import VirtualizedMessageList from "./VirtualizedMessageList";
+import { VirtualizedMessageList } from "./VirtualizedMessageList";
 
 // Types matching Chat.tsx
 interface Message {

@@ -4,7 +4,7 @@
  * This should be called once at app startup to register all indicator types
  */
 
-import IndicatorFactory from "./IndicatorFactory";
+import { IndicatorFactory } from "./IndicatorFactory";
 import {
   SMAIndicator,
   EMAIndicator,

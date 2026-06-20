@@ -481,5 +481,3 @@ export const MACDPanel = forwardRef<MACDPanelRef, MACDPanelProps>(
     );
   },
 );
-
-export default MACDPanel;

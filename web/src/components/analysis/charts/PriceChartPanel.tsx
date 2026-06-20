@@ -494,5 +494,4 @@ export const PriceChartPanel = forwardRef<
   );
 });
 
-export default PriceChartPanel;
 export { CrosshairMode };

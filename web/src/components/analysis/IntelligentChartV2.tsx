@@ -167,7 +167,7 @@ function createTradeMarkers(
 // Main Component
 // ============================================================================
 
-export default function IntelligentChartV2() {
+export function IntelligentChartV2() {
   const { state, dispatch } = useAnalysis();
   const { intents, processIntent } = useChartIntents();
 

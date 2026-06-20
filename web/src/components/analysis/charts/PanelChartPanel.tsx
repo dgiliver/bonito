@@ -511,5 +511,3 @@ export const PanelChartPanel = forwardRef<
     />
   );
 });
-
-export default PanelChartPanel;

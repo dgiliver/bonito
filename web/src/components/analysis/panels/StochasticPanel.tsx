@@ -451,5 +451,3 @@ export const StochasticPanel = forwardRef<
     </div>
   );
 });
-
-export default StochasticPanel;

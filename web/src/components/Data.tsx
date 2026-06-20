@@ -18,7 +18,7 @@ interface SymbolData {
   bars: number;
 }
 
-export default function Data() {
+export function Data() {
   const [symbols, setSymbols] = useState<SymbolData[]>([]);
   const [loading, setLoading] = useState(true);
   const [ingesting, setIngesting] = useState(false);
