@@ -131,8 +131,11 @@ Setup:
 6. Execute ONLY the intents in the newest intents file, sells before buys:
    for each, Robinhood review_equity_order then place_equity_order (fresh
    UUID ref_id), then `.venv/bin/bonito live record-fill SYMBOL SIDE PRICE
-   --dollars N` (or `... SIDE PRICE` for sells) with the ACTUAL fill price.
-   On any order error: STOP, report what filled and what didn't, do not retry.
+   --dollars N --broker-order-id ID` (or `... SIDE PRICE --broker-order-id ID`
+   for sells) with the ACTUAL fill price and the order id from
+   place_equity_order's response (or get_equity_orders if not returned
+   directly). On any order error: STOP, report what filled and what didn't,
+   do not retry.
 7. Reconcile again (get_equity_positions vs ledger). Report any mismatch;
    do not silently fix it.
 8. Persist: `.venv/bin/bonito live status -u config/universe.live.json`,

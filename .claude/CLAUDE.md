@@ -30,7 +30,7 @@ bonito live refresh [-u config/universe.live.json]       # Pull latest price dat
 bonito live preflight [-u config/universe.live.json]     # Fail-closed gate (kill switch, flags, data)
 bonito live run [--no-refresh] [-u ...]                  # Generate intents; auto-fills in paper mode
 bonito live reconcile '<{"SYMBOL":qty}>' [-u ...]        # Check broker positions vs ledger
-bonito live record-fill SYMBOL buy PRICE --dollars N     # Record a live fill
+bonito live record-fill SYMBOL buy PRICE --dollars N --broker-order-id ID  # Record a live fill
 bonito live status [-u ...]                              # Print current positions + P&L
 bonito live sweep [--execute] [-u ...]                   # Intraday stop sweep
 bonito live tracking [-u ...]                            # Paper-vs-replay fidelity check
