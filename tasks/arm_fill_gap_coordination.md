@@ -196,18 +196,33 @@ checklist confirms the live Routine has **not** been created (open `[ ]`,
 explicitly gated on sign-off) and `live_enabled` is still `false`, so no real
 fill has ever gone through this path.
 
-**Decision #3 — flagged, not fixed.** Per the same human-domain boundary as
-Decision #1 (entry logic / gate semantics / schedule timing are not mine to
-silently change), this needs a choice before the live Routine is created:
-(a) move the Routine's schedule to after the close (mirrors the paper
-workflow's already-proven-safe 22:30 UTC pattern — zero code change, just a
-different `/schedule` time + doc edit), or (b) harden the code itself (reject
-same-day bars in `_is_stale`/signal evaluation, independent of when anything
-happens to run — a real `src/` behavior change, would need the full
-Planner→Builder→Tester→Validator pipeline if pursued). Recommend (a): it's
-strictly simpler, has a working precedent in this same repo, and the
-intraday-stops workflow already proves exits are fine running mid-day (it
-only ever touches existing positions via live quotes, never `closes[-1]`
-entries). Added as a blocking pre-Routine-creation note in `tasks/todo.md`'s
-pre-live checklist so it isn't missed at sign-off time. No `src/` or
-`docs/AUTONOMOUS_LIVE_ROUTINE.md` edits made — both are the user's call.
+**Decision #3 — flagged, docs corrected, code untouched.** Per the same
+human-domain boundary as Decision #1 (entry logic / schedule timing are not
+mine to silently change), this needs a choice before the live Routine is
+created. *Correction to an earlier draft of this note:* the obvious-sounding
+"just schedule it after the close like the 22:30 UTC paper cron" does NOT
+work for the live cycle — Robinhood fractional/dollar orders fill RTH-only
+(`tasks/todo.md:626,659`), so the live Routine must run before 4pm ET; the
+paper GitHub Action gets away with after-close only because its fills are
+synthetic. So the real levers are:
+- **(a) schedule as late in RTH as practical** — as close to 4pm as the
+  reconcile→preflight→run→place→record chain can reliably finish before the
+  close. This shrinks the forming-bar window (3:45pm → e.g. ~3:55pm) so the
+  forming close ≈ settled close to within tick noise; the residual is the
+  known-benign tracking artifact (Decision #1/#2). Zero code change — a
+  `/schedule` time + the runbook note. Tradeoff: later = smaller gap but less
+  headroom before the close.
+- **(b) harden the code** to act only on settled bars (a
+  settled-vs-forming guard in `_is_stale`/signal evaluation, independent of
+  run time). A real `src/` live-behavior change — full
+  Planner→Builder→Tester→Validator pipeline + sign-off if pursued. Note
+  "reject *same-day* bars" is too blunt: after the close the same-day bar is
+  exactly the settled one you want (that's why the paper cron is fine), so
+  the guard must key on *settled vs forming*, not the calendar day.
+
+Done this pass (in-lane, reversible, no behavior change): corrected the
+timing guidance in `docs/AUTONOMOUS_LIVE_ROUTINE.md` (step 2) and the
+pre-live note in `tasks/todo.md` to record the RTH constraint and the (a)/(b)
+levers, so whoever creates the Routine picks the time with eyes open. The
+schedule-time decision and option (b) remain the user's call — no `src/` and
+no Routine created.
