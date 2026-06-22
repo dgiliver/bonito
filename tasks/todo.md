@@ -93,41 +93,48 @@ Follow-ups punted to Phase 2 (below): the `UP042` → `StrEnum` migration and
 the ruff-pin/`.venv` version drift — both surfaced, both non-blocking, both
 deliberately out of this phase's scope.
 
-## Phase 2 — near-term hardening
-- [ ] Test `trading/monitor.py` (P&L/drawdown — zero coverage today) and
+## Phase 2 — near-term hardening (DONE 2026-06-22 — see `tasks/phase2_coordination.md`)
+- [x] Test `trading/monitor.py` (P&L/drawdown — zero coverage today) and
       `autoresearch_trading.py`'s pure functions (`split_data`,
-      `validate_no_lookahead`, `apply_kill_filters`).
-- [ ] Deliberate `str, Enum` → `enum.StrEnum` migration for the 7 domain
+      `validate_no_lookahead`, `apply_kill_filters`). — P2-1, commit `a32cf0d`.
+- [x] Deliberate `str, Enum` → `enum.StrEnum` migration for the 7 domain
       enums currently behind the `UP042` ignore in `pyproject.toml` (added
       2026-06-19 to unblock CI without a wide-blast-radius behavioral change
       under time pressure). `StrEnum` changes `str(member)` from
       `"ClassName.MEMBER"` to the plain value — verify nothing depends on the
       old format (these enums are embedded in JSON strategy configs) before
       migrating, then drop the ignore. Same "tracked follow-up" status the
-      mypy backlog already has via `TODO(P1-2)` in `ci.yml`.
-- [ ] Reconcile ruff versions: `.pre-commit-config.yaml` pins
+      mypy backlog already has via `TODO(P1-2)` in `ci.yml`. — P2-2, commit
+      `69cecbd`.
+- [x] Reconcile ruff versions: `.pre-commit-config.yaml` pins
       `ruff-pre-commit` to v0.8.2, `pyproject.toml` floors `ruff>=0.8.0`, but
       the `.venv` ships a much newer ruff whose formatter wraps
       parenthesized asserts differently — so `make format` and the pinned
       pre-commit hook disagree on style (cosmetic; `ruff check`/CI unaffected).
       Bump the pin to match the `.venv` (or pin the floor) so all three agree.
-- [ ] Add `broker_order_id` to `PaperFill`/`TradeIntent`; require it for
-      live-mode fills; reject `record-fill` in paper mode.
-- [ ] Add a confirmation requirement to `PaperLedger.resume()` (currently
-      human-only by convention, not by any enforced precondition).
-- [ ] Document the Robinhood account-scoping boundary (••••8597, cash-only)
+      — P2-3, commit `69cecbd`.
+- [x] Add `broker_order_id` to `PaperFill`/`TradeIntent`; require it for
+      live-mode fills; reject `record-fill` in paper mode. — P2-4, commit
+      `69cecbd` (+ `afe6a8a` for 3 docs that still showed the old flag-less
+      invocation, caught by the Validator).
+- [x] Add a confirmation requirement to `PaperLedger.resume()` (currently
+      human-only by convention, not by any enforced precondition). — P2-5,
+      commit `69cecbd`.
+- [x] Document the Robinhood account-scoping boundary (••••8597, cash-only)
       explicitly as non-code-enforceable in `docs/AUTONOMOUS_LIVE_ROUTINE.md`;
-      add a runbook check if the MCP exposes account identity.
-- [ ] Frontend: delete dead `IntelligentChart.tsx` V1 (2,587 lines, zero live
+      add a runbook check if the MCP exposes account identity. — P2-6, commit
+      `69cecbd`.
+- [x] Frontend: delete dead `IntelligentChart.tsx` V1 (2,587 lines, zero live
       importers) + its test + the `index.ts` re-export. Align the
       `PanelChartPanel`/`PriceChartPanel` init `useEffect` dependency arrays
       to the documented `[height, config]` pattern (or explicitly document
       the resize-based alternative). Type the `any` usage concentrated in
       `ChartContainer.tsx`/`BaseChartPanel.ts`. Fix ~8 default-export
       violations (`AdvancedChart`, `EquityChart`, `Chat`, `Sidebar`, etc.).
-- [ ] Zero Playwright tests exist despite tooling/skill references implying
+      — P2-7, commits `659ea87`/`1f28162`/`06671b0`/`334f781`/`f31377d`.
+- [x] Zero Playwright tests exist despite tooling/skill references implying
       otherwise — scaffold a minimal config + 1-2 smoke specs, or correct
-      the docs.
+      the docs. — P2-8, commit `fd8600c`.
 
 ## Phase 3 — housekeeping
 - [ ] Archive this file's fully-completed session sections to
