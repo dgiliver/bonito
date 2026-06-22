@@ -63,15 +63,50 @@ Per-fill gaps — the WARN is dominated by **ARM**, not spread evenly:
 
 | ID | Role | Task | Status | Result |
 |----|------|------|--------|--------|
-| A-1 | Planner | Map paper-fill-price vs replay-fill-price flow; ranked falsifiable hypothesis tree for ARM both-legs ~10% gap; investigation/fix plan | architect | in progress |
-| A-2 | Builder | Confirm root cause + minimal fix (or documented "legitimate") | debugger | blocked on A-1 |
+| A-1 | Planner | Map paper-fill-price vs replay-fill-price flow; ranked falsifiable hypothesis tree for ARM both-legs ~10% gap; investigation/fix plan | architect | done | Root cause = **no code bug** (conf ~0.95). ARM both-legs gap + 342.23 collision = paper intraday-quote entry 06-10 vs replay close entry 06-11 (one bar behind a sharp rally; replay sell = entry×1.10 TP = 376.45). −7.5% equity gap = mid-window config drift (5-slot/$1k → 8-slot/12.5% on 06-12). Unmatched ORCL = paper bought intraday 204.16 on a bar whose close (201.26) was BELOW ema_slow (203.02). H4/H5/H6 refuted. See Decision #1. |
+| A-2 | Builder | Independently reproduce B1-B4 via REAL code paths to confirm/refute the no-bug diagnosis; NO source edits (fix is gated on a user policy decision) | debugger | in progress |
 | A-3 | Tester | Regression test | tdd-developer | blocked on A-2 |
 | A-4 | Validator | Independent re-verify + PASS/FAIL | code-reviewer | blocked on A-3 |
 
 ## Decisions log
 
-(none yet)
+**#1 — Root cause is a legitimate divergence, not a bug (Planner, A-1; pending
+Builder confirmation).** The tracking WARN has three fully-explained
+components, none a math/code error:
+- *ARM −944/−909 bps both legs + the 342.23 paper-sell==replay-buy collision*:
+  paper opened ARM from an **intraday quote (309.93) on 06-10**; the close-based
+  replay first enters ARM on the **06-11 close (342.23)** and rides the
+  06-10→06-12 rally one bar behind, exiting at its 10% TP (342.23×1.10=376.45).
+  Same-signed large gaps are the inevitable intraday-vs-next-day-close artifact
+  during a sharp uptrend. Byte-stable across 3 weekly reports ⇒ structural.
+- *−7.5% equity gap*: replay runs the CURRENT 8-slot/12.5% config over a window
+  whose early fills were under the old 5-slot/$1k config (changed 06-12,
+  `b8bb3a6`/`32d976c`). Equity gap grows (1.96→−5.73→−7.5%) while fill bps stay
+  frozen ⇒ config-drift signature, already annotated in `tracking.py:289`.
+- *Unmatched ORCL (+DELL)*: paper bought ORCL intraday at 204.16 on 06-10, but
+  that bar's **close (201.26) was below ema_slow (203.02)** — the entry gate is
+  False, so the close-based replay never enters ORCL ⇒ no replay buy to match.
+- H4 (matcher off-by-one), H5 (adjusted/split mismatch — SNDK 06-11 buy is
+  0.0 bps, refutes a global factor), H6 (wrong-fill pairing) all REFUTED.
+
+**The one real signal — a USER POLICY DECISION, not an auto-fix:** the
+paper/live pipeline opens positions from **intraday quotes on bars whose close
+does not satisfy the entry rule** (ORCL is the clean example). The close-based
+replay — and the weekly research gate that trusts it — will never reproduce
+those entries. Options: (a) restrict entries to confirmed-close signals
+[changes LIVE trading behavior]; (b) exclude config-change-window /
+unconfirmed-close fills from tracking [changes the pre-live GATE semantics];
+(c) accept + document as a known early-window artifact that washes out.
+Per the live-status skill + CLAUDE.md (entry logic & gate semantics are
+human-domain), (a)/(b) require explicit user sign-off; (c) is the safe
+no-regret default. To be surfaced after independent Builder/Validator
+confirmation.
 
 ## Run log
 
 - Orchestrator: created coordination doc, dispatched Planner (A-1).
+- Planner (A-1) → done. Root cause = no code bug (intraday-entry + config-drift
+  artifact); one policy signal flagged. See Decision #1.
+- Orchestrator: dispatched Builder (A-2) to independently reproduce B1-B4 via
+  the real code paths and confirm/refute the no-bug diagnosis (no source edits
+  — fix gated on user).
