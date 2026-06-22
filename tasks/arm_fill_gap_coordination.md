@@ -146,3 +146,68 @@ bar) or was only a manual pre-live MCP rehearsal artifact. Recommended:
 verify recurrence BEFORE any live-behavior change (a) or gate-semantics change
 (b). That verification is itself a new, separate investigation — not folded
 into this one.
+
+## Follow-up — recurrence check (2026-06-22, read-only, no `src/` changes)
+
+User picked "verify recurrence first." Answer is two-part — the mechanism is
+real, but it has not yet touched an automated run, only the manual rehearsal
+already on record.
+
+**Part A — did the 06-10 ORCL/ARM intraday-entry mechanism recur in an
+automated run? No. Four independent confirmations:**
+1. Both the ORCL buy and ARM buy in `livetrade/paper_ledger.json` are stamped
+   `2026-06-10T16:13:52Z` — byte-identical to
+   `livetrade/intents/intents_2026-06-10_161352.json`'s filename timestamp
+   (the SECOND of two same-day manual batches; see original trigger evidence,
+   batch 1 was 15:49:18).
+2. The real GitHub Actions run history for `paper-trading.yml`
+   (`mcp__github__actions_list`, not the YAML read in isolation) shows its
+   **first-ever scheduled (`event=schedule`) run was 2026-06-11T23:05:09Z** —
+   the day AFTER the 06-10 fills already existed. The cron (`30 22 * * 1-5` =
+   22:30 UTC) cannot have produced them.
+3. Every one of the 7 confirmed scheduled runs since (06-11 → 06-19) lands at
+   22:30 UTC / completes ~23:00-23:10 UTC — 3+ hours after the 20:00 UTC
+   close, exactly as the workflow's own header comment intends ("after US
+   market close year-round, when Yahoo has the day's completed daily bar").
+   Zero exceptions. The ARM **sell** fill (`2026-06-11T23:05:46Z`) matches
+   that first legitimate scheduled run to the second.
+4. `tasks/todo.md`'s own contemporaneous 2026-06-10/11 session note already
+   said this in plain language: "All steps rehearsed locally end-to-end
+   2026-06-10; second same-day run filled ORCL + ARM" — written before this
+   investigation existed, not a reconstruction.
+
+**Part B — but the mechanism would recur once the live Routine is created,
+exactly as currently documented.** Traced the real code, not just the
+schedule: `refresh_data()` (`live_runner.py:145`) ingests via
+`ticker.history(end=now+1day)`, which yfinance fills with a same-day
+**forming** bar (Open/High/Low-so-far/last-trade-as-Close) whenever called
+intraday. `_is_stale()` (`live_runner.py:706-707`) only rejects bars >5 days
+old — no completeness check. `latest_entry_signal`/`latest_exit_signal`
+(`signals.py:307-329`, `332+`) unconditionally evaluate `data.closes[-1]` /
+`latest_idx = len(data) - 1` — no guard distinguishing a settled close from a
+forming one. `docs/AUTONOMOUS_LIVE_ROUTINE.md`'s prompt schedules step 3
+(`bonito live refresh`) and step 5 (`bonito live run --no-refresh`) at
+**3:45pm ET — 15 minutes before the 4pm ET close**. If that Routine is
+created exactly as currently written, it inherits this mechanism on every
+live trading day, not as a rare edge case.
+
+This is prospective only, not yet realized: `tasks/todo.md`'s pre-live
+checklist confirms the live Routine has **not** been created (open `[ ]`,
+explicitly gated on sign-off) and `live_enabled` is still `false`, so no real
+fill has ever gone through this path.
+
+**Decision #3 — flagged, not fixed.** Per the same human-domain boundary as
+Decision #1 (entry logic / gate semantics / schedule timing are not mine to
+silently change), this needs a choice before the live Routine is created:
+(a) move the Routine's schedule to after the close (mirrors the paper
+workflow's already-proven-safe 22:30 UTC pattern — zero code change, just a
+different `/schedule` time + doc edit), or (b) harden the code itself (reject
+same-day bars in `_is_stale`/signal evaluation, independent of when anything
+happens to run — a real `src/` behavior change, would need the full
+Planner→Builder→Tester→Validator pipeline if pursued). Recommend (a): it's
+strictly simpler, has a working precedent in this same repo, and the
+intraday-stops workflow already proves exits are fine running mid-day (it
+only ever touches existing positions via live quotes, never `closes[-1]`
+entries). Added as a blocking pre-Routine-creation note in `tasks/todo.md`'s
+pre-live checklist so it isn't missed at sign-off time. No `src/` or
+`docs/AUTONOMOUS_LIVE_ROUTINE.md` edits made — both are the user's call.

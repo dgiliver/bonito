@@ -481,6 +481,16 @@ intraday sweep modeled from daily OHLC, not 15-min quotes.
       run → place → record → commit. Dogfood on paper / live_enabled:false
       first (proves container-on-schedule + connector auth, places nothing).
       This removes the last human checkpoint, so it comes AFTER sign-off.
+      ⚠️ BEFORE creating it: 3:45pm ET is 15 min before the 4pm close, and
+      `bonito live refresh`+`run` have no same-day-bar guard — confirmed
+      (read-only, see `tasks/arm_fill_gap_coordination.md` Decision #3) this
+      schedule would price entries off yfinance's still-forming daily bar
+      every run, the same mechanism behind the 06-10 ORCL/ARM tracking WARN
+      (that one was a manual rehearsal, not this Routine — it didn't exist
+      yet). Move the scheduled time to after the close (mirrors
+      `paper-trading.yml`'s proven-safe 22:30 UTC) before/when setting up
+      `/schedule`, or harden `_is_stale`/signal evaluation to reject same-day
+      bars outright.
 
 # Per-Cluster Strategy Research (2026-06-10/11)
 
