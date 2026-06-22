@@ -1,0 +1,24 @@
+[
+  {
+    "symbol": "MU",
+    "side": "sell",
+    "dollar_amount": null,
+    "quantity": 0.6403643473318303,
+    "reason": "take profit triggered (intraday)",
+    "signal_price": 1197.719970703125,
+    "signal_date": "2026-06-22T16:34:21.752910Z",
+    "strategy_name": "ema_cross_rsi_atr_regime",
+    "generated_at": "2026-06-22T16:34:21.753210Z"
+  },
+  {
+    "symbol": "TE",
+    "side": "sell",
+    "dollar_amount": null,
+    "quantity": 34.82632758058838,
+    "reason": "take profit triggered (intraday)",
+    "signal_price": 10.40999984741211,
+    "signal_date": "2026-06-22T16:34:21.752910Z",
+    "strategy_name": "ema_cross_rsi_atr_regime",
+    "generated_at": "2026-06-22T16:34:21.753244Z"
+  }
+]
