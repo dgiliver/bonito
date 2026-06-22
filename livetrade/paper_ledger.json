@@ -212,7 +212,8 @@
       "notional": 1000.0,
       "reason": "entry rule matched: ema_fast gt ema_slow, close gt ema_slow, rsi_14 lt 68.0",
       "filled_at": "2026-06-10T15:49:18.796392Z",
-      "strategy_name": "ema_cross_rsi_atr_regime"
+      "strategy_name": "ema_cross_rsi_atr_regime",
+      "broker_order_id": null
     },
     {
       "symbol": "SNDK",
@@ -222,7 +223,8 @@
       "notional": 1000.0,
       "reason": "entry rule matched: ema_fast gt ema_slow, close gt ema_slow, rsi_14 lt 68.0",
       "filled_at": "2026-06-10T15:49:18.796761Z",
-      "strategy_name": "ema_cross_rsi_atr_regime"
+      "strategy_name": "ema_cross_rsi_atr_regime",
+      "broker_order_id": null
     },
     {
       "symbol": "DELL",
@@ -232,7 +234,8 @@
       "notional": 1000.0,
       "reason": "entry rule matched: ema_fast gt ema_slow, close gt ema_slow, rsi_14 lt 68.0",
       "filled_at": "2026-06-10T15:49:18.796906Z",
-      "strategy_name": "ema_cross_rsi_atr_regime"
+      "strategy_name": "ema_cross_rsi_atr_regime",
+      "broker_order_id": null
     },
     {
       "symbol": "ORCL",
@@ -242,7 +245,8 @@
       "notional": 1000.0,
       "reason": "entry rule matched: ema_fast gt ema_slow, close gt ema_slow, rsi_14 lt 68.0",
       "filled_at": "2026-06-10T16:13:52.032254Z",
-      "strategy_name": "ema_cross_rsi_atr_regime"
+      "strategy_name": "ema_cross_rsi_atr_regime",
+      "broker_order_id": null
     },
     {
       "symbol": "ARM",
@@ -252,7 +256,8 @@
       "notional": 900.0,
       "reason": "entry rule matched: ema_fast gt ema_slow, close gt ema_slow, rsi_14 lt 68.0",
       "filled_at": "2026-06-10T16:13:52.032626Z",
-      "strategy_name": "ema_cross_rsi_atr_regime"
+      "strategy_name": "ema_cross_rsi_atr_regime",
+      "broker_order_id": null
     },
     {
       "symbol": "SNDK",
@@ -262,7 +267,8 @@
       "notional": 1125.305582125738,
       "reason": "take profit triggered (intraday)",
       "filled_at": "2026-06-11T18:54:32.730265Z",
-      "strategy_name": "ema_cross_rsi_atr_regime"
+      "strategy_name": "ema_cross_rsi_atr_regime",
+      "broker_order_id": null
     },
     {
       "symbol": "ARM",
@@ -272,7 +278,8 @@
       "notional": 993.7954285369935,
       "reason": "take profit triggered",
       "filled_at": "2026-06-11T23:05:46.129799Z",
-      "strategy_name": "ema_cross_rsi_atr_regime"
+      "strategy_name": "ema_cross_rsi_atr_regime",
+      "broker_order_id": null
     },
     {
       "symbol": "SNDK",
@@ -282,7 +289,8 @@
       "notional": 1000.0,
       "reason": "entry rule matched: ema_fast gt ema_slow, close gt ema_slow, rsi_14 lt 68.0",
       "filled_at": "2026-06-11T23:05:46.129991Z",
-      "strategy_name": "ema_cross_rsi_atr_regime"
+      "strategy_name": "ema_cross_rsi_atr_regime",
+      "broker_order_id": null
     },
     {
       "symbol": "IREN",
@@ -292,7 +300,8 @@
       "notional": 125.31,
       "reason": "entry rule matched: ema_fast gt ema_slow, close gt ema_slow, rsi_14 lt 68.0",
       "filled_at": "2026-06-11T23:05:46.130273Z",
-      "strategy_name": "ema_cross_rsi_atr_regime"
+      "strategy_name": "ema_cross_rsi_atr_regime",
+      "broker_order_id": null
     },
     {
       "symbol": "DELL",
@@ -302,7 +311,8 @@
       "notional": 1106.3954454088155,
       "reason": "take profit triggered (intraday)",
       "filled_at": "2026-06-15T15:03:47.878223Z",
-      "strategy_name": "ema_cross_rsi_atr_regime"
+      "strategy_name": "ema_cross_rsi_atr_regime",
+      "broker_order_id": null
     },
     {
       "symbol": "MU",
@@ -312,7 +322,8 @@
       "notional": 1180.4335526144587,
       "reason": "take profit triggered (intraday)",
       "filled_at": "2026-06-15T15:03:47.878359Z",
-      "strategy_name": "ema_cross_rsi_atr_regime"
+      "strategy_name": "ema_cross_rsi_atr_regime",
+      "broker_order_id": null
     },
     {
       "symbol": "SNDK",
@@ -322,12 +333,13 @@
       "notional": 1115.0511927013824,
       "reason": "take profit triggered (intraday)",
       "filled_at": "2026-06-15T15:03:47.878431Z",
-      "strategy_name": "ema_cross_rsi_atr_regime"
+      "strategy_name": "ema_cross_rsi_atr_regime",
+      "broker_order_id": null
     }
   ],
   "realized_pnl": 620.9812013873884,
   "peak_equity": 5317.332210178836,
   "halted": false,
   "halt_reason": "",
-  "updated_at": "2026-06-15T16:33:33.828467Z"
+  "updated_at": "2026-06-22T15:08:39.126024Z"
 }
