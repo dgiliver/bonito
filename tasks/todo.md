@@ -494,7 +494,8 @@ intraday sweep modeled from daily OHLC, not 15-min quotes.
       before the close (shrinks the forming-bar gap to ~cents; residual is the
       known-benign tracking artifact), or (b) harden `_is_stale`/signal
       evaluation to act only on settled bars (gated `src/` change, full 4-role
-      pipeline + sign-off).
+      pipeline + sign-off). Option (b) is now specced in
+      `docs/RFC_SETTLED_BAR_GUARD.md` (awaiting the §8 decisions before build).
 
 # Per-Cluster Strategy Research (2026-06-10/11)
 

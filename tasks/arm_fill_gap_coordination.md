@@ -226,3 +226,13 @@ pre-live note in `tasks/todo.md` to record the RTH constraint and the (a)/(b)
 levers, so whoever creates the Routine picks the time with eyes open. The
 schedule-time decision and option (b) remain the user's call — no `src/` and
 no Routine created.
+
+**Decision #4 — option (b) specced as an RFC (2026-06-23, docs-only).** The
+code-hardening lever now has a full design doc: `docs/RFC_SETTLED_BAR_GUARD.md`.
+It verifies the §2 touchpoints against current `src/`, places the guard at the
+decision layer (`generate_intents`, NOT ingest — the sweep needs the forming
+bar), keeps the intraday sweep exempt by construction, and is fail-closed
+(skip entries / hold exits). Three decisions are put to the user before any
+build (RFC §8): detection mechanism (ET-clock heuristic vs exchange-calendar
+dep), build-now vs schedule-only-first, and preflight severity. Still no
+`src/` change; `live_enabled` stays `false`.
