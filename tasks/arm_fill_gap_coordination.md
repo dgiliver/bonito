@@ -236,3 +236,10 @@ bar), keeps the intraday sweep exempt by construction, and is fail-closed
 build (RFC §8): detection mechanism (ET-clock heuristic vs exchange-calendar
 dep), build-now vs schedule-only-first, and preflight severity. Still no
 `src/` change; `live_enabled` stays `false`.
+
+**Decision #5 — all three resolved by the user (2026-06-23); this doc's
+scope is now fully closed.** D1 (ET-clock heuristic), build both the code
+guard and the schedule fix in the same pass, preflight soft-WARN. This
+investigation doc stops here — the build itself gets its own coordination
+doc (`tasks/settled_bar_guard_coordination.md`) under the standard 4-role
+pipeline, not folded into this closed investigation.

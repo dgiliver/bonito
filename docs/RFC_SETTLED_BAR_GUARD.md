@@ -230,19 +230,22 @@ to the settled close is correct, and is exactly what the replay does.
 
 ---
 
-## 8. Open questions (need a decision before build)
+## 8. Decisions (resolved 2026-06-23 — user sign-off)
 
-1. **Detection mechanism:** D1 (ET-clock heuristic, no dep — recommended)
-   or D2 (exchange-calendar dependency)?
-2. **Build (b) now, or ship (a) schedule-only first?** (b) is a real
-   live-behavior change; it requires the full Planner→Builder→Tester→
-   Validator pipeline + your sign-off, and `live_enabled` stays `false`
-   until it clears. (a) is a one-line schedule choice available today.
-3. **Preflight severity** for a forming latest bar: hard **FAIL**
-   (fail-closed gate refuses to run pre-close) or soft **WARN** (cycle runs,
-   guard suppresses the unsafe intents, report notes it)? FAIL is stricter
-   but would block a deliberately-scheduled near-close run; WARN keeps the
-   cycle running and lets the per-symbol guard do the suppression.
+1. **Detection mechanism: D1** (ET-clock heuristic, stdlib `zoneinfo`, no
+   new dependency). The half-day blind spot is accepted as a benign
+   missed-trade, never a wrong action.
+2. **Build order: both in this pass.** Build the settled-bar guard (full
+   Planner→Builder→Tester→Validator pipeline) AND fix the live Routine's
+   documented schedule time in the same pass — the RFC's recommended end
+   state (§4). `live_enabled` stays `false` until the pipeline clears.
+3. **Preflight severity: soft WARN.** The cycle still runs; the per-symbol
+   guard in `generate_intents` suppresses the unsafe entries/exits;
+   preflight's report notes why, it doesn't hard-fail.
+
+Next: dispatch the 4-role pipeline in a new coordination doc
+(`tasks/settled_bar_guard_coordination.md`) to implement §5 against
+`live_runner.py`/`signals.py`, per §7's test plan.
 
 ---
 
