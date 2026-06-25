@@ -13,6 +13,7 @@ import json
 import logging
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
+from zoneinfo import ZoneInfo
 
 from pydantic import BaseModel, Field, PrivateAttr
 
@@ -35,6 +36,13 @@ MIN_ORDER_USD = 1.0
 # Extra history ingested for regime symbols so the SMA is defined from the
 # universe start (200 trading days ≈ 10 months; 550 calendar days is safe).
 REGIME_WARMUP_DAYS = 550
+
+# Eastern exchange clock for the settled-vs-forming guard.
+_ET = ZoneInfo("America/New_York")
+# Minutes after the 16:00 ET close before the daily bar is trusted as settled
+# (lets Yahoo finalize the row). Below this on the bar's date, the bar is forming.
+SETTLE_HOUR_ET = 16
+SETTLE_MINUTE_ET = 15
 
 
 class RiskConfig(BaseModel):
@@ -181,6 +189,7 @@ def generate_intents(
     store: MarketDataStore,
     ledger: PaperLedger,
     as_of: datetime | None = None,
+    require_settled: bool = True,
 ) -> tuple[list[TradeIntent], dict[str, float]]:
     """Evaluate per-symbol strategies across the universe and produce intents.
 
@@ -190,6 +199,11 @@ def generate_intents(
     priced, the portfolio kill switch runs: if drawdown from peak equity
     reaches risk.max_drawdown_halt, every position is flattened and the
     ledger halts — no entries until `bonito live resume`.
+
+    When `require_settled` is True (default), entries are skipped and exits
+    held if the latest stored bar's session has not settled in ET (forming
+    intraday bar); set False only for the account replay, whose `as_of` is
+    itself a settled session date.
 
     Trailing-stop high-water marks and the peak-equity watermark on the
     ledger are updated as side effects (caller saves the ledger).
@@ -213,6 +227,9 @@ def generate_intents(
             continue
         if _is_stale(data.timestamps[-1], as_of):
             logger.warning(f"{symbol}: data is stale, holding")
+            continue
+        if require_settled and _is_forming(data.timestamps[-1], as_of):
+            logger.warning(f"{symbol}: latest bar is forming (pre-close), holding")
             continue
 
         last_close = data.closes[-1]
@@ -314,7 +331,9 @@ def generate_intents(
             break
 
         strategy = universe.load_strategy_for(symbol)
-        if not _regime_allows(strategy, store, universe, as_of, regime_cache):
+        if not _regime_allows(
+            strategy, store, universe, as_of, regime_cache, require_settled=require_settled
+        ):
             logger.info(f"{symbol}: regime filter is risk-off, skipping entry")
             continue
 
@@ -324,6 +343,9 @@ def generate_intents(
             continue
         if _is_stale(data.timestamps[-1], as_of):
             logger.warning(f"{symbol}: data is stale, skipping")
+            continue
+        if require_settled and _is_forming(data.timestamps[-1], as_of):
+            logger.warning(f"{symbol}: latest bar is forming (pre-close), skipping entry")
             continue
 
         last_close = data.closes[-1]
@@ -367,6 +389,7 @@ def _regime_allows(
     universe: UniverseConfig,
     as_of: datetime,
     cache: dict[tuple[str, int], bool],
+    require_settled: bool = True,
 ) -> bool:
     """Evaluate (and cache) a strategy's regime filter against stored bars."""
     regime = strategy.regime_filter
@@ -384,6 +407,14 @@ def _regime_allows(
             and _is_stale(regime_data.timestamps[-1], as_of)
         ):
             logger.warning(f"{key[0]}: regime data is stale, treating as risk-off")
+            regime_data = None
+        elif (
+            require_settled
+            and regime_data is not None
+            and len(regime_data) > 0
+            and _is_forming(regime_data.timestamps[-1], as_of)
+        ):
+            logger.warning(f"{key[0]}: regime data is forming (pre-close), treating as risk-off")
             regime_data = None
         cache[key] = signals.regime_allows_long(regime, regime_data)
     return cache[key]
@@ -569,6 +600,7 @@ class PreflightReport(BaseModel):
     stale_symbols: list[str] = Field(default_factory=list)
     missing_symbols: list[str] = Field(default_factory=list)
     stale_regime: list[str] = Field(default_factory=list)
+    forming_symbols: list[str] = Field(default_factory=list)
 
     def describe(self) -> str:
         head = "PREFLIGHT OK" if self.ok else "PREFLIGHT ABORT"
@@ -577,7 +609,8 @@ class PreflightReport(BaseModel):
         lines += [f"  warn: {w}" for w in self.warnings]
         lines.append(
             f"  data: {len(self.fresh_symbols)} fresh, "
-            f"{len(self.stale_symbols)} stale, {len(self.missing_symbols)} missing"
+            f"{len(self.stale_symbols)} stale, {len(self.missing_symbols)} missing, "
+            f"{len(self.forming_symbols)} forming"
         )
         return "\n".join(lines)
 
@@ -618,6 +651,7 @@ def preflight(
     fresh: list[str] = []
     stale: list[str] = []
     missing: list[str] = []
+    forming: list[str] = []
     for symbol in universe.symbols:
         data = store.get_bars(symbol, start, as_of, universe.data.timeframe)
         if data is None or len(data) == 0:
@@ -626,6 +660,8 @@ def preflight(
             stale.append(symbol)
         else:
             fresh.append(symbol)
+            if _is_forming(data.timestamps[-1], as_of):
+                forming.append(symbol)
     if not fresh:
         reasons.append(
             f"no fresh market data for any of {len(universe.symbols)} symbols (data outage?)"
@@ -634,6 +670,11 @@ def preflight(
         warnings.append(f"{len(stale)} symbol(s) stale, will be skipped: {stale}")
     if missing:
         warnings.append(f"{len(missing)} symbol(s) missing data: {missing}")
+    if forming:
+        warnings.append(
+            f"{len(forming)} symbol(s) have a forming (pre-close) latest bar; "
+            f"entries skipped and exits held for those: {forming}"
+        )
 
     regime_start = start - timedelta(days=REGIME_WARMUP_DAYS)
     stale_regime: list[str] = []
@@ -656,6 +697,7 @@ def preflight(
         stale_symbols=stale,
         missing_symbols=missing,
         stale_regime=stale_regime,
+        forming_symbols=forming,
     )
 
 
@@ -705,3 +747,30 @@ def save_intents(intents: list[TradeIntent], directory: Path = Path("livetrade/i
 
 def _is_stale(last_bar: datetime, as_of: datetime) -> bool:
     return (as_of - last_bar) > timedelta(days=MAX_DATA_AGE_DAYS)
+
+
+def _is_forming(last_bar: datetime, as_of: datetime) -> bool:
+    """True if last_bar's trading session has not settled at as_of.
+
+    D1 heuristic (RFC §5.1): treats every session as closing 16:00 ET and
+    trusts the bar 15 min later. Both args are naive-UTC (the live path's
+    convention); stored daily timestamps are ET-midnight-of-D in UTC, so the
+    UTC->ET conversion recovers the session date D in both EST and EDT.
+    Half-days (~9/yr) are intentionally ignored: the only error is treating a
+    13:00-settled bar as forming until 16:15, i.e. skip a trade — never act on
+    a wrong price. Any resolution failure is treated as forming (fail-closed).
+    """
+    try:
+        bar_et = last_bar.replace(tzinfo=UTC).astimezone(_ET)
+        now_et = as_of.replace(tzinfo=UTC).astimezone(_ET)
+    except (ValueError, OverflowError, OSError):
+        return True
+    settle = datetime(
+        bar_et.year,
+        bar_et.month,
+        bar_et.day,
+        SETTLE_HOUR_ET,
+        SETTLE_MINUTE_ET,
+        tzinfo=_ET,
+    )
+    return now_et < settle

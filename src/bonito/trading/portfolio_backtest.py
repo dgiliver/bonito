@@ -276,7 +276,12 @@ def backtest_account(
         if intraday_stops:
             _intraday_pass(universe, replay, ledger, day)
 
-        intents, prices = generate_intents(universe, replay, ledger, as_of=day)
+        # Replay's as_of IS a settled session date (the bar's own timestamp);
+        # the forming guard would otherwise treat every replayed bar as
+        # pre-close and skip the whole backtest. See RFC §5.4 / settled-bar guard.
+        intents, prices = generate_intents(
+            universe, replay, ledger, as_of=day, require_settled=False
+        )
         buy_strategies = {
             i.symbol: universe.load_strategy_for(i.symbol) for i in intents if i.side == "buy"
         }

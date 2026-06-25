@@ -93,20 +93,20 @@ your own machine or from [claude.ai/code/routines](https://claude.ai/code/routin
    *must* run during regular hours: Robinhood fractional/dollar orders only
    fill in RTH, so the after-close pattern the paper GitHub Action uses
    (22:30 UTC, when the daily bar is settled) is NOT available here — copying
-   it would place orders that never fill. But every minute before the 4pm ET
-   close, `bonito live refresh` pulls a still-*forming* daily bar from Yahoo
-   (last trade as the "close"), and `bonito live run` evaluates entries off
-   `data.closes[-1]` with no settled-vs-forming guard — so signals and entry
-   prices can differ from the settled close. Usually that gap is a few cents
-   (the benign, self-correcting tracking artifact in
-   `tasks/arm_fill_gap_coordination.md`); during a fast move it can be large
-   (the 06-10 ORCL/ARM case). Net: schedule as LATE in RTH as the full
-   reconcile → preflight → run → place → record chain can reliably finish
-   *before* 4pm (3:45pm leaves ~15 min of headroom; later shrinks the
-   forming-bar gap but risks an order slipping past the close). To remove the
-   dependence on timing entirely, the live path would have to act only on
-   settled bars — a gated code change (`_is_stale`/signal evaluation), not a
-   schedule tweak; see `tasks/arm_fill_gap_coordination.md` Decision #3.
+   it would place orders that never fill. Every minute before the 4pm ET
+   close, `bonito live refresh` still pulls a still-*forming* daily bar from
+   Yahoo (last trade as the "close"). But `bonito live run` now guards every
+   entry/exit with `_is_forming` (the settled-bar guard): on a forming bar it
+   skips entries and holds exits rather than acting on an unsettled price.
+   Pre-close runs are correct by construction — at worst they no-op a symbol
+   whose settled signal would have fired, never trade a wrong price. Net: the
+   schedule no longer affects correctness, only opportunity — run too early
+   and the guard suppresses that day's trades (picked up next session or a
+   later run); run too late and an order risks slipping past 4pm. 3:45pm ET
+   keeps ~15 min of headroom while staying in RTH, intentionally biased
+   toward "miss a trade > mis-trade." The settled-bar guard is now
+   IMPLEMENTED; see `tasks/arm_fill_gap_coordination.md` Decision #3 and
+   `docs/RFC_SETTLED_BAR_GUARD.md`.
 3. Confirm the environment allows the Yahoo domains and has
    `mode: live` + `live_enabled: true` in `config/universe.live.json`.
 4. Use **Run now** once while you watch, to confirm the full chain end to
