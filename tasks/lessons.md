@@ -58,3 +58,29 @@ when working on the corresponding area.
   `delta_bps = (paper−replay)/replay×1e4` (paper below replay ⇒ negative); a
   fill with no in-tolerance counterpart is a decision divergence. Locked so a
   refactor can't silently move the boundary.
+
+## Settled-vs-forming bar guard (2026-06-25)
+
+- **A shared test fixture's timestamp convention can silently make a new
+  flag's default path untested.** `tests/test_portfolio_backtest.py`'s
+  existing fixtures build `as_of` from a naive-midnight `day(i)` helper;
+  naive midnight always converts to several hours into the *previous* ET
+  evening, so a settled-bar check is `False` (settled) for every `d` it
+  produces, regardless of the new `require_settled` flag's value. All 12
+  pre-existing replay tests passed identically whether the guard's
+  `require_settled=False` opt-out was wired correctly or missing entirely —
+  caught only because the Tester independently checked whether the existing
+  "this already covers it" claim actually held, instead of trusting it.
+  Lesson: when a new parameter is supposed to be load-bearing for an
+  existing test, prove it (mutate the call site, confirm the test fails)
+  rather than inferring coverage from "the test still passes."
+- **Accepted residual: half-day sessions (~9/yr, e.g. day before
+  Thanksgiving) close at 13:00 ET, not 16:00.** The guard's D1 heuristic
+  (`_is_forming`) treats every session as closing at 16:00 ET, so on a
+  half-day it reads an already-settled bar as forming until 16:15 ET
+  regardless. Accepted as-is per RFC §5.1 / §8 decision #1 — the failure
+  mode is always "skip a trade," never "act on a stale or wrong price," and
+  correctly detecting half-days would require a market-calendar dependency
+  the user explicitly ruled out (detection = D1, stdlib `zoneinfo` only, no
+  new dependency). Revisit only if half-day skips show up as a recurring
+  `bonito live tracking` WARN pattern.

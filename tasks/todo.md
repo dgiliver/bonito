@@ -481,21 +481,20 @@ intraday sweep modeled from daily OHLC, not 15-min quotes.
       run → place → record → commit. Dogfood on paper / live_enabled:false
       first (proves container-on-schedule + connector auth, places nothing).
       This removes the last human checkpoint, so it comes AFTER sign-off.
-      ⚠️ BEFORE creating it: 3:45pm ET is 15 min before the 4pm close, and
-      `bonito live refresh`+`run` have no settled-vs-forming-bar guard —
-      confirmed (read-only, see `tasks/arm_fill_gap_coordination.md`
-      Decision #3) this schedule prices entries off yfinance's still-forming
-      daily bar every run, the same mechanism behind the 06-10 ORCL/ARM
-      tracking WARN (that one was a manual rehearsal, not this Routine — it
-      didn't exist yet). Note: the live cycle CAN'T just move after the close
-      like `paper-trading.yml`'s 22:30 UTC — Robinhood fractional orders fill
-      RTH-only, so it must run before 4pm. The lever is therefore (a) schedule
-      as late in RTH as the reconcile→preflight→run→place chain can finish
-      before the close (shrinks the forming-bar gap to ~cents; residual is the
-      known-benign tracking artifact), or (b) harden `_is_stale`/signal
-      evaluation to act only on settled bars (gated `src/` change, full 4-role
-      pipeline + sign-off). Option (b) is now specced in
-      `docs/RFC_SETTLED_BAR_GUARD.md` (awaiting the §8 decisions before build).
+      ✅ RESOLVED 2026-06-25: `bonito live refresh`+`run` now carry a
+      settled-vs-forming-bar guard (`_is_forming` in `live_runner.py`,
+      stdlib `zoneinfo`, fail-closed) — entries skip and exits hold on a
+      forming (pre-close) bar instead of pricing off yfinance's still-forming
+      daily print. This was the mechanism behind the 06-10 ORCL/ARM tracking
+      WARN (see `tasks/arm_fill_gap_coordination.md` Decision #3); full
+      design in `docs/RFC_SETTLED_BAR_GUARD.md`, build history in
+      `tasks/settled_bar_guard_coordination.md` (4-role pipeline, Validator
+      PASS). Net effect: the schedule no longer affects correctness, only
+      how often a pre-close run suppresses a trade — 3:45pm ET is fine to
+      keep (see `docs/AUTONOMOUS_LIVE_ROUTINE.md` "Picking the time").
+      Accepted residual: half-day sessions (~9/yr) close at 13:00 ET, so the
+      guard reads them as forming until 16:15 ET and any run in that window
+      skips — a missed trade, never a mis-trade (see `tasks/lessons.md`).
 
 # Per-Cluster Strategy Research (2026-06-10/11)
 

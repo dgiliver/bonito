@@ -54,7 +54,7 @@ construction, not by a flag. No change here should touch that path.
 | C-1 | Planner | Re-verify RFC touchpoints vs. current `src/`; produce file:line diff plan; pin Routine schedule time | architect | done | RFC touchpoints confirmed (line numbers drifted, corrected). Caught an unflagged regression: `generate_intents` is also called by the account replay (`portfolio_backtest.py:279`) — a naive guard would zero every replay day. Fix: `require_settled: bool = True` param, `False` only at that call site. Resolved the RFC's tz ambiguity: stored daily timestamps are ET-midnight-of-D as naive UTC (04:00 UTC summer / 05:00 UTC winter). `signals.py`/`cli.py` sweep confirmed unchanged. Schedule: keep 3:45pm ET. Full plan in run log. |
 | C-2 | Builder | Implement C-1's plan: `_is_forming` helper + entry/exit/regime/preflight wiring + schedule doc update | backend-dev | done | Implemented §1-§6, §9, §10 exactly — zero drift from the plan (every "Current:" snippet matched the live tree byte-for-byte). `signals.py`/`cli.py` spot-checked, confirmed no changes needed. ruff clean; mypy's one error on `portfolio_backtest.py` confirmed pre-existing via `git stash` diff. `pytest tests/ -m "not slow"`: 763 passed, 1 skipped, 8 deselected — full green. Reproduced all 7 rows of the Planner's empirical proof table directly against the shipped helper — all matched. Orchestrator reviewed the diff directly (not just the report) before committing. |
 | C-3 | Tester | RFC §7 test plan (5 parts), non-vacuous | tdd-developer | done | `tests/test_settled_bar_guard.py` (new, 30 active + 2 slow tests) covers parts 1-4; part 5 (mutation) executed live against `src/`, restored, documented. **Corrected the Planner/Builder's claim that existing replay coverage was sufficient**: pre-existing `test_portfolio_backtest.py` fixtures use naive-midnight timestamps that are always "settled" regardless of `require_settled`, so they never exercised the `portfolio_backtest.py:283` opt-out. Added `TestSettledBarGuardReplayWiring` (winter+summer) using the real ET-midnight-as-UTC convention, proven load-bearing via mutation. `pytest tests/ -m "not slow"`: 795 passed, 1 skipped, 10 deselected. ruff/ruff-format clean. Orchestrator independently re-ran the replay-regression mutation (flip `require_settled=False`→`True` at :283) and confirmed the same 2-fail/12-pass split before restoring. |
-| C-4 | Validator | Independent re-verification; PASS/FAIL | code-reviewer | pending | |
+| C-4 | Validator | Independent re-verification; PASS/FAIL | code-reviewer | done | **PASS.** All 8 checklist items independently re-derived (own hand-traced UTC/ET arithmetic, own DuckDB query, own call-graph grep, own mutation distinct from the Tester's, own cron-time trace, own scope-leakage diff). Two non-blocking doc gaps flagged (RFC §9 closeout note never written; stale `tasks/todo.md` paragraph) — both closed by orchestrator below, outside the 4-role pipeline's remit since they're pure doc updates, not code/test changes. |
 
 ## Run log
 
@@ -168,3 +168,42 @@ construction, not by a flag. No change here should touch that path.
   2-fail/12-pass split, confirmed `git diff --stat` empty after restore —
   before accepting the report and committing (`aa62a86`). Dispatching
   Validator (C-4) next.
+- Validator (C-4) done: **PASS.** Re-derived every claim independently
+  rather than citing prior roles: hand-traced two fresh UTC↔ET cases (not
+  reused from the test file) and confirmed both against the live function;
+  queried `data/market_data.duckdb` directly to reconfirm the stored-bar
+  convention; did a fresh `grep -rn "generate_intents" src/` across the
+  whole tree (not just the Tester's two known call sites) confirming the
+  sweep path never reaches it; ran a *third*, distinct mutation (inverted
+  the `<` boundary comparison, rather than reusing either of the Tester's
+  two mutations) — 23 failed / 21 passed / 2 skipped, then restored clean;
+  traced `paper-trading.yml`'s actual `30 22 * * 1-5` cron through
+  `_is_forming` for both seasons, confirming the post-close run is a true
+  structural no-op, not just "probably fine"; independently reproduced the
+  replay-regression mutation (2-fail/12-pass, matching the Tester exactly);
+  confirmed zero diff on `signals.py`/`cli.py` across the whole commit
+  range, no guard-disabling flag anywhere in the CLI, `config/universe.live.json`'s
+  `mode`/`live_enabled` untouched; reproduced `ruff check .` clean, mypy's
+  one pre-existing `portfolio_backtest.py` error (matches Builder's
+  citation), full suite **795 passed, 1 skipped, 10 deselected** cold, plus
+  `--run-slow` showing the guard's 2 new DuckDB tests pass cleanly (32/32 in
+  isolation) and confirming the only slow-suite failures are the
+  pre-existing unrelated yfinance network tests. Working tree left clean.
+  Two non-blocking findings: (1) the run log's own commitment to a
+  `tasks/lessons.md` closeout note was never followed through; (2)
+  `tasks/todo.md`'s pre-build paragraph (~:484-498) was never updated after
+  the §8 decisions resolved and the build shipped, so it still read "no
+  guard" / "awaiting decisions." Orchestrator closed both directly (pure
+  doc edits, no code/test risk, so no role dispatch needed): rewrote
+  `tasks/todo.md`'s paragraph to state the guard is built and cite this doc;
+  added a `tasks/lessons.md` entry capturing (a) the shared-fixture
+  silently-untested-flag pattern the Tester caught and (b) the accepted
+  half-day residual. `docs/EXPERIMENT_LOG.md` intentionally left alone — its
+  stated purpose is pre-registered train/holdout optimization outcomes, and
+  this is a correctness/safety fix with no such criterion, so an entry
+  there would be a category error, not a gap.
+- **Pipeline complete. All 4 roles done, Validator verdict PASS.** Settled-
+  vs-forming bar guard is live in `src/`, tested, independently verified,
+  and documented. Remaining work (creating the actual scheduled live
+  Routine, the ≥2-week paper-vs-replay tracking gate, user sign-off) is
+  tracked in `tasks/todo.md` and was never in scope for this doc.
