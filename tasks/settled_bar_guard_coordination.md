@@ -52,8 +52,8 @@ construction, not by a flag. No change here should touch that path.
 | ID | Role | Task | Status | Result |
 |----|------|------|--------|--------|
 | C-1 | Planner | Re-verify RFC touchpoints vs. current `src/`; produce file:line diff plan; pin Routine schedule time | architect | done | RFC touchpoints confirmed (line numbers drifted, corrected). Caught an unflagged regression: `generate_intents` is also called by the account replay (`portfolio_backtest.py:279`) — a naive guard would zero every replay day. Fix: `require_settled: bool = True` param, `False` only at that call site. Resolved the RFC's tz ambiguity: stored daily timestamps are ET-midnight-of-D as naive UTC (04:00 UTC summer / 05:00 UTC winter). `signals.py`/`cli.py` sweep confirmed unchanged. Schedule: keep 3:45pm ET. Full plan in run log. |
-| C-2 | Builder | Implement C-1's plan: `_is_forming` helper + entry/exit/regime/preflight wiring + schedule doc update | backend-dev | dispatched | |
-| C-3 | Tester | RFC §7 test plan (5 parts), non-vacuous | tdd-developer | pending | |
+| C-2 | Builder | Implement C-1's plan: `_is_forming` helper + entry/exit/regime/preflight wiring + schedule doc update | backend-dev | done | Implemented §1-§6, §9, §10 exactly — zero drift from the plan (every "Current:" snippet matched the live tree byte-for-byte). `signals.py`/`cli.py` spot-checked, confirmed no changes needed. ruff clean; mypy's one error on `portfolio_backtest.py` confirmed pre-existing via `git stash` diff. `pytest tests/ -m "not slow"`: 763 passed, 1 skipped, 8 deselected — full green. Reproduced all 7 rows of the Planner's empirical proof table directly against the shipped helper — all matched. Orchestrator reviewed the diff directly (not just the report) before committing. |
+| C-3 | Tester | RFC §7 test plan (5 parts), non-vacuous | tdd-developer | dispatched | |
 | C-4 | Validator | Independent re-verification; PASS/FAIL | code-reviewer | pending | |
 
 ## Run log
