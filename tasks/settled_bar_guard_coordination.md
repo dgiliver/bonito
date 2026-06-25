@@ -51,8 +51,8 @@ construction, not by a flag. No change here should touch that path.
 
 | ID | Role | Task | Status | Result |
 |----|------|------|--------|--------|
-| C-1 | Planner | Re-verify RFC touchpoints vs. current `src/`; produce file:line diff plan; pin Routine schedule time | architect | dispatched | |
-| C-2 | Builder | Implement C-1's plan: `_is_forming` helper + entry/exit/regime/preflight wiring + schedule doc update | backend-dev | pending | |
+| C-1 | Planner | Re-verify RFC touchpoints vs. current `src/`; produce file:line diff plan; pin Routine schedule time | architect | done | RFC touchpoints confirmed (line numbers drifted, corrected). Caught an unflagged regression: `generate_intents` is also called by the account replay (`portfolio_backtest.py:279`) — a naive guard would zero every replay day. Fix: `require_settled: bool = True` param, `False` only at that call site. Resolved the RFC's tz ambiguity: stored daily timestamps are ET-midnight-of-D as naive UTC (04:00 UTC summer / 05:00 UTC winter). `signals.py`/`cli.py` sweep confirmed unchanged. Schedule: keep 3:45pm ET. Full plan in run log. |
+| C-2 | Builder | Implement C-1's plan: `_is_forming` helper + entry/exit/regime/preflight wiring + schedule doc update | backend-dev | dispatched | |
 | C-3 | Tester | RFC §7 test plan (5 parts), non-vacuous | tdd-developer | pending | |
 | C-4 | Validator | Independent re-verification; PASS/FAIL | code-reviewer | pending | |
 
@@ -60,3 +60,75 @@ construction, not by a flag. No change here should touch that path.
 
 - Orchestrator: user resolved all 3 RFC §8 decisions, said "go for it".
   Created this coordination doc, dispatched Planner (C-1).
+- Planner (C-1) done. Verified all RFC §10 touchpoints against current
+  `src/`; line numbers had drifted (corrected in the diff plan below) but no
+  structural surprise there. Two findings beyond the RFC itself:
+  - **RFC API-sketch gap, now resolved.** Stored daily bar timestamps are
+    **ET-midnight-of-D as naive UTC** (`04:00 UTC` in EDT, `05:00 UTC` in
+    EST) — not midnight-UTC, not naive-ET — verified directly against
+    `data/market_data.duckdb`. `_is_forming` must convert both `last_bar`
+    and `as_of` through `America/New_York` via `zoneinfo`; a naive `.date()`
+    would be wrong in principle (lucky only in summer).
+  - **Unflagged regression, now mandatory in the plan.** `generate_intents`
+    is also called by the account replay (`portfolio_backtest.backtest_account`,
+    `portfolio_backtest.py:279`, independently re-confirmed by orchestrator
+    grep) with `as_of=day` — itself a settled bar timestamp. A naive guard
+    would read every replayed bar as forming and **zero the entire
+    replay**, silently breaking the weekly-research adoption gate
+    (`tracking.py`, `auto_research.py`, `bonito live backtest-account/-universe`).
+    Fix: add `require_settled: bool = True` to `generate_intents` (threaded
+    into `_regime_allows` too); the replay call site is the only caller that
+    sets `require_settled=False`.
+  - Diff plan (Builder-ready, file:line-exact):
+    - `live_runner.py`: import `zoneinfo.ZoneInfo` (after :14); module
+      constants `_ET`/`SETTLE_HOUR_ET=16`/`SETTLE_MINUTE_ET=15` (after :37);
+      new `_is_forming(last_bar, as_of) -> bool` sibling to `_is_stale`,
+      appended at EOF (fail-closed: any tz resolution error → `True`).
+      `generate_intents` signature gets `require_settled: bool = True`
+      (:179-184). Exit-loop hold mirrors the stale-hold at :214-216;
+      entry-loop skip mirrors the stale-skip at :325-327 (inserted before
+      the `:329` price read, so a forming price never lands in `prices`).
+      `_regime_allows` (:364-389) gets `require_settled` threaded through
+      its one call site (:317) and an `elif` forming-branch after its
+      existing stale branch (:387) — same risk-off-via-`regime_data=None`
+      pattern.
+    - `portfolio_backtest.py:279`: `generate_intents(..., require_settled=False)`
+      + a one-line comment explaining why. The only required `src/` change
+      outside `live_runner.py`.
+    - `signals.py`: **no changes** (confirmed) — guard is decision-layer
+      only; signal evaluators stay pure/deterministic over their inputs.
+    - `cli.py`: **no changes** (confirmed) — call-graph grep shows
+      `live_sweep`/`live_check_stops` → `_sweep_stops` → `check_stops` et
+      al., never `generate_intents`. The only 4 callers in the tree:
+      `live_runner.py:179` (def), `portfolio_backtest.py:279`, and
+      `cli.py:1006,1056` (`live signals`/`live run` — both correctly
+      default to `require_settled=True`).
+    - Preflight (`PreflightReport`/`preflight()` in `live_runner.py`,
+      :556-659): new `forming_symbols: list[str]` field (soft WARN per RFC
+      §8 decision #3) — symbol stays in `fresh` (existing no-fresh-data
+      ABORT stays unaffected) and is *also* added to `forming`; one
+      `warnings.append(...)` summarizing the list. `ok`/`reasons` untouched
+      — never hard-fails. Regime preflight (:638-645) intentionally left
+      alone — already produces an equivalent warning, and `_regime_allows`
+      independently forces risk-off at runtime; a second WARN would be
+      redundant noise.
+    - `docs/AUTONOMOUS_LIVE_ROUTINE.md`: rewrite the "Picking the time"
+      paragraph (currently ~:92-109) to state the guard now makes
+      correctness time-independent; flip its "not yet done" sentence about
+      the guard to past tense. **Schedule recommendation: keep 3:45pm ET**
+      — no observed real-world chain runtimes exist to responsibly justify
+      a later number (inventing one would be false precision), and the
+      guard means the time no longer affects correctness, only how often a
+      pre-close run suppresses a trade.
+  - Risks flagged for Tester/Validator: replay-regression needs a positive
+    test (≥1 intent fires over a multi-day replay window); tz-semantics
+    test must cover both a winter (05:00 UTC) and summer (04:00 UTC) stored
+    bar, not just one season; existing suite's `AS_OF = LAST_BAR + 3 days`
+    idiom stays settled (green) but new tests must not perturb that shared
+    fixture; half-day blind spot accepted as-is (skip, never mis-trade) —
+    no code change, just a `tasks/lessons.md` note at closeout.
+  - Full plan (verbatim) handed to Builder in C-2's dispatch prompt.
+- Orchestrator: independently re-confirmed the replay-regression claim via
+  a direct grep of `portfolio_backtest.py` (matches Planner's citation
+  exactly) before baking it into the Builder's mandatory instructions.
+  Dispatching Builder (C-2) now with the Planner's full plan embedded.
