@@ -1,0 +1,24 @@
+[
+  {
+    "symbol": "BE",
+    "side": "sell",
+    "dollar_amount": null,
+    "quantity": 2.231978327889852,
+    "reason": "stop loss triggered (intraday)",
+    "signal_price": 280.6000061035156,
+    "signal_date": "2026-06-26T13:40:11.939149Z",
+    "strategy_name": "ema_cross_rsi_atr_regime",
+    "generated_at": "2026-06-26T13:40:11.939273Z"
+  },
+  {
+    "symbol": "TSM",
+    "side": "sell",
+    "dollar_amount": null,
+    "quantity": 1.6049136751334179,
+    "reason": "stop loss triggered (intraday)",
+    "signal_price": 421.04998779296875,
+    "signal_date": "2026-06-26T13:40:11.939149Z",
+    "strategy_name": "ema_cross_rsi_atr_regime",
+    "generated_at": "2026-06-26T13:40:11.939445Z"
+  }
+]
