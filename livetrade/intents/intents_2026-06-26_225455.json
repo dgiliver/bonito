@@ -1,0 +1,24 @@
+[
+  {
+    "symbol": "TSM",
+    "side": "buy",
+    "dollar_amount": 687.67,
+    "quantity": null,
+    "reason": "entry rule matched: ema_fast gt ema_slow, close gt ema_slow, rsi_14 lt 68.0",
+    "signal_price": 432.3500061035156,
+    "signal_date": "2026-06-26T04:00:00",
+    "strategy_name": "ema_cross_rsi_atr_regime",
+    "generated_at": "2026-06-26T22:54:55.155571Z"
+  },
+  {
+    "symbol": "INTC",
+    "side": "buy",
+    "dollar_amount": 687.67,
+    "quantity": null,
+    "reason": "entry rule matched: ema_fast gt ema_slow, close gt ema_slow, rsi_14 lt 68.0",
+    "signal_price": 128.32000732421875,
+    "signal_date": "2026-06-26T04:00:00",
+    "strategy_name": "ema_cross_rsi_atr_regime",
+    "generated_at": "2026-06-26T22:54:55.161174Z"
+  }
+]
