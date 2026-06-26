@@ -13,7 +13,7 @@
 
 import { describe, it, expect } from "vitest";
 import { render, screen, fireEvent } from "@testing-library/react";
-import TradeLog from "./TradeLog";
+import { TradeLog } from "./TradeLog";
 
 // Mock trade data generator
 function generateTrades(count: number) {

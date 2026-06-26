@@ -48,26 +48,6 @@ export class CrosshairSync {
 
     this.lastCrosshairData = data;
 
-    // #region agent log
-    fetch("http://127.0.0.1:7242/ingest/3d78da6f-49c7-481a-bafb-b1cb31305326", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        location: "CrosshairSync.ts:handleCrosshairMove",
-        message: "Crosshair move",
-        data: {
-          sourcePanel,
-          time: data.time,
-          price: data.price,
-          registeredPanels: Array.from(this.panels.keys()),
-        },
-        timestamp: Date.now(),
-        sessionId: "debug-session",
-        hypothesisId: "H50",
-      }),
-    }).catch(() => {});
-    // #endregion
-
     // Broadcast to all panels except the source
     for (const [panelId, panel] of this.panels) {
       if (panelId !== sourcePanel) {
@@ -160,5 +140,3 @@ export class CrosshairSync {
     this.lastCrosshairData = null;
   }
 }
-
-export default CrosshairSync;

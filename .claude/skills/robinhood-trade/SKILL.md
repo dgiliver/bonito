@@ -36,8 +36,9 @@ git pull origin <current-branch>   # pick up latest ledger state
    - Non-zero exit = drift (e.g. a prior session crashed between placing an
      order and recording the fill). **HARD STOP — do not trade.** Pull the
      truth from `get_equity_orders` (placed_agent=agentic), repair the
-     ledger with `bonito live record-fill` using actual fill prices, re-run
-     reconcile until green, and report what happened to the user.
+     ledger with `bonito live record-fill` (actual fill price +
+     `--broker-order-id` from that same order), re-run reconcile until
+     green, and report what happened to the user.
 1. **Refresh data**: `.venv/bin/bonito live refresh`
    - If Yahoo is blocked ("Host not in allowlist"), STOP and tell the user
      to add `query1.finance.yahoo.com` / `query2.finance.yahoo.com` to the
@@ -62,8 +63,9 @@ git pull origin <current-branch>   # pick up latest ledger state
        for sells, regular_hours) → sanity-check estimated cost and alerts.
      - `place_equity_order` with a fresh UUID `ref_id` (reuse SAME ref_id
        only when retrying a transport failure).
-     - Record: `.venv/bin/bonito live record-fill SYMBOL buy PRICE --dollars N`
-       (or `... sell PRICE`) using the actual fill price from the order.
+     - Record: `.venv/bin/bonito live record-fill SYMBOL buy PRICE --dollars N
+       --broker-order-id ID` (or `... sell PRICE --broker-order-id ID`) using
+       the actual fill price and order id from the order.
    - Reconcile: `get_equity_positions` must match ledger positions; report
      any mismatch to the user instead of "fixing" it silently.
 4. **Report + persist**:

@@ -39,7 +39,7 @@ const suggestions = [
   "Compare EMA cross and RSI strategies on QQQ",
 ];
 
-export default function Chat({
+export function Chat({
   messages,
   setMessages,
   sessionId,

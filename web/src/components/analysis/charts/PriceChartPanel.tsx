@@ -204,29 +204,6 @@ class PriceChartPanelImpl extends BaseChartPanel {
     if (data.overlays) {
       this.updateOverlays(data.overlays);
     }
-
-    // #region agent log
-    const visibleRange = this.chart?.timeScale().getVisibleLogicalRange();
-    const timeRange = this.chart?.timeScale().getVisibleRange();
-    fetch("http://127.0.0.1:7242/ingest/3d78da6f-49c7-481a-bafb-b1cb31305326", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        location: "PriceChartPanel.ts:updateData",
-        message: "Price data updated",
-        data: {
-          candleCount: data.candles.length,
-          firstTime: data.candles[0]?.time,
-          lastTime: data.candles[data.candles.length - 1]?.time,
-          visibleLogicalRange: visibleRange,
-          visibleTimeRange: timeRange,
-        },
-        timestamp: Date.now(),
-        sessionId: "debug-session",
-        hypothesisId: "H14",
-      }),
-    }).catch(() => {});
-    // #endregion
   }
 
   private updateOverlays(overlays: OverlayIndicatorData[]): void {
@@ -399,6 +376,13 @@ export const PriceChartPanel = forwardRef<
   const [initialized, setInitialized] = useState(false);
 
   // Create panel instance and initialize when container is ready
+  // NOTE: height is intentionally excluded from these deps (showTimeScale is
+  // excluded too, see comment below). Height changes are handled by the
+  // separate resize effect below, which calls .resize() on the existing
+  // chart instance instead of destroying and recreating it. Do not "fix"
+  // this by adding height to these deps (that's the panels/ pattern, e.g.
+  // RSIPanel/MACDPanel) — doing so would reintroduce destroy/recreate
+  // thrash on every height change.
   useEffect(() => {
     if (!containerRef.current) return;
 
@@ -510,5 +494,4 @@ export const PriceChartPanel = forwardRef<
   );
 });
 
-export default PriceChartPanel;
 export { CrosshairMode };

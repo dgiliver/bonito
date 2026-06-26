@@ -52,6 +52,46 @@ DEFAULT_BUCKETS: list[tuple[float, str]] = [
 ]
 
 
+class ADXTrendGrid(BaseModel):
+    """ADX(14) trend-strength gate + directional EMA filter (no crossover).
+
+    Diversifies from EMA-cross: requires a confirmed strong trend (ADX
+    above threshold) AND price above a single trend EMA, instead of a
+    fast/slow EMA crossover.
+    """
+
+    adx_threshold: list[float] = [15.0, 20.0, 25.0]
+    ema_period: list[int] = [30, 50, 100]
+    atr_mult: list[float] = [1.5, 2.0, 2.5]
+
+
+class MACDCrossGrid(BaseModel):
+    """MACD line/signal crossover, RSI-filtered against overbought entries.
+
+    Pure momentum-crossover signal — structurally distinct from both the
+    EMA-cross and ADX-trend templates.
+    """
+
+    macd_params: list[tuple[int, int, int]] = [(12, 26, 9), (8, 17, 9), (5, 35, 5)]
+    rsi_max: list[float] = [60.0, 70.0]
+    atr_mult: list[float] = [1.5, 2.0, 2.5]
+
+
+class BBandsMeanRevGrid(BaseModel):
+    """Bollinger Band mean-reversion: buy the lower-band touch (RSI-confirmed
+    oversold), exit at the mid-band.
+
+    The one non-trend-following template — expected to behave differently
+    across regimes than the other three (see the regime breakdown report
+    before trusting any single aggregate Sharpe number for this family).
+    """
+
+    bb_period: list[int] = [14, 20]
+    bb_std: list[float] = [2.0, 2.5]
+    rsi_max: list[float] = [30.0, 35.0]
+    atr_mult: list[float] = [1.5, 2.0]
+
+
 class GridSpec(BaseModel):
     """The candidate search space. Keep it small on purpose.
 
@@ -59,12 +99,25 @@ class GridSpec(BaseModel):
     the ema/rsi/atr minimums, so each flagged axis gained headroom below
     (ema (5,13), rsi 50/55, atr 1.0/1.25). 450 candidates total — growth
     is deliberate and one-time; auto-research flags edges, humans extend.
+
+    Extended 2026-06-18: three opt-in template families (adx, macd,
+    bbands) alongside the original EMA-cross template, each its own small
+    grid (16-27 candidates). All default to None (disabled) —
+    candidate_grid() with no args still returns exactly the same 450
+    EMA-only candidates as before. Enable a template explicitly (e.g.
+    GridSpec(adx=ADXTrendGrid())) to include it; auto research / --apply
+    runs stay on the EMA-only default until a human deliberately opts in,
+    same philosophy as the grid-size growth above.
     """
 
     ema_pairs: list[tuple[int, int]] = [(5, 13), (8, 21), (10, 26), (12, 26), (20, 50)]
     rsi_max: list[float] = [50.0, 55.0, 60.0, 68.0, 75.0]
     atr_mult: list[float] = [1.0, 1.25, 1.5, 2.0, 2.5, 3.0]
     take_profit: list[float | None] = [0.10, 0.20, None]
+
+    adx: ADXTrendGrid | None = None
+    macd: MACDCrossGrid | None = None
+    bbands: BBandsMeanRevGrid | None = None
 
 
 class MemberVerdict(BaseModel):
@@ -156,9 +209,9 @@ def cluster_universe(
     return {name: members for name, members in clusters.items() if members}, vols
 
 
-def candidate_grid(grid: GridSpec | None = None) -> list[StrategyConfig]:
-    """Materialize the search space as concrete strategy configs."""
-    grid = grid or GridSpec()
+def _ema_cross_candidates(grid: GridSpec) -> list[StrategyConfig]:
+    """Original template: EMA fast/slow cross entry + RSI filter + EMA-cross
+    exit + ATR trailing stop. ~450 candidates at default grid size."""
     candidates = []
     for fast, slow in grid.ema_pairs:
         for rsi in grid.rsi_max:
@@ -217,6 +270,213 @@ def candidate_grid(grid: GridSpec | None = None) -> list[StrategyConfig]:
                             regime_filter={"symbol": "SPY", "sma_period": 200},
                         )
                     )
+    return candidates
+
+
+def _adx_trend_candidates(grid: ADXTrendGrid) -> list[StrategyConfig]:
+    """ADX(14) trend-strength gate + directional EMA filter.
+
+    Entry requires both a confirmed strong trend (ADX above threshold) and
+    price above the trend EMA. Exit on either condition failing — trend
+    weakens or price falls back below the EMA, whichever comes first.
+    """
+    candidates = []
+    for threshold in grid.adx_threshold:
+        for ema_period in grid.ema_period:
+            for atr in grid.atr_mult:
+                candidates.append(
+                    StrategyConfig(
+                        name=f"c_adx{int(threshold)}_ema{ema_period}_atr{atr}",
+                        description=(
+                            f"ADX(14)>{int(threshold)} trend-strength gate + close>EMA"
+                            f"{ema_period}, {atr}x ATR(14) trailing stop, SPY>SMA200 regime gate"
+                        ),
+                        version="1.0",
+                        symbols=["SPY"],
+                        timeframe="1d",
+                        indicators=[
+                            {"type": "adx", "name": "adx", "params": {"length": 14}},
+                            {
+                                "type": "ema",
+                                "name": "ema_trend",
+                                "params": {"period": ema_period},
+                            },
+                        ],
+                        entry_rules=[
+                            {
+                                "conditions": [
+                                    {"left": "adx_adx", "comparison": "gt", "right": threshold},
+                                    {"left": "close", "comparison": "gt", "right": "ema_trend"},
+                                ],
+                                "logic": "AND",
+                                "side": "long",
+                            }
+                        ],
+                        exit_rules=[
+                            {
+                                "conditions": [
+                                    {"left": "adx_adx", "comparison": "lt", "right": threshold},
+                                    {"left": "close", "comparison": "lt", "right": "ema_trend"},
+                                ],
+                                "logic": "OR",
+                                "side": "long",
+                            }
+                        ],
+                        position_size={"type": "percent_equity", "value": 98.0},
+                        max_positions=1,
+                        stop_loss={"type": "trailing_atr", "value": atr, "atr_period": 14},
+                        take_profit=None,
+                        regime_filter={"symbol": "SPY", "sma_period": 200},
+                    )
+                )
+    return candidates
+
+
+def _macd_cross_candidates(grid: MACDCrossGrid) -> list[StrategyConfig]:
+    """MACD line/signal crossover, RSI-filtered against overbought entries."""
+    candidates = []
+    for fast, slow, signal in grid.macd_params:
+        for rsi in grid.rsi_max:
+            for atr in grid.atr_mult:
+                candidates.append(
+                    StrategyConfig(
+                        name=f"c_macd{fast}-{slow}-{signal}_rsi{int(rsi)}_atr{atr}",
+                        description=(
+                            f"MACD({fast},{slow},{signal}) line crosses signal + RSI<{int(rsi)}, "
+                            f"{atr}x ATR(14) trailing stop, SPY>SMA200 regime gate"
+                        ),
+                        version="1.0",
+                        symbols=["SPY"],
+                        timeframe="1d",
+                        indicators=[
+                            {
+                                "type": "macd",
+                                "name": "macd",
+                                "params": {
+                                    "fast_period": fast,
+                                    "slow_period": slow,
+                                    "signal_period": signal,
+                                },
+                            },
+                            {"type": "rsi", "name": "rsi_14", "params": {"period": 14}},
+                        ],
+                        entry_rules=[
+                            {
+                                "conditions": [
+                                    {
+                                        "left": "macd_line",
+                                        "comparison": "crosses_above",
+                                        "right": "macd_signal",
+                                    },
+                                    {"left": "rsi_14", "comparison": "lt", "right": rsi},
+                                ],
+                                "logic": "AND",
+                                "side": "long",
+                            }
+                        ],
+                        exit_rules=[
+                            {
+                                "conditions": [
+                                    {
+                                        "left": "macd_line",
+                                        "comparison": "crosses_below",
+                                        "right": "macd_signal",
+                                    }
+                                ],
+                                "logic": "AND",
+                                "side": "long",
+                            }
+                        ],
+                        position_size={"type": "percent_equity", "value": 98.0},
+                        max_positions=1,
+                        stop_loss={"type": "trailing_atr", "value": atr, "atr_period": 14},
+                        take_profit=None,
+                        regime_filter={"symbol": "SPY", "sma_period": 200},
+                    )
+                )
+    return candidates
+
+
+def _bbands_meanrev_candidates(grid: BBandsMeanRevGrid) -> list[StrategyConfig]:
+    """Bollinger Band mean-reversion: buy the lower-band touch (RSI-confirmed
+    oversold), exit at the mid-band. The one non-trend-following template."""
+    candidates = []
+    for period in grid.bb_period:
+        for std in grid.bb_std:
+            for rsi in grid.rsi_max:
+                for atr in grid.atr_mult:
+                    candidates.append(
+                        StrategyConfig(
+                            name=f"c_bb{period}-{std}_rsi{int(rsi)}_atr{atr}",
+                            description=(
+                                f"Bollinger({period},{std}) lower-band touch + RSI<{int(rsi)} "
+                                f"entry, mid-band exit, {atr}x ATR(14) trailing stop, "
+                                f"SPY>SMA200 regime gate"
+                            ),
+                            version="1.0",
+                            symbols=["SPY"],
+                            timeframe="1d",
+                            indicators=[
+                                {
+                                    "type": "bbands",
+                                    "name": "bb",
+                                    "params": {"period": period, "std_dev": std},
+                                },
+                                {"type": "rsi", "name": "rsi_14", "params": {"period": 14}},
+                            ],
+                            entry_rules=[
+                                {
+                                    "conditions": [
+                                        {
+                                            "left": "close",
+                                            "comparison": "crosses_below",
+                                            "right": "bb_lower",
+                                        },
+                                        {"left": "rsi_14", "comparison": "lt", "right": rsi},
+                                    ],
+                                    "logic": "AND",
+                                    "side": "long",
+                                }
+                            ],
+                            exit_rules=[
+                                {
+                                    "conditions": [
+                                        {
+                                            "left": "close",
+                                            "comparison": "crosses_above",
+                                            "right": "bb_middle",
+                                        }
+                                    ],
+                                    "logic": "AND",
+                                    "side": "long",
+                                }
+                            ],
+                            position_size={"type": "percent_equity", "value": 98.0},
+                            max_positions=1,
+                            stop_loss={"type": "trailing_atr", "value": atr, "atr_period": 14},
+                            take_profit=None,
+                            regime_filter={"symbol": "SPY", "sma_period": 200},
+                        )
+                    )
+    return candidates
+
+
+def candidate_grid(grid: GridSpec | None = None) -> list[StrategyConfig]:
+    """Materialize the search space as concrete strategy configs.
+
+    Always includes the EMA-cross template. The adx/macd/bbands template
+    families are opt-in — pass a GridSpec with that field set (e.g.
+    GridSpec(adx=ADXTrendGrid())) to include them. With no args this
+    returns exactly the original 450 EMA-only candidates.
+    """
+    grid = grid or GridSpec()
+    candidates = _ema_cross_candidates(grid)
+    if grid.adx is not None:
+        candidates += _adx_trend_candidates(grid.adx)
+    if grid.macd is not None:
+        candidates += _macd_cross_candidates(grid.macd)
+    if grid.bbands is not None:
+        candidates += _bbands_meanrev_candidates(grid.bbands)
     return candidates
 
 

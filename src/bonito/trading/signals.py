@@ -49,6 +49,9 @@ class TradeIntent(BaseModel):
     signal_date: datetime
     strategy_name: str
     generated_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
+    broker_order_id: str | None = Field(
+        default=None, description="Robinhood order id, for live-mode fills recorded via CLI"
+    )
 
 
 def evaluate_condition_for_bar(

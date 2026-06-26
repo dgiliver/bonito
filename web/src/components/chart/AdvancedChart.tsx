@@ -64,7 +64,7 @@ const INTRADAY_RANGES = ["1D", "1W", "1M"];
 
 const API_BASE = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
 
-export default function AdvancedChart({
+export function AdvancedChart({
   initialSymbol = "SPY",
   initialInterval = "1d",
   initialRange = "1Y",

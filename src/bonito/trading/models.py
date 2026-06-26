@@ -1,13 +1,13 @@
 """Pydantic models for trading infrastructure."""
 
 from datetime import datetime
-from enum import Enum
+from enum import StrEnum
 from typing import Literal
 
 from pydantic import BaseModel, Field
 
 
-class ExecutionModel(str, Enum):
+class ExecutionModel(StrEnum):
     """Execution model for trading bots."""
 
     SCHEDULED = "scheduled"
@@ -74,7 +74,7 @@ class DeployedBot(BaseModel):
 
     id: str
     config: BotConfig
-    status: Literal["running", "paused", "stopped", "error"]
+    status: Literal["running", "paused", "stopped", "error", "halted"]
     broker_connected: bool = False
     open_positions: list[Position] = Field(default_factory=list)
     pending_orders: list[Order] = Field(default_factory=list)
@@ -85,6 +85,7 @@ class DeployedBot(BaseModel):
     peak_equity: float = 0.0
     current_equity: float = 0.0
     daily_pnl: float = 0.0
+    halt_reason: str = ""
 
 
 class AccountInfo(BaseModel):

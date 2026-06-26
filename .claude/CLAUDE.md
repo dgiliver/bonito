@@ -30,7 +30,7 @@ bonito live refresh [-u config/universe.live.json]       # Pull latest price dat
 bonito live preflight [-u config/universe.live.json]     # Fail-closed gate (kill switch, flags, data)
 bonito live run [--no-refresh] [-u ...]                  # Generate intents; auto-fills in paper mode
 bonito live reconcile '<{"SYMBOL":qty}>' [-u ...]        # Check broker positions vs ledger
-bonito live record-fill SYMBOL buy PRICE --dollars N     # Record a live fill
+bonito live record-fill SYMBOL buy PRICE --dollars N --broker-order-id ID  # Record a live fill
 bonito live status [-u ...]                              # Print current positions + P&L
 bonito live sweep [--execute] [-u ...]                   # Intraday stop sweep
 bonito live tracking [-u ...]                            # Paper-vs-replay fidelity check
@@ -82,7 +82,7 @@ livetrade/          # Paper ledger, live ledger, intents, and research artifacts
 ### Commits
 - Use conventional commits: `feat:`, `fix:`, `chore:`, `docs:`, `refactor:`, `test:`
 - Run `make pre-commit` before committing
-- Pre-commit hooks run: ruff, mypy, ESLint, Prettier, TypeScript checks
+- Pre-commit hooks run: ruff, ESLint, Prettier, TypeScript checks (blocking); mypy runs too but is advisory/report-only — it never blocks a commit
 
 ## Architecture Decisions
 
@@ -138,7 +138,8 @@ Test files:
 | `src/bonito/backtest/strategy.py` | Strategy DSL Pydantic models |
 | `src/bonito/research/autoresearch_trading.py` | Karpathy-style autonomous strategy mutation loop |
 | `src/bonito/research/auto_research.py` | Weekly rolling-holdout + graded-bundle adoption loop |
-| `src/bonito/research/cluster_research.py` | Cluster / per-symbol grid search (450 candidates) |
+| `src/bonito/research/cluster_research.py` | Cluster / per-symbol grid search (450 EMA candidates; opt-in ADX/MACD/BBands templates via `--templates`) |
+| `src/bonito/research/regime_sweep.py` | Slices one backtest into fixed historical regimes (GFC/COVID/2022 bear/AI bull) vs. buy-and-hold — `bonito research regime-sweep <strategy.json>` |
 | `src/bonito/trading/live_runner.py` | Intent generation, risk caps, kill switch, preflight |
 | `src/bonito/trading/portfolio_backtest.py` | Account-level replay (ReplayStore, strategy attribution) |
 | `src/bonito/trading/tracking.py` | Paper-vs-replay fidelity (fill gaps, equity drift) |
@@ -284,6 +285,17 @@ useEffect(() => {
 }, [height, config]); // NOT []
 ```
 Empty deps cause panel to not re-initialize when height changes (new panels added).
+
+This `[height, config]` recreate-on-resize pattern applies to **`panels/`** components
+(`RSIPanel.tsx`, `MACDPanel.tsx`, `StochasticPanel.tsx`) — they destroy and recreate
+their chart instance when height changes.
+
+**`charts/`** components (`PanelChartPanel.tsx`, `PriceChartPanel.tsx`) intentionally use
+a DIFFERENT pattern instead: their init `useEffect` excludes height from its deps, and a
+separate resize `useEffect` calls `.resize()` on the existing chart instance when height
+changes, rather than destroying/recreating it. This avoids visual thrash on every height
+change. This is intentional, not a bug — do not "fix" `charts/` components by copying the
+`panels/` recreate-on-resize pattern.
 
 ### Dynamic Panel Rendering
 Panels must render in user add order via `activePanels.map()`:

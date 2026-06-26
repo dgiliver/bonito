@@ -1,12 +1,12 @@
 """Strategy configuration models - the DSL for defining strategies."""
 
-from enum import Enum
+from enum import StrEnum
 from typing import Annotated, Literal
 
 from pydantic import BaseModel, BeforeValidator, Field
 
 
-class IndicatorType(str, Enum):
+class IndicatorType(StrEnum):
     """Built-in indicator types (legacy - maintained for backward compatibility)."""
 
     SMA = "sma"
@@ -42,7 +42,6 @@ PANDAS_TA_INDICATORS = {
     # Volatility / Channels
     "donchian",
     "kc",
-    "massi",
     "natr",
     "pdist",
     "rvi",
@@ -57,7 +56,6 @@ PANDAS_TA_INDICATORS = {
     "mom",
     "ppo",
     "roc",
-    "rsi_pandas",
     "stochrsi",
     "trix",
     "tsi",
@@ -65,7 +63,6 @@ PANDAS_TA_INDICATORS = {
     "willr",
     # Overlap
     "dema",
-    "ema_pandas",
     "fwma",
     "hma",
     "kama",
@@ -75,7 +72,6 @@ PANDAS_TA_INDICATORS = {
     "pwma",
     "rma",
     "sinwma",
-    "sma_pandas",
     "ssf",
     "swma",
     "t3",
@@ -97,9 +93,19 @@ PANDAS_TA_INDICATORS = {
     "zscore",
 }
 
+# Rolling lookback indicators implemented directly in compute_indicators()
+# (not part of pandas-ta) - see backtest/indicators.py.
+ROLLING_INDICATOR_TYPES = {
+    "rolling_max",
+    "rolling_min",
+    "rolling_mean",
+    "rolling_std",
+    "percentile",
+}
+
 
 def _validate_indicator_type(value: str | IndicatorType) -> str | IndicatorType:
-    """Validate indicator type - accepts enum or string for pandas-ta indicators."""
+    """Validate indicator type - accepts enum, pandas-ta, or rolling lookback types."""
     if isinstance(value, IndicatorType):
         return value
 
@@ -112,13 +118,15 @@ def _validate_indicator_type(value: str | IndicatorType) -> str | IndicatorType:
     except ValueError:
         pass
 
-    # Check if it's a valid pandas-ta indicator
-    if str_value in PANDAS_TA_INDICATORS:
+    # Check if it's a valid pandas-ta indicator or rolling lookback type
+    if str_value in PANDAS_TA_INDICATORS or str_value in ROLLING_INDICATOR_TYPES:
         return str_value
 
-    # Allow any string for flexibility (pandas-ta has 130+ indicators)
-    # The compute_indicators function will raise if truly invalid
-    return str_value
+    raise ValueError(
+        f"Unknown indicator type {value!r}. Must be a built-in type "
+        f"({', '.join(sorted(BUILTIN_INDICATOR_TYPES))}), a pandas-ta indicator, "
+        f"or a rolling lookback type ({', '.join(sorted(ROLLING_INDICATOR_TYPES))})."
+    )
 
 
 # Type that accepts either IndicatorType enum or string for pandas-ta
@@ -147,7 +155,7 @@ class IndicatorConfig(BaseModel):
     model_config = {"extra": "forbid"}
 
 
-class Comparison(str, Enum):
+class Comparison(StrEnum):
     """Comparison operators for rules."""
 
     GT = "gt"
@@ -204,7 +212,7 @@ class Rule(BaseModel):
     )
 
 
-class PositionSizeType(str, Enum):
+class PositionSizeType(StrEnum):
     """Position sizing methods."""
 
     FIXED_QUANTITY = "fixed_quantity"
@@ -219,7 +227,7 @@ class PositionSizeConfig(BaseModel):
     value: float = Field(..., description="Size value (quantity, dollars, or percentage)")
 
 
-class StopLossType(str, Enum):
+class StopLossType(StrEnum):
     """Stop loss types."""
 
     # Fixed stops (set at entry, never move)
@@ -280,7 +288,7 @@ class RegimeFilterConfig(BaseModel):
     sma_period: int = Field(default=200, ge=2, description="SMA period on the reference symbol")
 
 
-class TakeProfitType(str, Enum):
+class TakeProfitType(StrEnum):
     """Take profit types."""
 
     PERCENT = "percent"

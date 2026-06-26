@@ -9,8 +9,8 @@ import {
   ChevronDown,
 } from "lucide-react";
 import { fetchStrategies, runBacktest } from "@/lib/api";
-import EquityChart from "./EquityChart";
-import TradeLog from "./TradeLog";
+import { EquityChart } from "./EquityChart";
+import { TradeLog } from "./TradeLog";
 
 interface Strategy {
   id: string;
@@ -62,7 +62,7 @@ interface BacktestResult {
   trade_log?: Trade[];
 }
 
-export default function Strategies() {
+export function Strategies() {
   const [strategies, setStrategies] = useState<Strategy[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedStrategy, setSelectedStrategy] = useState<Strategy | null>(

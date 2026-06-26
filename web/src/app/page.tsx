@@ -2,16 +2,16 @@
 
 import { useState, useEffect } from "react";
 import dynamic from "next/dynamic";
-import Sidebar from "@/components/Sidebar";
-import Chat, { Message } from "@/components/Chat";
-import Strategies from "@/components/Strategies";
-import Data from "@/components/Data";
+import { Sidebar } from "@/components/Sidebar";
+import { Chat, Message } from "@/components/Chat";
+import { Strategies } from "@/components/Strategies";
+import { Data } from "@/components/Data";
 import { BotDashboard } from "@/components/trading";
 import { TradingProvider } from "@/contexts/TradingContext";
 
 // Dynamically import chart components to avoid SSR issues with lightweight-charts
 const AdvancedChart = dynamic(
-  () => import("@/components/chart/AdvancedChart"),
+  () => import("@/components/chart/AdvancedChart").then((m) => m.AdvancedChart),
   {
     ssr: false,
     loading: () => (
@@ -30,7 +30,7 @@ const AdvancedChart = dynamic(
 
 // Unified Analysis View - combines chart + AI assistant
 const AnalysisView = dynamic(
-  () => import("@/components/analysis/AnalysisView"),
+  () => import("@/components/analysis/AnalysisView").then((m) => m.AnalysisView),
   {
     ssr: false,
     loading: () => (

@@ -12,6 +12,23 @@ from cryptography.hazmat.primitives.kdf.pbkdf2 import PBKDF2HMAC
 from .credentials import AlpacaCredentials
 
 
+def get_credential_password() -> str:
+    """Resolve the credential-store encryption passphrase.
+
+    Raises if BONITO_CREDENTIAL_PASSWORD isn't set rather than falling back
+    to a default - a hardcoded default lives in source control, so using it
+    would mean encrypting real broker secrets with a key anyone can read.
+    """
+    password = os.environ.get("BONITO_CREDENTIAL_PASSWORD")
+    if not password:
+        raise RuntimeError(
+            "BONITO_CREDENTIAL_PASSWORD is not set. Refusing to store or load "
+            "encrypted broker credentials with a hardcoded default password - "
+            "set this environment variable before linking a broker account."
+        )
+    return password
+
+
 class CredentialStore:
     """Encrypted local credential storage."""
 

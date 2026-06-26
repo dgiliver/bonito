@@ -10,7 +10,13 @@ import pytest
 
 from bonito.data.models import BarData
 from bonito.research.cluster_research import (
+    ADXTrendGrid,
+    BBandsMeanRevGrid,
     GridSpec,
+    MACDCrossGrid,
+    _adx_trend_candidates,
+    _bbands_meanrev_candidates,
+    _macd_cross_candidates,
     annualized_volatility,
     apply_assignments,
     candidate_grid,
@@ -137,6 +143,93 @@ class TestCandidateGrid:
             assert c.regime_filter is not None
             assert c.stop_loss.type.value == "trailing_atr"
             assert c.name.startswith("c_ema10-26")
+
+
+class TestTemplateFamilies:
+    """The 2026-06-18 adx/macd/bbands templates: opt-in, additive, and each
+    wired to its own indicator outputs."""
+
+    def test_disabled_by_default_grid_unchanged(self):
+        # No args and an explicit all-None GridSpec must both still yield
+        # exactly the original 450 EMA-only candidates.
+        assert len(candidate_grid()) == 450
+        assert len(candidate_grid(GridSpec())) == 450
+
+    def test_each_template_is_additive_and_opt_in(self):
+        base = len(candidate_grid(GridSpec()))
+        adx_grid = GridSpec(adx=ADXTrendGrid())
+        macd_grid = GridSpec(macd=MACDCrossGrid())
+        bbands_grid = GridSpec(bbands=BBandsMeanRevGrid())
+
+        assert len(candidate_grid(adx_grid)) == base + len(_adx_trend_candidates(adx_grid.adx))
+        assert len(candidate_grid(macd_grid)) == base + len(_macd_cross_candidates(macd_grid.macd))
+        assert len(candidate_grid(bbands_grid)) == base + len(
+            _bbands_meanrev_candidates(bbands_grid.bbands)
+        )
+
+    def test_all_templates_enabled_together_have_unique_hashes(self):
+        grid = GridSpec(adx=ADXTrendGrid(), macd=MACDCrossGrid(), bbands=BBandsMeanRevGrid())
+        candidates = candidate_grid(grid)
+        assert len(candidates) == 450 + 27 + 18 + 16
+        hashes = {strategy_hash(c) for c in candidates}
+        assert len(hashes) == len(candidates)
+
+    def test_adx_candidates_use_adx_and_have_regime_and_atr_stop(self):
+        candidates = _adx_trend_candidates(ADXTrendGrid())
+        assert len(candidates) == 3 * 3 * 3
+        for c in candidates:
+            assert c.name.startswith("c_adx")
+            assert c.regime_filter is not None
+            assert c.stop_loss.type.value == "trailing_atr"
+            # "adx" is pandas-ta-dispatched, not a built-in IndicatorType
+            # member, so it stays a raw str rather than coercing to enum.
+            indicator_types = {i.type for i in c.indicators}
+            assert "adx" in indicator_types
+            assert "ema" in indicator_types
+
+    def test_macd_candidates_use_macd_and_have_regime_and_atr_stop(self):
+        candidates = _macd_cross_candidates(MACDCrossGrid())
+        assert len(candidates) == 3 * 2 * 3
+        for c in candidates:
+            assert c.name.startswith("c_macd")
+            assert c.regime_filter is not None
+            assert c.stop_loss.type.value == "trailing_atr"
+            indicator_types = {i.type for i in c.indicators}
+            assert "macd" in indicator_types
+            assert "rsi" in indicator_types
+
+    def test_bbands_candidates_use_bbands_and_have_regime_and_atr_stop(self):
+        candidates = _bbands_meanrev_candidates(BBandsMeanRevGrid())
+        assert len(candidates) == 2 * 2 * 2 * 2
+        for c in candidates:
+            assert c.name.startswith("c_bb")
+            assert c.regime_filter is not None
+            assert c.stop_loss.type.value == "trailing_atr"
+            indicator_types = {i.type for i in c.indicators}
+            assert "bbands" in indicator_types
+            assert "rsi" in indicator_types
+
+    def test_macd_entry_and_exit_reference_macd_line_and_signal(self):
+        candidates = _macd_cross_candidates(MACDCrossGrid(macd_params=[(12, 26, 9)]))
+        entry_refs = {
+            cond.right
+            for c in candidates
+            for rule in c.entry_rules
+            for cond in rule.conditions
+            if isinstance(cond.right, str)
+        }
+        assert "macd_signal" in entry_refs
+
+    def test_bbands_exit_targets_mid_band(self):
+        candidates = _bbands_meanrev_candidates(BBandsMeanRevGrid(bb_period=[14], bb_std=[2.0]))
+        for c in candidates:
+            exit_refs = {
+                cond.right
+                for rule in c.exit_rules
+                for cond in rule.conditions
+                if isinstance(cond.right, str)
+            }
+            assert "bb_middle" in exit_refs
 
 
 class TestResearchAndApply:

@@ -46,6 +46,14 @@ ideas, structural changes) still follow the steps below by hand:
 | 2026-06-12 | Momentum-ranked entry competition (21-day momentum decides who gets slots instead of universe list order) | Train improved +83.4%→+121.8% | Holdout collapsed to **-20.1%** and the 25% kill switch fired (DD 26.3%). Ranking by momentum buys the most extended signals and concentrates into correlated high-beta names. Classic overfit: better in-sample, fatal out-of-sample |
 | 2026-06-12 | Per-symbol grid winner for MSFT | Passed the kill filter on holdout | Holdout return was **-10.1%** — the kill filter checks structure (trades/DD/Sharpe ceiling), not profitability. Led to the profitable-holdout gate now in `cluster_research.py` |
 
+## Bugs found & risk findings
+
+| Date | Bug | Impact | Fix |
+|------|-----|--------|-----|
+| 2026-06-18 | `ema()` seeded its recursive computation from `np.mean(prices[:period])`, assuming index 0 is always valid | MACD's `signal_line` (an `ema()` of `macd_line`, which itself starts with `slow_period-1` NaNs) seeded on NaN and propagated NaN forever — `signal_line`/`histogram` were 100% NaN for every strategy that has ever used a MACD crossover rule. `crosses_above`/`crosses_below` against an all-NaN series never fires, so the rule was silently inert, not erroring. `macd_line` itself was unaffected (built from two raw-price EMAs valid at index 0) | Seed from the first window of *valid* (non-NaN) values instead of index 0 (`d1b75e2`). `rsi()`/`atr()` had the same class of bug — `atr()` failed visibly (100% NaN output), `rsi()` failed silently (`np.where(deltas > 0, deltas, 0)` evaluated NaN comparisons as `False`, silently zeroing leading NaN deltas instead of propagating them, corrupting the rolling average with wrong non-NaN numbers). Both given the same first-valid-window seeding; `rsi()` additionally NaN-guarded its gain/loss split |
+| 2026-06-18 | `bonito backtest` never fetched or passed `regime_data` | Any strategy with a `regime_filter` crashed inside the engine — including `strategies/deployed_strategy.json`, the actual live/paper strategy | Fetch the regime symbol's bars (with the same `REGIME_WARMUP_DAYS` padding `live_runner.py` already uses) before `engine.run()` (`f77d428`) |
+| 2026-06-19 | `research/autoresearch_trading.py` carried its own kill filter with an absolute `MIN_TRADES = 30`, duplicating but diverging from `trading/validation.py::kill_verdict()`'s rate-based `MIN_TRADES_PER_YEAR = 7.0` | The two filters could disagree on the same strategy/window — an absolute count conflates short and long backtest windows where a rate doesn't. `cluster_research.py` and `regime_sweep.py` (the paths that actually gate live promotion) already called the canonical `kill_verdict()`; only the standalone `autoresearch_trading.py` loop was evaluating candidates against the divergent, non-canonical threshold | Deleted the local `MIN_TRADES`/`MAX_DRAWDOWN`/`MAX_SHARPE` constants and duplicated filter logic; `apply_kill_filters()` now builds a `WindowMetrics` via `window_metrics()` and delegates to `kill_verdict()`, keeping only the autoresearch-specific indicator-count check local |
+
 ## Grid changes
 
 | Date | Change | Trigger |
@@ -59,5 +67,12 @@ ideas, structural changes) still follow the steps below by hand:
 - **The exit rule stays** even though its raw P&L is negative.
 - **Kill-filter PASS ≠ deployable**: assignments additionally require
   positive holdout return (enforced in code since 2026-06-12).
+- **Silent NaN-handling bugs are a recurring risk class in indicator
+  code** — `np.where` collapsing a NaN comparison to its default branch,
+  or seeding a recursive computation at index 0 instead of the first valid
+  value, doesn't crash; it just produces wrong numbers (or, worse, makes a
+  rule silently never fire). And rate-based thresholds (trades/year) beat
+  absolute ones (raw trade count) whenever the windows being compared
+  vary in length.
 - Full replay artifacts: `livetrade/research/account_backtest_*.json`;
   research reports: `livetrade/research/cluster_report_*.json`.

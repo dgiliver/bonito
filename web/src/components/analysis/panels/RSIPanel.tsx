@@ -263,5 +263,3 @@ export const RSIPanel = forwardRef<RSIPanelRef, RSIPanelProps>(
     );
   },
 );
-
-export default RSIPanel;

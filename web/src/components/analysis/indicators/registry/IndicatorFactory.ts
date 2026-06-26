@@ -2,7 +2,7 @@
  * IndicatorFactory - Factory pattern for creating indicator instances
  *
  * Maps indicator types to their corresponding classes.
- * This allows IntelligentChart to create indicators without knowing
+ * This allows IntelligentChartV2 to create indicators without knowing
  * the specific class implementations.
  */
 
@@ -39,7 +39,7 @@ const PANEL_PRICE_SCALE_IDS: Record<string, string> = {
   atr: "atr",
 };
 
-class IndicatorFactory {
+export class IndicatorFactory {
   private static registry = new Map<string, IndicatorConstructor>();
 
   /**
@@ -100,5 +100,3 @@ class IndicatorFactory {
     return this.registry.has(type.toLowerCase());
   }
 }
-
-export default IndicatorFactory;

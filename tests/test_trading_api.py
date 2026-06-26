@@ -124,7 +124,7 @@ class TestDeployBotEndpoint:
                 "strategy_name": "risky",
                 "strategy_config": VALID_STRATEGY_CONFIG,
                 "execution_model": "continuous",
-                "mode": "live",
+                "mode": "paper",
                 "max_position_pct": 95.0,
             },
         )
@@ -140,13 +140,48 @@ class TestDeployBotEndpoint:
                 "strategy_name": "risky",
                 "strategy_config": VALID_STRATEGY_CONFIG,
                 "execution_model": "continuous",
-                "mode": "live",
+                "mode": "paper",
                 "max_position_pct": 95.0,
                 "acknowledge_risks": True,
             },
         )
 
         assert response.status_code == 201
+
+    def test_deploy_live_blocked_by_default(self, linked_client):
+        """Live trading requires an operator to set ALPACA_LIVE_TRADING_ENABLED."""
+        response = linked_client.post(
+            "/api/trading/bots",
+            json={
+                "strategy_name": "risky",
+                "strategy_config": STRATEGY_WITH_STOP_LOSS,
+                "execution_model": "continuous",
+                "mode": "live",
+                "acknowledge_risks": True,
+            },
+        )
+
+        assert response.status_code == 403
+        assert "Live trading is disabled" in response.json()["detail"]
+
+    def test_deploy_live_allowed_when_enabled(self, linked_client, monkeypatch):
+        import bonito.api.routes.trading as trading_routes
+
+        monkeypatch.setattr(trading_routes.settings, "alpaca_live_trading_enabled", True)
+
+        response = linked_client.post(
+            "/api/trading/bots",
+            json={
+                "strategy_name": "risky",
+                "strategy_config": STRATEGY_WITH_STOP_LOSS,
+                "execution_model": "continuous",
+                "mode": "live",
+                "acknowledge_risks": True,
+            },
+        )
+
+        assert response.status_code == 201
+        assert response.json()["mode"] == "live"
 
 
 class TestListBotsEndpoint:

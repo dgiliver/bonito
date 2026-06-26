@@ -6,7 +6,7 @@ Supports both built-in indicators and pandas-ta indicators.
 import numpy as np
 import pandas as pd
 
-from bonito.backtest.strategy import IndicatorConfig, IndicatorType
+from bonito.backtest.strategy import PANDAS_TA_INDICATORS, IndicatorConfig, IndicatorType
 from bonito.data.models import BarData
 
 # Lazy import for pandas_ta to avoid startup overhead
@@ -61,6 +61,12 @@ def _compute_pandas_ta_indicator(
     Returns:
         Dictionary of indicator name -> numpy array
     """
+    # Defense-in-depth: only dispatch to the curated allowlist, even if a
+    # config bypassed StrategyConfig's pydantic validation (e.g. constructed
+    # directly rather than parsed). Never probe arbitrary pandas_ta attributes.
+    if indicator_type not in PANDAS_TA_INDICATORS:
+        raise ValueError(f"Unknown pandas-ta indicator: {indicator_type}")
+
     ta = _get_pandas_ta()
     results = {}
 
@@ -338,44 +344,66 @@ def sma(prices: np.ndarray, period: int) -> np.ndarray:
 
 
 def ema(prices: np.ndarray, period: int) -> np.ndarray:
-    """Exponential Moving Average."""
+    """Exponential Moving Average.
+
+    Seeds from the first window of `period` valid values rather than
+    assuming index 0 is valid, so this also works on derived series that
+    start with a run of NaN (e.g. MACD's signal line, which is an EMA of
+    the MACD line — itself NaN for its slow-EMA warm-up period). Without
+    this, a NaN seed propagates through every later value via the
+    recursive update below and never recovers.
+    """
     result = np.full_like(prices, np.nan)
-    if len(prices) < period:
+    valid = np.flatnonzero(~np.isnan(prices))
+    if len(valid) == 0 or len(prices) - valid[0] < period:
         return result
+    start = valid[0]
     multiplier = 2 / (period + 1)
 
-    # Initialize with SMA
-    result[period - 1] = np.mean(prices[:period])
+    # Initialize with SMA over the first `period` valid values
+    seed = start + period - 1
+    result[seed] = np.mean(prices[start : start + period])
 
     # Calculate EMA
-    for i in range(period, len(prices)):
+    for i in range(seed + 1, len(prices)):
         result[i] = (prices[i] * multiplier) + (result[i - 1] * (1 - multiplier))
 
     return result
 
 
 def rsi(prices: np.ndarray, period: int = 14) -> np.ndarray:
-    """Relative Strength Index."""
+    """Relative Strength Index.
+
+    Seeds from the first window of `period` valid deltas rather than
+    assuming index 0 is valid (same rationale as `ema()`), and guards the
+    gain/loss split so a NaN delta propagates as NaN instead of silently
+    becoming 0 - `np.where(deltas > 0, deltas, 0)` evaluates `NaN > 0` as
+    False, which would otherwise corrupt the rolling average with wrong,
+    non-NaN numbers instead of surfacing a visible NaN.
+    """
     deltas = np.diff(prices)
-    gains = np.where(deltas > 0, deltas, 0)
-    losses = np.where(deltas < 0, -deltas, 0)
+    gains = np.where(np.isnan(deltas), np.nan, np.where(deltas > 0, deltas, 0))
+    losses = np.where(np.isnan(deltas), np.nan, np.where(deltas < 0, -deltas, 0))
 
     result = np.full_like(prices, np.nan)
-    if len(prices) <= period:
+    valid = np.flatnonzero(~np.isnan(prices))
+    if len(valid) == 0 or len(prices) - valid[0] <= period:
         return result
+    start = valid[0]
 
-    # Initial averages
-    avg_gain = np.mean(gains[:period])
-    avg_loss = np.mean(losses[:period])
+    # Initial averages over the first `period` valid deltas
+    avg_gain = np.mean(gains[start : start + period])
+    avg_loss = np.mean(losses[start : start + period])
 
+    seed = start + period
     if avg_loss == 0:
-        result[period] = 100
+        result[seed] = 100
     else:
         rs = avg_gain / avg_loss
-        result[period] = 100 - (100 / (1 + rs))
+        result[seed] = 100 - (100 / (1 + rs))
 
     # Subsequent values using smoothing
-    for i in range(period, len(prices) - 1):
+    for i in range(seed, len(prices) - 1):
         avg_gain = (avg_gain * (period - 1) + gains[i]) / period
         avg_loss = (avg_loss * (period - 1) + losses[i]) / period
 
@@ -389,15 +417,27 @@ def rsi(prices: np.ndarray, period: int = 14) -> np.ndarray:
 
 
 def atr(high: np.ndarray, low: np.ndarray, close: np.ndarray, period: int = 14) -> np.ndarray:
-    """Average True Range."""
+    """Average True Range.
+
+    Seeds from the first window of `period` valid true-range values rather
+    than assuming index 0 is valid (same rationale as `ema()`) - otherwise
+    any leading NaN poisons the seed mean and the whole output is NaN
+    forever, since the recursive update below never recovers from a NaN seed.
+    """
     tr = np.maximum(
         high[1:] - low[1:], np.maximum(np.abs(high[1:] - close[:-1]), np.abs(low[1:] - close[:-1]))
     )
 
     result = np.full_like(close, np.nan)
-    result[period] = np.mean(tr[:period])
+    valid = np.flatnonzero(~np.isnan(tr))
+    if len(valid) == 0 or len(tr) - valid[0] < period:
+        return result
+    start = valid[0]
 
-    for i in range(period, len(tr)):
+    seed = start + period
+    result[seed] = np.mean(tr[start : start + period])
+
+    for i in range(seed, len(tr)):
         result[i + 1] = (result[i] * (period - 1) + tr[i]) / period
 
     return result

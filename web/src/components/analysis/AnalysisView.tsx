@@ -33,7 +33,9 @@ import dynamic from "next/dynamic";
 
 // Dynamically import chart to avoid SSR issues
 // Using V2 with multi-chart architecture for proper panel scales
-const IntelligentChart = dynamic(() => import("./IntelligentChartV2"), {
+const IntelligentChart = dynamic(
+  () => import("./IntelligentChartV2").then((m) => m.IntelligentChartV2),
+  {
   ssr: false,
   loading: () => (
     <div
@@ -983,7 +985,7 @@ function AnalysisContent() {
   );
 }
 
-export default function AnalysisView() {
+export function AnalysisView() {
   return (
     <TradingProvider>
       <AnalysisProvider>

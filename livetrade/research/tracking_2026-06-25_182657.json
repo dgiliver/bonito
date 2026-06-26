@@ -1,0 +1,130 @@
+{
+  "generated_at": "2026-06-25T18:26:57.656249",
+  "window_start": "2026-06-10T00:00:00",
+  "window_end": "2026-06-25T18:26:57.150856",
+  "status": "WARN",
+  "reasons": [
+    "mean fill gap 311bps > 50bps",
+    "equity gap -7.6% > ±3% (config changes during the paper window inflate this early on)"
+  ],
+  "paper_fills": 12,
+  "matched_fills": 10,
+  "decision_divergence": 0.1667,
+  "mean_abs_fill_bps": 310.9,
+  "median_abs_fill_bps": 158.2,
+  "worst_fill_bps": 943.8,
+  "paper_final_equity": 5503.62,
+  "replay_final_equity": 5954.87,
+  "equity_gap_pct": -7.58,
+  "mean_daily_tracking_error_bps": 279.3,
+  "fills": [
+    {
+      "symbol": "MU",
+      "side": "buy",
+      "paper_date": "2026-06-10T15:49:18.796392",
+      "paper_price": 910.030029296875,
+      "replay_price": 891.8800048828125,
+      "delta_bps": 203.5,
+      "matched": true
+    },
+    {
+      "symbol": "SNDK",
+      "side": "buy",
+      "paper_date": "2026-06-10T15:49:18.796761",
+      "paper_price": 1625.9849853515625,
+      "replay_price": 1643.22998046875,
+      "delta_bps": -104.95,
+      "matched": true
+    },
+    {
+      "symbol": "DELL",
+      "side": "buy",
+      "paper_date": "2026-06-10T15:49:18.796906",
+      "paper_price": 373.70001220703125,
+      "replay_price": 369.8299865722656,
+      "delta_bps": 104.64,
+      "matched": true
+    },
+    {
+      "symbol": "ORCL",
+      "side": "buy",
+      "paper_date": "2026-06-10T16:13:52.032254",
+      "paper_price": 204.16000366210938,
+      "replay_price": null,
+      "delta_bps": null,
+      "matched": false
+    },
+    {
+      "symbol": "ARM",
+      "side": "buy",
+      "paper_date": "2026-06-10T16:13:52.032626",
+      "paper_price": 309.92999267578125,
+      "replay_price": 342.2300109863281,
+      "delta_bps": -943.81,
+      "matched": true
+    },
+    {
+      "symbol": "SNDK",
+      "side": "sell",
+      "paper_date": "2026-06-11T18:54:32.730265",
+      "paper_price": 1829.72998046875,
+      "replay_price": 1807.5529785156252,
+      "delta_bps": 122.69,
+      "matched": true
+    },
+    {
+      "symbol": "ARM",
+      "side": "sell",
+      "paper_date": "2026-06-11T23:05:46.129799",
+      "paper_price": 342.2300109863281,
+      "replay_price": 376.45301208496096,
+      "delta_bps": -909.09,
+      "matched": true
+    },
+    {
+      "symbol": "SNDK",
+      "side": "buy",
+      "paper_date": "2026-06-11T23:05:46.129991",
+      "paper_price": 1881.510009765625,
+      "replay_price": 1881.510009765625,
+      "delta_bps": 0.0,
+      "matched": true
+    },
+    {
+      "symbol": "IREN",
+      "side": "buy",
+      "paper_date": "2026-06-11T23:05:46.130273",
+      "paper_price": 56.709999084472656,
+      "replay_price": 59.77000045776367,
+      "delta_bps": -511.96,
+      "matched": true
+    },
+    {
+      "symbol": "DELL",
+      "side": "sell",
+      "paper_date": "2026-06-15T15:03:47.878223",
+      "paper_price": 413.4599914550781,
+      "replay_price": null,
+      "delta_bps": null,
+      "matched": false
+    },
+    {
+      "symbol": "MU",
+      "side": "sell",
+      "paper_date": "2026-06-15T15:03:47.878359",
+      "paper_price": 1074.22998046875,
+      "replay_price": 1095.4569946289064,
+      "delta_bps": -193.77,
+      "matched": true
+    },
+    {
+      "symbol": "SNDK",
+      "side": "sell",
+      "paper_date": "2026-06-15T15:03:47.878431",
+      "paper_price": 2097.97998046875,
+      "replay_price": 2101.1201171875,
+      "delta_bps": -14.95,
+      "matched": true
+    }
+  ]
+}

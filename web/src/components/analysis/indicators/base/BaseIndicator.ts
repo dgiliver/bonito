@@ -9,7 +9,7 @@
  * - Crosshair value extraction
  *
  * This ensures encapsulation and provides a consistent interface
- * for the IndicatorRegistry and IntelligentChart.
+ * for the IndicatorRegistry and IntelligentChartV2.
  */
 
 import type {

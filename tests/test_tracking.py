@@ -72,6 +72,60 @@ class TestMatchFills:
         out = match_fills(paper, replay)
         assert not out[0].matched and out[0].replay_price is None
 
+    def test_two_days_apart_exceeds_tolerance_boundary(self):
+        """Exactly 2 days apart must NOT match — the tight edge of MATCH_TOLERANCE_DAYS.
+
+        Paired with test_match_within_tolerance_day (1 day apart, matches),
+        this locks the boundary on both sides: a refactor that widened the
+        tolerance to 2 days would flip this test green->red.
+        """
+        paper = [fill("AAA", "buy", 100.0, day(3))]
+        replay = [("AAA", "buy", day(1), 100.0)]
+        out = match_fills(paper, replay)
+        assert not out[0].matched
+        assert out[0].replay_price is None
+        assert out[0].delta_bps is None
+
+    def test_delta_bps_negative_when_paper_below_replay(self):
+        """Sign convention: paper below replay price ⇒ negative delta_bps.
+
+        delta_bps = (paper_price - replay_price) / replay_price * 10_000.
+        This is the formula and sign the investigation relied on (paper
+        filled BELOW the replay's close-based price ⇒ negative bps, e.g.
+        the -943.8bps ARM case). The companion exact-match test only
+        exercises paper > replay (positive); this covers paper < replay.
+        """
+        paper = [fill("AAA", "buy", 99.0, day(1))]
+        replay = [("AAA", "buy", day(1), 100.0)]
+        out = match_fills(paper, replay)
+        assert out[0].matched
+        # (99 - 100) / 100 * 10_000 = -100.0
+        assert out[0].delta_bps == -100.0
+
+    def test_unmatched_fill_counts_toward_decision_divergence(self):
+        """A fill with no same-key replay event within tolerance is the unit
+        that decision_divergence is built from: run_tracking computes
+        `1 - len(matched) / len(comparisons)` directly off `matched` flags.
+
+        This locks that arithmetic at the match_fills level: one matched
+        ARM-like pair plus one unmatched ORCL-like fill (no replay event at
+        all for that symbol) must yield a divergence of exactly 0.5.
+        """
+        paper = [
+            fill("ARM", "buy", 100.0, day(1)),
+            fill("ORCL", "buy", 50.0, day(1)),
+        ]
+        replay = [("ARM", "buy", day(1), 100.0)]  # no ORCL event at all
+        out = match_fills(paper, replay)
+
+        matched = [c for c in out if c.matched]
+        divergence = 1 - len(matched) / len(out)
+
+        assert len(matched) == 1
+        assert divergence == 0.5
+        unmatched = [c for c in out if not c.matched]
+        assert len(unmatched) == 1 and unmatched[0].symbol == "ORCL"
+
     def test_side_and_symbol_must_agree(self):
         paper = [fill("AAA", "sell", 100.0, day(1)), fill("BBB", "buy", 100.0, day(1))]
         replay = [("AAA", "buy", day(1), 100.0)]
@@ -147,9 +201,7 @@ class TestPaperEquityCurve:
 
     def test_empty_ledger(self, tmp_path):
         ledger = PaperLedger(cash=1000.0, starting_cash=1000.0)
-        dates, equity = paper_equity_curve(
-            ledger, FakeStore({}), self.universe(tmp_path), day(3)
-        )
+        dates, equity = paper_equity_curve(ledger, FakeStore({}), self.universe(tmp_path), day(3))
         assert dates == [] and equity == []
 
 

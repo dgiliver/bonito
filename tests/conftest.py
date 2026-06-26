@@ -1,6 +1,21 @@
 """Pytest configuration and shared fixtures."""
 
+import os
+
 import pytest
+
+
+@pytest.fixture(autouse=True, scope="session")
+def credential_password():
+    """Provide BONITO_CREDENTIAL_PASSWORD for the test session.
+
+    Production code refuses to encrypt/decrypt broker credentials without
+    this env var set (no hardcoded fallback) - tests need a value so any
+    code path touching CredentialStore doesn't raise RuntimeError.
+    """
+    os.environ["BONITO_CREDENTIAL_PASSWORD"] = "test-password-not-for-prod"
+    yield
+    del os.environ["BONITO_CREDENTIAL_PASSWORD"]
 
 
 def pytest_configure(config):

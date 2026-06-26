@@ -47,6 +47,14 @@ Routine until that sign-off.
    (`query1.finance.yahoo.com`, `query2.finance.yahoo.com`) for the data
    refresh. Robinhood MCP traffic routes through Anthropic and needs no
    domain allowlisting.
+5. The ••••8597 cash-only account scoping is **NOT enforced by any code in
+   `src/bonito/`** — Bonito's own pipeline never contacts Robinhood at all;
+   it only emits intents (`livetrade/intents/*.json`). The Robinhood MCP
+   calls happen entirely inside the Claude session/Routine, outside this
+   codebase. The only enforcement is (a) Robinhood's own API rejecting the
+   margin account for agentic trading (`agentic_allowed: false` on that
+   account), and (b) the Routine prompt's own discipline (step 1 below). A
+   reviewer must not assume `src/bonito/` guards this boundary.
 
 ## The safety chain inside each run
 
@@ -80,6 +88,25 @@ your own machine or from [claude.ai/code/routines](https://claude.ai/code/routin
    ```
    Claude will collect the repo, environment, connectors, and the prompt
    (paste the prompt below). Include only the Robinhood connector.
+
+   **Picking the time — a real tradeoff, not a free choice.** The live cycle
+   *must* run during regular hours: Robinhood fractional/dollar orders only
+   fill in RTH, so the after-close pattern the paper GitHub Action uses
+   (22:30 UTC, when the daily bar is settled) is NOT available here — copying
+   it would place orders that never fill. Every minute before the 4pm ET
+   close, `bonito live refresh` still pulls a still-*forming* daily bar from
+   Yahoo (last trade as the "close"). But `bonito live run` now guards every
+   entry/exit with `_is_forming` (the settled-bar guard): on a forming bar it
+   skips entries and holds exits rather than acting on an unsettled price.
+   Pre-close runs are correct by construction — at worst they no-op a symbol
+   whose settled signal would have fired, never trade a wrong price. Net: the
+   schedule no longer affects correctness, only opportunity — run too early
+   and the guard suppresses that day's trades (picked up next session or a
+   later run); run too late and an order risks slipping past 4pm. 3:45pm ET
+   keeps ~15 min of headroom while staying in RTH, intentionally biased
+   toward "miss a trade > mis-trade." The settled-bar guard is now
+   IMPLEMENTED; see `tasks/arm_fill_gap_coordination.md` Decision #3 and
+   `docs/RFC_SETTLED_BAR_GUARD.md`.
 3. Confirm the environment allows the Yahoo domains and has
    `mode: live` + `live_enabled: true` in `config/universe.live.json`.
 4. Use **Run now** once while you watch, to confirm the full chain end to
@@ -105,7 +132,10 @@ Setup:
 
 1. Resolve the account: Robinhood get_accounts → the one with
    agentic_allowed: true (nickname "Agentic", ••••8597). NEVER the margin
-   account (••••7982).
+   account (••••7982). Assert ALL THREE of: masked number ends in 8597 AND
+   agentic_allowed == true AND nickname == "Agentic". If any check fails,
+   STOP immediately, place nothing, and report the mismatch — this is the
+   same fail-closed posture as every other step below.
 2. Reconcile: get_equity_positions for that account → build
    {"SYMBOL": qty} JSON ({} if flat) → `.venv/bin/bonito live reconcile
    '<json>' -u config/universe.live.json`. Non-zero exit = drift: STOP,
@@ -120,8 +150,11 @@ Setup:
 6. Execute ONLY the intents in the newest intents file, sells before buys:
    for each, Robinhood review_equity_order then place_equity_order (fresh
    UUID ref_id), then `.venv/bin/bonito live record-fill SYMBOL SIDE PRICE
-   --dollars N` (or `... SIDE PRICE` for sells) with the ACTUAL fill price.
-   On any order error: STOP, report what filled and what didn't, do not retry.
+   --dollars N --broker-order-id ID` (or `... SIDE PRICE --broker-order-id ID`
+   for sells) with the ACTUAL fill price and the order id from
+   place_equity_order's response (or get_equity_orders if not returned
+   directly). On any order error: STOP, report what filled and what didn't,
+   do not retry.
 7. Reconcile again (get_equity_positions vs ledger). Report any mismatch;
    do not silently fix it.
 8. Persist: `.venv/bin/bonito live status -u config/universe.live.json`,

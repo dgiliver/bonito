@@ -107,19 +107,6 @@ class PanelChartPanelImpl extends BaseChartPanel {
   protected onInitialize(): void {
     if (!this.chart) return;
 
-    console.log(
-      "[DEBUG] PanelChartPanel.onInitialize:",
-      this.panelConfig.indicatorName,
-    );
-    console.log(
-      "[DEBUG] thresholdLines config:",
-      this.panelConfig.thresholdLines,
-    );
-    console.log(
-      "[DEBUG] thresholdZone config:",
-      this.panelConfig.thresholdZone,
-    );
-
     // Configure the price scale for this indicator
     // Note: autoScale must be TRUE for autoscaleInfoProvider to work
     // minimumWidth ensures alignment with price chart
@@ -138,63 +125,17 @@ class PanelChartPanelImpl extends BaseChartPanel {
 
     // Create threshold zone if configured (e.g., RSI 30-70 zone)
     if (this.panelConfig.thresholdZone) {
-      console.log("[DEBUG] Creating threshold zone");
       this.createThresholdZone(this.panelConfig.thresholdZone);
     }
 
     // Create threshold lines if configured
     if (this.panelConfig.thresholdLines) {
-      console.log(
-        "[DEBUG] Creating",
-        this.panelConfig.thresholdLines.length,
-        "threshold lines",
-      );
-      // #region agent log
-      fetch(
-        "http://127.0.0.1:7242/ingest/3d78da6f-49c7-481a-bafb-b1cb31305326",
-        {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            location: "PanelChartPanel.tsx:onInitialize",
-            message: "Creating threshold lines",
-            data: {
-              count: this.panelConfig.thresholdLines.length,
-              thresholds: this.panelConfig.thresholdLines.map((t) => ({
-                value: t.value,
-                color: t.color,
-              })),
-            },
-            timestamp: Date.now(),
-            sessionId: "debug-session",
-            hypothesisId: "H53",
-          }),
-        },
-      ).catch(() => {});
-      // #endregion
       for (const threshold of this.panelConfig.thresholdLines) {
         this.createThresholdLine(threshold);
       }
     }
 
     // Create main indicator line
-    // #region agent log
-    fetch("http://127.0.0.1:7242/ingest/3d78da6f-49c7-481a-bafb-b1cb31305326", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        location: "PanelChartPanel.tsx:onInitialize",
-        message: "Creating main indicator line",
-        data: {
-          color: this.panelConfig.color,
-          indicatorName: this.panelConfig.indicatorName,
-        },
-        timestamp: Date.now(),
-        sessionId: "debug-session",
-        hypothesisId: "H54",
-      }),
-    }).catch(() => {});
-    // #endregion
     this.mainSeries = this.chart.addSeries(LineSeries, {
       color: this.panelConfig.color,
       lineWidth: 2 as 1 | 2 | 3 | 4,
@@ -233,26 +174,6 @@ class PanelChartPanelImpl extends BaseChartPanel {
 
   private createThresholdZone(zone: ThresholdZone): void {
     if (!this.chart) return;
-
-    // #region agent log
-    fetch("http://127.0.0.1:7242/ingest/3d78da6f-49c7-481a-bafb-b1cb31305326", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        location: "PanelChartPanel.tsx:createThresholdZone",
-        message: "Creating threshold zone",
-        data: {
-          upper: zone.upper,
-          lower: zone.lower,
-          color: zone.color,
-          backgroundColor: this.panelConfig.backgroundColor,
-        },
-        timestamp: Date.now(),
-        sessionId: "debug-session",
-        hypothesisId: "H58",
-      }),
-    }).catch(() => {});
-    // #endregion
 
     // To create a band between lower (30) and upper (70):
     // 1. First area: fills from upper (70) down to 0 with zone color
@@ -309,13 +230,6 @@ class PanelChartPanelImpl extends BaseChartPanel {
   private createThresholdLine(threshold: ThresholdLine): void {
     if (!this.chart) return;
 
-    console.log(
-      "[DEBUG] Creating threshold line:",
-      threshold.value,
-      "color:",
-      threshold.color,
-    );
-
     const line = this.chart.addSeries(LineSeries, {
       color: threshold.color,
       lineWidth: (threshold.lineWidth ?? 1) as 1 | 2 | 3 | 4,
@@ -341,10 +255,6 @@ class PanelChartPanelImpl extends BaseChartPanel {
     }
 
     this.thresholdSeries.push(line);
-    console.log(
-      "[DEBUG] Threshold series count after add:",
-      this.thresholdSeries.length,
-    );
   }
 
   getMainSeries(): ISeriesApi<"Line"> | null {
@@ -365,29 +275,6 @@ class PanelChartPanelImpl extends BaseChartPanel {
       value: d.value,
     }));
 
-    // #region agent log
-    const sampleValues = lineData.slice(-5).map((d) => d.value);
-    fetch("http://127.0.0.1:7242/ingest/3d78da6f-49c7-481a-bafb-b1cb31305326", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        location: "PanelChartPanel.tsx:updateData",
-        message: "Setting RSI line data",
-        data: {
-          panelId: this.panelId,
-          dataLength: lineData.length,
-          sampleValues,
-          minValue: this.panelConfig.minValue,
-          maxValue: this.panelConfig.maxValue,
-          hasMainSeries: !!this.mainSeries,
-        },
-        timestamp: Date.now(),
-        sessionId: "debug-session",
-        hypothesisId: "H51",
-      }),
-    }).catch(() => {});
-    // #endregion
-
     this.mainSeries.setData(lineData);
 
     // DON'T call fitContent() here - let the time axis sync handle it
@@ -395,34 +282,14 @@ class PanelChartPanelImpl extends BaseChartPanel {
 
     // Update threshold lines with data points at same times
     if (this.panelConfig.thresholdLines) {
-      console.log(
-        "[DEBUG] Setting threshold line data, config lines:",
-        this.panelConfig.thresholdLines.length,
-        "series count:",
-        this.thresholdSeries.length,
-      );
       this.panelConfig.thresholdLines.forEach((threshold, index) => {
         const series = this.thresholdSeries[index];
-        console.log(
-          "[DEBUG] Threshold line",
-          index,
-          "value:",
-          threshold.value,
-          "series exists:",
-          !!series,
-        );
         if (series) {
           const thresholdData: LineData<Time>[] = data.map((d) => ({
             time: d.time,
             value: threshold.value,
           }));
           series.setData(thresholdData);
-          console.log(
-            "[DEBUG] Set",
-            thresholdData.length,
-            "points for threshold at",
-            threshold.value,
-          );
         }
       });
     }
@@ -533,6 +400,12 @@ export const PanelChartPanel = forwardRef<
   );
 
   // Create and initialize panel when container is ready
+  // NOTE: config.height is intentionally excluded from these deps. Height
+  // changes are handled by the separate resize effect below, which calls
+  // .resize() on the existing chart instance instead of destroying and
+  // recreating it. Do not "fix" this by adding height/config here (that's
+  // the panels/ pattern, e.g. RSIPanel/MACDPanel) — doing so would
+  // reintroduce destroy/recreate thrash on every height change.
   useEffect(() => {
     if (!containerRef.current) return;
 
@@ -638,5 +511,3 @@ export const PanelChartPanel = forwardRef<
     />
   );
 });
-
-export default PanelChartPanel;

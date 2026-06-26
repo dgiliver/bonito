@@ -252,6 +252,91 @@ class TestRegimeAndLookahead:
         assert all(e == pytest.approx(150.0) for e in flat_until)
 
 
+class TestSettledBarGuardReplayWiring:
+    """Closes a real gap: START/day() above are naive midnight (e.g. 2026-01-01 00:00:00),
+
+    which is NOT the production bar-timestamp convention. Converted to ET, naive midnight
+    is always several hours into the *previous* day's evening — already well past every
+    session's 16:15 ET settle boundary — so `_is_forming(d, d) -> False` for every `d` built
+    from `day(i)` regardless of `require_settled`. That makes every existing replay test in
+    this file (including test_no_lookahead_entry_fires_on_signal_day above) pass identically
+    whether `portfolio_backtest.py:283` passes `require_settled=False` or the guard's own
+    default of `True` — i.e. they do NOT exercise the replay call site's opt-out at all.
+
+    Confirmed by hand before writing this test:
+        _is_forming(datetime(2026, 1, 1), datetime(2026, 1, 1)) == False  (always settled)
+
+    These tests instead use the REAL stored-bar convention — ET-midnight-of-session-date
+    expressed as naive UTC (verified against data/market_data.duckdb: 05:00 UTC in EST/winter,
+    04:00 UTC in EDT/summer) — under which a bar's own timestamp IS forming relative to
+    itself (midnight ET is always before that same day's 16:15 ET settle):
+
+        _is_forming(datetime(2026, 1, 5, 5, 0), datetime(2026, 1, 5, 5, 0)) == True
+
+    so `require_settled=False` is the only thing that lets the replay act at all. Without it,
+    `backtest_account` would silently produce zero trades and zero open positions over any
+    window — exactly the "zero the entire replay" regression the settled-bar guard RFC
+    (docs/RFC_SETTLED_BAR_GUARD.md §5.4) flagged as the reason the replay call site must pass
+    require_settled=False.
+    """
+
+    WINTER_START = datetime(2026, 1, 5, 5, 0)  # ET-midnight-of-D as naive UTC, EST (winter)
+    SUMMER_START = datetime(2026, 7, 6, 4, 0)  # ET-midnight-of-D as naive UTC, EDT (summer)
+
+    def realistic_day(self, base: datetime, i: int) -> datetime:
+        return base + timedelta(days=i)
+
+    def _rising_bars_at(self, base: datetime, n: int = 6) -> BarData:
+        closes = [100.0 + i for i in range(n)]
+        return BarData(
+            symbol="AAA",
+            timeframe="1d",
+            timestamps=[self.realistic_day(base, i) for i in range(n)],
+            opens=closes,
+            highs=[c * 1.01 for c in closes],
+            lows=[c * 0.99 for c in closes],
+            closes=closes,
+            volumes=[1_000_000.0] * n,
+        )
+
+    def test_winter_replay_fires_an_entry_through_the_real_call_site(self, tmp_path):
+        """Multi-day winter-convention replay: require_settled=False at the real call
+
+        site (portfolio_backtest.py:283) must let the entry actually fire and the
+        position accrue unrealized P&L as price rises.
+        """
+        universe = make_universe(tmp_path, BASE_STRATEGY, ["AAA"])
+        bars = self._rising_bars_at(self.WINTER_START, n=6)
+        replay = ReplayStore({"AAA": bars})
+
+        result = backtest_account(
+            universe, replay, self.WINTER_START, self.realistic_day(self.WINTER_START, 5)
+        )
+
+        assert "AAA" in result.open_position_entries
+        assert result.open_position_entries["AAA"].entry_price == pytest.approx(101.0)
+        assert result.open_positions["AAA"] > 0  # unrealized P&L, price rose post-entry
+        assert result.final_equity > result.starting_cash
+
+    def test_summer_replay_fires_an_entry_through_the_real_call_site(self, tmp_path):
+        """Same proof as the winter case, but with the EDT (04:00 UTC) bar convention —
+
+        both DST seasons must independently exercise require_settled=False correctly.
+        """
+        universe = make_universe(tmp_path, BASE_STRATEGY, ["AAA"])
+        bars = self._rising_bars_at(self.SUMMER_START, n=6)
+        replay = ReplayStore({"AAA": bars})
+
+        result = backtest_account(
+            universe, replay, self.SUMMER_START, self.realistic_day(self.SUMMER_START, 5)
+        )
+
+        assert "AAA" in result.open_position_entries
+        assert result.open_position_entries["AAA"].entry_price == pytest.approx(101.0)
+        assert result.open_positions["AAA"] > 0
+        assert result.final_equity > result.starting_cash
+
+
 class TestResultIntegrity:
     def test_determinism_and_accounting(self, tmp_path):
         universe = make_universe(tmp_path, BASE_STRATEGY, ["AAA", "BBB"])

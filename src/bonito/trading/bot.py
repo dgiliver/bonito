@@ -3,7 +3,7 @@
 import asyncio
 import contextlib
 import logging
-from datetime import datetime, timedelta
+from datetime import UTC, date, datetime, timedelta
 from typing import Literal
 
 import numpy as np
@@ -27,13 +27,18 @@ class TradingBot:
     def __init__(self, config: BotConfig, broker: Broker):
         self.config = config
         self.broker = broker
-        self._status: Literal["stopped", "running", "paused", "error"] = "stopped"
+        self._status: Literal["stopped", "running", "paused", "error", "halted"] = "stopped"
         self._task: asyncio.Task | None = None
         self._positions: list[Position] = []
         self._orders: list[Order] = []
         self._start_time: datetime | None = None
         self._total_trades: int = 0
         self._realized_pnl: float = 0.0
+
+        # Daily-loss kill switch (TradingConfig.max_daily_loss_pct)
+        self._daily_start_equity: float | None = None
+        self._daily_start_date: date | None = None
+        self._halt_reason: str = ""
 
         # Trailing stop tracking: symbol -> highest price since entry (longs) or lowest (shorts)
         self._trailing_highs: dict[str, float] = {}
@@ -146,6 +151,10 @@ class TradingBot:
         current market data and generates trade signals.
         """
         try:
+            account = await self.broker.get_account()
+            if await self._check_kill_switch(account.equity):
+                return
+
             # Fetch recent market data
             data = await self._fetch_recent_data()
             if data is None or len(data) < 2:
@@ -174,6 +183,43 @@ class TradingBot:
 
         except Exception as e:
             logger.error(f"Error in bot {self.id} execution: {e}", exc_info=True)
+
+    async def _check_kill_switch(self, current_equity: float) -> bool:
+        """Daily-loss kill switch: close all positions and halt if breached.
+
+        TradingConfig.max_daily_loss_pct previously only fed a deploy-time risk
+        *warning* ("bot won't auto-stop on bad days") - it was never enforced.
+        This makes the bot actually stop instead of trading through a bad day.
+        Once halted, the bot stays halted; resume() only accepts "paused" bots,
+        so restarting requires deliberate human action.
+        """
+        max_daily_loss_pct = self.config.trading_config.max_daily_loss_pct
+        if max_daily_loss_pct is None:
+            return False
+
+        today = datetime.now(UTC).date()
+        if self._daily_start_date != today:
+            self._daily_start_date = today
+            self._daily_start_equity = current_equity
+
+        if not self._daily_start_equity:
+            return False
+
+        daily_loss_pct = (
+            (self._daily_start_equity - current_equity) / self._daily_start_equity * 100
+        )
+        if daily_loss_pct < max_daily_loss_pct:
+            return False
+
+        self._halt_reason = (
+            f"daily loss {daily_loss_pct:.2f}% exceeds max_daily_loss_pct={max_daily_loss_pct}%"
+        )
+        logger.error(
+            f"Bot {self.id}: kill switch tripped - {self._halt_reason}. Closing positions."
+        )
+        await self._executor.close_all_positions()
+        self._status = "halted"
+        return True
 
     async def _fetch_recent_data(self) -> BarData | None:
         """Fetch recent market data from Alpaca.
@@ -480,4 +526,5 @@ class TradingBot:
             peak_equity=0.0,  # Track separately
             current_equity=0.0,  # Get from broker
             daily_pnl=0.0,  # Track separately
+            halt_reason=self._halt_reason,
         )

@@ -365,7 +365,6 @@ def backtest(
 
     console.print(f"\n[bold]Loading data for {target_symbol}...[/bold]")
     data = store.get_bars(target_symbol, start_date, end_date, strategy.timeframe)
-    store.close()
 
     if data is None:
         console.print(f"[red]No data found for {target_symbol}[/red]")
@@ -375,6 +374,19 @@ def backtest(
     console.print(
         f"[dim]Loaded {len(data)} bars from {data.timestamps[0].strftime('%Y-%m-%d')} to {data.timestamps[-1].strftime('%Y-%m-%d')}[/dim]"
     )
+
+    regime_data = None
+    if strategy.regime_filter is not None:
+        from bonito.trading.live_runner import REGIME_WARMUP_DAYS
+
+        regime_symbol = strategy.regime_filter.symbol
+        regime_start = start_date - timedelta(days=REGIME_WARMUP_DAYS)
+        regime_data = store.get_bars(regime_symbol, regime_start, end_date, strategy.timeframe)
+        if regime_data is None:
+            console.print(f"[red]No regime data found for {regime_symbol}[/red]")
+            raise typer.Exit(1)
+
+    store.close()
 
     # Run backtest
     console.print(f"\n[bold]Running backtest: {strategy.name}[/bold]")
@@ -387,7 +399,7 @@ def backtest(
     engine = BacktestEngine(config)
 
     with console.status("[bold blue]Backtesting...[/bold blue]"):
-        result = engine.run(strategy, data)
+        result = engine.run(strategy, data, regime_data=regime_data)
 
     # Display results
     console.print(result.summary())
@@ -602,10 +614,17 @@ def research_clusters(
         help="Research every ticker as its own singleton cluster (winner tuned "
         "per symbol; holdout gate is the only out-of-sample protection)",
     ),
+    templates: str = typer.Option(
+        "ema",
+        "--templates",
+        help="Comma-separated template families to search: ema, adx, macd, bbands. "
+        "ema is the always-on production default (450 candidates); the others are "
+        "opt-in additions a human must explicitly request.",
+    ),
 ) -> None:
     """Per-cluster strategy research over a fixed parameter grid.
 
-    Clusters the universe by realized volatility, ranks ~450 candidates per
+    Clusters the universe by realized volatility, ranks candidates per
     cluster on the TRAIN window only, then gates the single winner on the
     holdout kill filter. Assignments are per (symbol, strategy) pair —
     symbols where nothing passes keep the default strategy.
@@ -614,10 +633,25 @@ def research_clusters(
     from datetime import datetime as _dt
 
     from bonito.research.cluster_research import (
+        ADXTrendGrid,
+        BBandsMeanRevGrid,
+        GridSpec,
+        MACDCrossGrid,
         apply_assignments,
         candidate_grid,
         run_cluster_research,
         save_report,
+    )
+
+    requested = {t.strip().lower() for t in templates.split(",") if t.strip()}
+    unknown = requested - {"ema", "adx", "macd", "bbands"}
+    if unknown:
+        console.print(f"[red]Unknown template(s): {', '.join(sorted(unknown))}[/red]")
+        raise typer.Exit(1)
+    grid = GridSpec(
+        adx=ADXTrendGrid() if "adx" in requested else None,
+        macd=MACDCrossGrid() if "macd" in requested else None,
+        bbands=BBandsMeanRevGrid() if "bbands" in requested else None,
     )
 
     universe = _load_universe(universe_path)
@@ -626,12 +660,13 @@ def research_clusters(
     holdout_dt = datetime.strptime(holdout, "%Y-%m-%d")
     end_dt = datetime.strptime(end, "%Y-%m-%d") if end else _dt.now(_UTC).replace(tzinfo=None)
 
-    n_candidates = len(candidate_grid())
+    n_candidates = len(candidate_grid(grid))
     mode = "per-symbol (singleton clusters)" if per_symbol else "per-cluster"
     console.print(
         Panel.fit(
             f"[bold blue]Strategy Research — {mode}[/bold blue]\n"
             f"Train: {start} → {holdout} | Holdout: {holdout} → {end or 'today'}\n"
+            f"Templates: {', '.join(sorted(requested))} | "
             f"{n_candidates} candidates per cluster, ranked on train, gated on holdout",
             border_style="blue",
         )
@@ -648,7 +683,14 @@ def research_clusters(
             prog.update(task, description=f"researching... {done['n']} candidates evaluated")
 
         report = run_cluster_research(
-            universe, store, start_dt, holdout_dt, end_dt, progress=tick, per_symbol=per_symbol
+            universe,
+            store,
+            start_dt,
+            holdout_dt,
+            end_dt,
+            grid=grid,
+            progress=tick,
+            per_symbol=per_symbol,
         )
 
     report_path = save_report(report)
@@ -678,6 +720,152 @@ def research_clusters(
         )
     else:
         console.print("[dim]Dry run — re-run with --apply to write assignments.[/dim]")
+
+
+@research_app.command("regime-sweep")
+def research_regime_sweep(
+    strategy_file: str = typer.Argument(..., help="Path to strategy config JSON file"),
+    symbol: str = typer.Option(None, "--symbol", "-s", help="Override strategy symbol"),
+    benchmark: str = typer.Option(
+        None,
+        "--benchmark",
+        "-b",
+        help="Buy-and-hold benchmark symbol. Default: the strategy's regime-filter "
+        "symbol (usually SPY) if it has one, else the traded symbol itself.",
+    ),
+    capital: float = typer.Option(10000.0, "--capital", "-c", help="Initial capital"),
+) -> None:
+    """Stress-test one strategy across distinct historical market regimes.
+
+    Backtests over the full available history for the symbol, then slices
+    the single result into fixed regime windows (GFC, COVID crash/recovery,
+    2022 bear, 2023-25 bull) plus full history, comparing each to a
+    buy-and-hold benchmark over the same window. A train/holdout split
+    answers "does this generalize" — this answers "does this survive a
+    crash," which a single holdout window rarely covers on its own.
+
+    Windows with few trades are flagged [low sample]: their Sharpe is not a
+    trustworthy point estimate, even if the kill filter happens to pass or
+    fail on it.
+    """
+    import json
+
+    from bonito.backtest.engine import BacktestEngine
+    from bonito.backtest.models import BacktestConfig
+    from bonito.backtest.strategy import StrategyConfig
+    from bonito.research.regime_sweep import STANDARD_REGIMES, full_history_regime, regime_report
+    from bonito.trading.live_runner import REGIME_WARMUP_DAYS
+
+    strategy_path = Path(strategy_file)
+    if not strategy_path.exists():
+        console.print(f"[red]Strategy file not found: {strategy_file}[/red]")
+        raise typer.Exit(1)
+
+    with open(strategy_path) as f:
+        strategy_data = json.load(f)
+
+    try:
+        strategy = StrategyConfig(**strategy_data)
+    except Exception as e:
+        console.print(f"[red]Invalid strategy configuration: {e}[/red]")
+        raise typer.Exit(1) from None
+
+    if symbol:
+        strategy = strategy.model_copy(update={"symbols": [symbol.upper()]})
+    target_symbol = strategy.symbols[0]
+
+    store = _get_store()
+    full_start = datetime(1990, 1, 1)
+    full_end = datetime.now()
+
+    data = store.get_bars(target_symbol, full_start, full_end, strategy.timeframe)
+    if data is None or len(data) < 50:
+        console.print(f"[red]Insufficient data for {target_symbol}[/red]")
+        raise typer.Exit(1)
+
+    regime_data = None
+    if strategy.regime_filter is not None:
+        regime_symbol = strategy.regime_filter.symbol
+        regime_start = full_start - timedelta(days=REGIME_WARMUP_DAYS)
+        regime_data = store.get_bars(regime_symbol, regime_start, full_end, strategy.timeframe)
+        if regime_data is None:
+            console.print(f"[red]No regime data found for {regime_symbol}[/red]")
+            raise typer.Exit(1)
+
+    if benchmark:
+        benchmark_symbol = benchmark.upper()
+        benchmark_data = (
+            data
+            if benchmark_symbol == target_symbol
+            else store.get_bars(benchmark_symbol, full_start, full_end, strategy.timeframe)
+        )
+    elif strategy.regime_filter is not None:
+        benchmark_symbol = strategy.regime_filter.symbol
+        benchmark_data = regime_data
+    else:
+        benchmark_symbol = target_symbol
+        benchmark_data = data
+
+    store.close()
+
+    config = BacktestConfig(
+        start_date=data.timestamps[0],
+        end_date=data.timestamps[-1],
+        initial_capital=capital,
+    )
+    engine = BacktestEngine(config)
+
+    with console.status("[bold blue]Running full-history backtest...[/bold blue]"):
+        result = engine.run(strategy, data, regime_data=regime_data)
+
+    regimes = STANDARD_REGIMES + [full_history_regime(data)]
+    rows = regime_report(result, regimes, benchmark_data=benchmark_data)
+
+    console.print(
+        Panel.fit(
+            f"[bold blue]Regime sweep — {strategy.name}[/bold blue]\n"
+            f"{target_symbol} | {data.timestamps[0]:%Y-%m-%d} → {data.timestamps[-1]:%Y-%m-%d} "
+            f"| benchmark: {benchmark_symbol} buy & hold",
+            border_style="blue",
+        )
+    )
+
+    table = Table()
+    for col in (
+        "Regime",
+        "Window",
+        "Sharpe",
+        "MaxDD%",
+        "CAGR%",
+        "Trades",
+        "Verdict",
+        "Bench CAGR%",
+    ):
+        table.add_column(col, justify="right" if col not in ("Regime", "Window") else "left")
+
+    for row in rows:
+        verdict = "PASS" if row.passed else "FAIL"
+        verdict_style = "green" if row.passed else "red"
+        regime_label = f"{row.regime} [dim](low sample)[/dim]" if row.low_sample else row.regime
+        bench_cagr = f"{row.benchmark_cagr * 100:.1f}" if row.benchmark_cagr is not None else "—"
+        table.add_row(
+            regime_label,
+            f"{row.start:%Y-%m} → {row.end:%Y-%m}",
+            f"{row.metrics.sharpe:.2f}",
+            f"{row.metrics.max_drawdown * 100:.1f}",
+            f"{row.cagr * 100:.1f}",
+            str(row.metrics.trades),
+            f"[{verdict_style}]{verdict}[/{verdict_style}]",
+            bench_cagr,
+        )
+
+    console.print(table)
+    console.print(
+        "[dim]CAGR is compound annual growth rate, not cumulative return — comparable "
+        "across windows of different lengths. (low sample) regimes have too few trades "
+        "for their Sharpe to be a trustworthy point estimate; read return/drawdown "
+        "instead.[/dim]"
+    )
 
 
 def _print_per_symbol_report(report) -> None:
@@ -1096,6 +1284,87 @@ def _print_status(ledger, prices: dict[str, float]) -> None:
         console.print(table)
 
 
+@live_app.command("performance")
+def live_performance(
+    universe_path: str = typer.Option("config/universe.json", "--universe", "-u"),
+    benchmark: str = typer.Option("SPY", "--benchmark", help="Symbol to compute alpha against"),
+    no_quotes: bool = typer.Option(
+        False, "--no-quotes", help="Skip live quote fetch; mark open positions at last close"
+    ),
+) -> None:
+    """Trailing-period performance: 1D/1W/since-inception returns, benchmark alpha, trade stats.
+
+    Reconstructs the daily equity curve from ledger fills (same source the
+    tracking gate uses), then swaps in a live mark-to-market for the final
+    point so the headline number reflects right-now prices.
+    """
+    from datetime import UTC as _UTC
+    from datetime import datetime as _dt
+
+    from bonito.data.quotes import fetch_latest_quotes
+    from bonito.trading.performance import build_performance_report
+
+    universe = _load_universe(universe_path)
+    ledger = _load_ledger(universe)
+    store = _get_store()
+
+    prices: dict[str, float] = {}
+    if not no_quotes and ledger.positions:
+        prices = fetch_latest_quotes(sorted(ledger.positions))
+
+    end = _dt.now(_UTC).replace(tzinfo=None)
+    report = build_performance_report(universe, ledger, store, prices, end, benchmark)
+
+    if not report.periods:
+        console.print("[dim]No fills yet — nothing to report.[/dim]")
+        return
+
+    table = Table(title="Trailing Performance")
+    table.add_column("Period")
+    table.add_column("Return", justify="right")
+    table.add_column(f"{benchmark}", justify="right")
+    table.add_column("Alpha", justify="right")
+    for p in report.periods:
+        bench = f"{p.benchmark_return_pct:+.2f}%" if p.benchmark_return_pct is not None else "n/a"
+        alpha = f"{p.alpha_pct:+.2f}pts" if p.alpha_pct is not None else "n/a"
+        style = "green" if p.return_pct >= 0 else "red"
+        table.add_row(p.label, f"[{style}]{p.return_pct:+.2f}%[/{style}]", bench, alpha)
+    console.print(table)
+
+    stats_bits = []
+    if report.win_rate_pct is not None:
+        stats_bits.append(f"win rate {report.win_rate_pct:.0f}%")
+    if report.profit_factor is not None:
+        stats_bits.append(f"profit factor {report.profit_factor:.2f}")
+    stats_bits.append(f"{len(report.closed_trades)} closed trade(s)")
+    console.print(
+        Panel.fit(
+            f"Equity: ${report.current_equity:,.2f} | Realized: ${report.realized_pnl:+,.2f} | "
+            f"Unrealized: ${report.unrealized_pnl:+,.2f}\n" + " | ".join(stats_bits),
+            border_style="cyan",
+        )
+    )
+
+    if report.closed_trades:
+        ct_table = Table(title="Closed Trades")
+        for col in ("Symbol", "Qty", "Entry", "Exit", "Return", "P&L", "Reason"):
+            ct_table.add_column(col, justify="right" if col != "Reason" else "left")
+        for t in report.closed_trades:
+            style = "green" if t.pnl >= 0 else "red"
+            ct_table.add_row(
+                t.symbol,
+                f"{t.quantity:.4f}",
+                f"${t.entry_price:.2f}",
+                f"${t.exit_price:.2f}",
+                f"[{style}]{t.return_pct:+.1f}%[/{style}]",
+                f"[{style}]${t.pnl:+.2f}[/{style}]",
+                t.reason[:40],
+            )
+        console.print(ct_table)
+
+    _print_status(ledger, prices)
+
+
 @live_app.command("record-fill")
 def live_record_fill(
     symbol: str = typer.Argument(...),
@@ -1103,6 +1372,9 @@ def live_record_fill(
     price: float = typer.Argument(..., help="Actual fill price from Robinhood"),
     dollar_amount: float = typer.Option(None, "--dollars", help="Notional for buys"),
     reason: str = typer.Option("live fill", "--reason"),
+    broker_order_id: str = typer.Option(
+        ..., "--broker-order-id", help="Robinhood order id from get_equity_orders"
+    ),
     universe_path: str = typer.Option("config/universe.json", "--universe", "-u"),
 ) -> None:
     """Record a real Robinhood fill into the ledger (live mode bookkeeping)."""
@@ -1113,6 +1385,14 @@ def live_record_fill(
     from bonito.trading.signals import TradeIntent
 
     universe = _load_universe(universe_path)
+
+    if universe.mode == "paper":
+        console.print(
+            "[red]record-fill is live-mode bookkeeping; paper fills are produced "
+            "automatically by `bonito live run`.[/red]"
+        )
+        raise typer.Exit(1)
+
     ledger = _load_ledger(universe)
     symbol = symbol.upper()
 
@@ -1130,6 +1410,7 @@ def live_record_fill(
         signal_price=price,
         signal_date=_dt.now(_UTC),
         strategy_name="live",
+        broker_order_id=broker_order_id,
     )
     strategies = {symbol: universe.load_strategy_for(symbol)} if side == "buy" else None
     fills, errors = execute_paper(ledger, [intent], {symbol: price}, strategies=strategies)
@@ -1168,7 +1449,7 @@ def live_resume(
         console.print("[dim]Ledger is not halted.[/dim]")
         return
     reason = ledger.halt_reason
-    ledger.resume()
+    ledger.resume(confirm=True)
     ledger.save()
     console.print(f"[green]Halt cleared[/green] (was: {reason})")
 

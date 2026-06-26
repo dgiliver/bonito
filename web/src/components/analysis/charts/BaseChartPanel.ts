@@ -11,6 +11,7 @@
 import type {
   IChartApi,
   ISeriesApi,
+  SeriesType,
   Time,
   MouseEventParams,
   LogicalRange,
@@ -40,7 +41,29 @@ export type TimeRangeChangeCallback = (
   sourcePanel: string,
 ) => void;
 
-export abstract class BaseChartPanel {
+/**
+ * Minimal structural shape of a lightweight-charts series data point as seen
+ * from `MouseEventParams.seriesData` - candlestick/area points expose
+ * `close`, line/histogram points expose `value`.
+ */
+interface SeriesDataPoint {
+  close?: number;
+  value?: number;
+}
+
+/**
+ * BaseChartPanel is generic over each subclass's actual data/value/legend
+ * shapes so abstract method signatures can be precisely typed instead of
+ * `any`, without forcing every panel into a shared shape they don't use:
+ * - TData: the parameter shape `updateData` accepts (e.g. PanelIndicatorData[])
+ * - TCrosshairValue: the return shape of `getCrosshairValue`
+ * - TLegendData: the return shape of `getLegendData` (must include `time`)
+ */
+export abstract class BaseChartPanel<
+  TData = unknown,
+  TCrosshairValue = unknown,
+  TLegendData extends { time: Time | null } = { time: Time | null },
+> {
   protected chart: IChartApi | null = null;
   protected container: HTMLDivElement | null = null;
   protected panelId: string;
@@ -127,28 +150,6 @@ export abstract class BaseChartPanel {
 
     this.chart = createChart(container, mergedOptions);
 
-    // #region agent log
-    const actualMode = this.chart.options().crosshair?.mode;
-    fetch("http://127.0.0.1:7242/ingest/3d78da6f-49c7-481a-bafb-b1cb31305326", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        location: "BaseChartPanel.ts:initialize",
-        message: "Chart created with crosshair mode",
-        data: {
-          panelId: this.panelId,
-          crosshairMode: actualMode,
-          expectedNormal: 0,
-          containerWidth: container.clientWidth,
-          containerHeight: container.clientHeight,
-        },
-        timestamp: Date.now(),
-        sessionId: "debug-session",
-        hypothesisId: "H57",
-      }),
-    }).catch(() => {});
-    // #endregion
-
     // Setup synchronization listeners
     this.setupSyncListeners();
 
@@ -176,7 +177,7 @@ export abstract class BaseChartPanel {
       if (param.seriesData && param.seriesData.size > 0) {
         const firstSeries = param.seriesData.entries().next().value;
         if (firstSeries && firstSeries[1]) {
-          const data = firstSeries[1] as any;
+          const data = firstSeries[1] as SeriesDataPoint;
           crosshairData.price = data.close ?? data.value ?? null;
         }
       }
@@ -217,19 +218,9 @@ export abstract class BaseChartPanel {
    */
   setCrosshairMode(mode: CrosshairMode): void {
     if (!this.chart) return;
-    console.log(
-      "[DEBUG] setCrosshairMode called:",
-      this.panelId,
-      "mode:",
-      mode,
-      "Normal=0, Magnet=1",
-    );
     this.chart.applyOptions({
       crosshair: { mode },
     });
-    // Verify the mode was applied
-    const appliedMode = this.chart.options().crosshair?.mode;
-    console.log("[DEBUG] crosshair mode after apply:", appliedMode);
   }
 
   /**
@@ -281,29 +272,6 @@ export abstract class BaseChartPanel {
         try {
           // Find this panel's value at the given time (not the source panel's price!)
           const localValue = this.getValueAtTime(data.time);
-
-          // #region agent log
-          fetch(
-            "http://127.0.0.1:7242/ingest/3d78da6f-49c7-481a-bafb-b1cb31305326",
-            {
-              method: "POST",
-              headers: { "Content-Type": "application/json" },
-              body: JSON.stringify({
-                location: "BaseChartPanel.ts:syncCrosshair",
-                message: "Syncing crosshair with local value",
-                data: {
-                  panelId: this.panelId,
-                  time: data.time,
-                  sourcePrice: data.price,
-                  localValue,
-                },
-                timestamp: Date.now(),
-                sessionId: "debug-session",
-                hypothesisId: "H55",
-              }),
-            },
-          ).catch(() => {});
-          // #endregion
 
           if (localValue !== null) {
             this.chart.setCrosshairPosition(localValue, data.time, series);
@@ -430,24 +398,23 @@ export abstract class BaseChartPanel {
   /**
    * Get the main series for this panel (used for crosshair sync)
    */
-  abstract getMainSeries(): ISeriesApi<any> | null;
+  abstract getMainSeries(): ISeriesApi<SeriesType> | null;
 
   /**
    * Update the panel with new data
    */
-  abstract updateData(data: any): void;
+  abstract updateData(data: TData): void;
 
   /**
    * Get the current value at the crosshair position
    */
-  abstract getCrosshairValue(time: Time): any;
+  abstract getCrosshairValue(time: Time): TCrosshairValue;
 
   /**
    * Get legend data for display
    * Returns an object with panel-specific legend information
    */
-  abstract getLegendData(time: Time): any;
+  abstract getLegendData(time: Time): TLegendData;
 }
 
-export default BaseChartPanel;
 export { CrosshairMode };

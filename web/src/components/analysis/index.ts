@@ -1,5 +1,4 @@
-export { default as AnalysisView } from "./AnalysisView";
-export { default as IntelligentChart } from "./IntelligentChart";
+export { AnalysisView } from "./AnalysisView";
 export {
   AnalysisProvider,
   useAnalysis,

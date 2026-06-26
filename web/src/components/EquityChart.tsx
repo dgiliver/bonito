@@ -29,7 +29,7 @@ interface EquityChartProps {
   showBenchmark?: boolean;
 }
 
-export default function EquityChart({
+export function EquityChart({
   data,
   initialCapital,
   symbol = "Stock",

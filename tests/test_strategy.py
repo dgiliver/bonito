@@ -370,6 +370,95 @@ class TestStrategyFromJSON:
         assert config.position_size.value == 25
 
 
+class TestStrEnumSerializationStability:
+    """Regression test for the (str, Enum) -> enum.StrEnum migration (P2-2,
+    commit 69cecbd, Phase 2 Decision #2).
+
+    StrEnum members format identically to plain str via str()/f-strings
+    ("sma", not the legacy (str, Enum) default of "IndicatorType.SMA"), but
+    nothing structurally prevents a future regression if code starts relying
+    on str(member) instead of member.value. This test builds a StrategyConfig
+    that exercises all 5 strategy.py enums (IndicatorType, Comparison,
+    PositionSizeType, StopLossType, TakeProfitType) and asserts the actual
+    JSON payload contains the plain .value strings, not "ClassName.MEMBER".
+    """
+
+    def _build_strategy(self) -> StrategyConfig:
+        return StrategyConfig(
+            name="strenum_stability_test",
+            symbols=["SPY"],
+            indicators=[
+                IndicatorConfig(type=IndicatorType.RSI, name="rsi_14", params={"period": 14})
+            ],
+            entry_rules=[
+                Rule(conditions=[RuleCondition(left="rsi_14", comparison=Comparison.LT, right=30)])
+            ],
+            exit_rules=[
+                Rule(conditions=[RuleCondition(left="rsi_14", comparison=Comparison.GT, right=70)])
+            ],
+            position_size=PositionSizeConfig(type=PositionSizeType.PERCENT_EQUITY, value=10),
+            stop_loss=StopLossConfig(type=StopLossType.TRAILING_PERCENT, value=0.05),
+            take_profit=TakeProfitConfig(type=TakeProfitType.RISK_MULTIPLE, value=2.0),
+        )
+
+    def test_json_contains_plain_enum_values_not_class_qualified_names(self):
+        """The actual regression StrEnum migration could silently break: if
+        any code relied on str(member)'s old (str, Enum) format, the JSON
+        would contain "IndicatorType.RSI" instead of "rsi". Assert the plain
+        values are present and the legacy qualified format is absent."""
+        config = self._build_strategy()
+        json_str = config.model_dump_json()
+
+        # Plain .value strings for every enum instance used above.
+        assert '"type":"rsi"' in json_str
+        assert '"comparison":"lt"' in json_str
+        assert '"comparison":"gt"' in json_str
+        assert '"type":"percent_equity"' in json_str
+        assert '"type":"trailing_percent"' in json_str
+        assert '"type":"risk_multiple"' in json_str
+
+        # The legacy (str, Enum) str() format must never appear.
+        assert "IndicatorType." not in json_str
+        assert "Comparison." not in json_str
+        assert "PositionSizeType." not in json_str
+        assert "StopLossType." not in json_str
+        assert "TakeProfitType." not in json_str
+
+    def test_strategy_hash_is_stable_and_value_based(self):
+        """strategy_hash() (bonito.trading.validation) hashes model_dump_json()
+        output directly — confirm it's deterministic and built from the same
+        plain-value JSON, not affected by enum repr/str differences."""
+        from bonito.trading.validation import strategy_hash
+
+        config = self._build_strategy()
+        h1 = strategy_hash(config)
+        h2 = strategy_hash(config)
+        assert h1 == h2
+        assert len(h1) == 12
+
+        # Re-building an equivalent config (fresh enum instances) must hash
+        # identically - the hash is content-based, not identity-based.
+        rebuilt = self._build_strategy()
+        assert strategy_hash(rebuilt) == h1
+
+    def test_round_trip_preserves_enum_values_through_json(self):
+        """Full round-trip: serialize all 5 enums, reload, confirm equality
+        and that reloaded fields are still usable as their StrEnum members
+        (not raw strings that merely look right)."""
+        config = self._build_strategy()
+        reloaded = StrategyConfig.model_validate_json(config.model_dump_json())
+
+        assert reloaded.indicators[0].type == IndicatorType.RSI
+        assert reloaded.entry_rules[0].conditions[0].comparison == Comparison.LT
+        assert reloaded.exit_rules[0].conditions[0].comparison == Comparison.GT
+        assert reloaded.position_size.type == PositionSizeType.PERCENT_EQUITY
+        assert reloaded.stop_loss.type == StopLossType.TRAILING_PERCENT
+        assert reloaded.take_profit.type == TakeProfitType.RISK_MULTIPLE
+
+        # Byte-identical re-serialization (the actual "stability" claim).
+        assert reloaded.model_dump_json() == config.model_dump_json()
+
+
 class TestToPromptDescription:
     """Tests for to_prompt_description method."""
 

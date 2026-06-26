@@ -1,0 +1,24 @@
+{
+  "name": "bear-market-stress-test",
+  "description": "Long-history symbols used to stress-test the deployed strategy through historic bear markets (dot-com, GFC, COVID crash, 2022). Not a trading universe — analysis only.",
+  "broker": "none",
+  "mode": "paper",
+  "live_enabled": false,
+  "symbols": [
+    "SPY",
+    "QQQ",
+    "AAPL",
+    "MSFT",
+    "AMZN",
+    "INTC",
+    "COST"
+  ],
+  "strategy_path": "strategies/deployed_strategy.json",
+  "data": {
+    "timeframe": "1d",
+    "start_date": "1993-01-01"
+  },
+  "risk": {
+    "starting_cash_usd": 100000.0
+  }
+}

@@ -56,7 +56,7 @@ const navItems = [
   { id: "data" as const, label: "Data", icon: Database, description: "Manage" },
 ];
 
-export default function Sidebar({
+export function Sidebar({
   currentView,
   onViewChange,
   collapsed,

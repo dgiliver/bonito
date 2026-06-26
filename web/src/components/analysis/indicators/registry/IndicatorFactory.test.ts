@@ -5,7 +5,7 @@
  */
 
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import IndicatorFactory from "./IndicatorFactory";
+import { IndicatorFactory } from "./IndicatorFactory";
 import { OverlayIndicator } from "../base/OverlayIndicator";
 import { PanelIndicator } from "../base/PanelIndicator";
 import type { IndicatorConfig } from "@/contexts/AnalysisContext";

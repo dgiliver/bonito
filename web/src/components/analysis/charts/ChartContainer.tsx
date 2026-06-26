@@ -28,22 +28,43 @@ import {
   PriceChartData,
   PriceChartLegendData,
 } from "./PriceChartPanel";
-import type { CrosshairData } from "./BaseChartPanel";
+import type {
+  CrosshairData,
+  CrosshairMoveCallback,
+  TimeRangeChangeCallback,
+} from "./BaseChartPanel";
 import { CrosshairSync } from "./sync/CrosshairSync";
 import { TimeAxisSync } from "./sync/TimeAxisSync";
-import { RSIPanel, RSIPanelRef } from "../panels/RSIPanel";
-import { MACDPanel, MACDPanelRef, MACDLegendData } from "../panels/MACDPanel";
+import { RSIPanel, RSIPanelRef, RSIPanelConfig } from "../panels/RSIPanel";
+import {
+  MACDPanel,
+  MACDPanelRef,
+  MACDLegendData,
+  MACDPanelConfig,
+} from "../panels/MACDPanel";
 import {
   StochasticPanel,
   StochasticPanelRef,
   StochasticLegendData,
+  StochasticPanelConfig,
 } from "../panels/StochasticPanel";
 import type { PanelLegendData } from "./PanelChartPanel";
 
 // Types
 export interface ActivePanel {
   type: "rsi" | "macd" | "stoch" | "adx" | "atr";
-  config?: any;
+  // ADX/ATR don't have dedicated panel components or config types yet
+  // (see ChartContainer's panel switch below, which falls through to null
+  // for those types) - config is unused until those panels are implemented.
+  // Record<string, number | string> covers the generic agent/UI-driven
+  // indicator params shape (IndicatorConfig.params in AnalysisContext) -
+  // callers building ActivePanel from live indicator state pass that
+  // generic shape rather than one of the three typed config interfaces.
+  config?:
+    | RSIPanelConfig
+    | MACDPanelConfig
+    | StochasticPanelConfig
+    | Record<string, number | string>;
 }
 
 export interface ChartContainerProps {
@@ -83,7 +104,9 @@ export interface ChartContainerRef {
   setTimeRange: (range: LogicalRange) => void;
   resize: (width: number, height: number) => void;
   getPriceChart: () => PriceChartPanelRef | null;
-  getPanel: (type: string) => any;
+  getPanel: (
+    type: string,
+  ) => RSIPanelRef | MACDPanelRef | StochasticPanelRef | null;
   setSnapToPrice: (snap: boolean) => void;
 }
 
@@ -168,19 +191,8 @@ export const ChartContainer = forwardRef<
 
   // Update price chart crosshair mode when snapToPrice changes
   useEffect(() => {
-    console.log(
-      "[DEBUG] snapToPrice effect triggered:",
-      snapToPrice,
-      "priceChartRef exists:",
-      !!priceChartRef.current,
-    );
     if (priceChartRef.current) {
       const mode = snapToPrice ? CrosshairMode.Magnet : CrosshairMode.Normal;
-      console.log(
-        "[DEBUG] Calling setCrosshairMode with mode:",
-        mode,
-        "(Magnet=1, Normal=0)",
-      );
       priceChartRef.current.setCrosshairMode(mode);
     }
   }, [snapToPrice]);
@@ -260,7 +272,7 @@ export const ChartContainer = forwardRef<
         priceChart.syncCrosshair(data);
       },
       clearCrosshair: () => priceChart.getChart()?.clearCrosshairPosition(),
-      setOnCrosshairMove: (callback: any) =>
+      setOnCrosshairMove: (callback: CrosshairMoveCallback) =>
         priceChart.setOnCrosshairMove(callback),
     };
 
@@ -271,7 +283,7 @@ export const ChartContainer = forwardRef<
       },
       getVisibleTimeRange: () =>
         priceChart.getChart()?.timeScale().getVisibleLogicalRange() ?? null,
-      setOnTimeRangeChange: (callback: any) =>
+      setOnTimeRangeChange: (callback: TimeRangeChangeCallback) =>
         priceChart.setOnTimeRangeChange(callback),
       fitContent: () => priceChart.fitContent(),
     };
@@ -321,7 +333,7 @@ export const ChartContainer = forwardRef<
         rsiPanel.syncCrosshair(data);
       },
       clearCrosshair: () => rsiPanel.getChart()?.clearCrosshairPosition(),
-      setOnCrosshairMove: (callback: any) =>
+      setOnCrosshairMove: (callback: CrosshairMoveCallback) =>
         rsiPanel.setOnCrosshairMove(callback),
     };
 
@@ -332,7 +344,7 @@ export const ChartContainer = forwardRef<
       },
       getVisibleTimeRange: () =>
         rsiPanel.getChart()?.timeScale().getVisibleLogicalRange() ?? null,
-      setOnTimeRangeChange: (callback: any) =>
+      setOnTimeRangeChange: (callback: TimeRangeChangeCallback) =>
         rsiPanel.setOnTimeRangeChange(callback),
       fitContent: () => rsiPanel.fitContent(),
     };
@@ -378,7 +390,7 @@ export const ChartContainer = forwardRef<
         macdPanel.syncCrosshair(data);
       },
       clearCrosshair: () => macdPanel.getChart()?.clearCrosshairPosition(),
-      setOnCrosshairMove: (callback: any) =>
+      setOnCrosshairMove: (callback: CrosshairMoveCallback) =>
         macdPanel.setOnCrosshairMove(callback),
     };
 
@@ -389,7 +401,7 @@ export const ChartContainer = forwardRef<
       },
       getVisibleTimeRange: () =>
         macdPanel.getChart()?.timeScale().getVisibleLogicalRange() ?? null,
-      setOnTimeRangeChange: (callback: any) =>
+      setOnTimeRangeChange: (callback: TimeRangeChangeCallback) =>
         macdPanel.setOnTimeRangeChange(callback),
       fitContent: () => macdPanel.fitContent(),
     };
@@ -435,7 +447,7 @@ export const ChartContainer = forwardRef<
         stochPanel.syncCrosshair(data);
       },
       clearCrosshair: () => stochPanel.getChart()?.clearCrosshairPosition(),
-      setOnCrosshairMove: (callback: any) =>
+      setOnCrosshairMove: (callback: CrosshairMoveCallback) =>
         stochPanel.setOnCrosshairMove(callback),
     };
 
@@ -446,7 +458,7 @@ export const ChartContainer = forwardRef<
       },
       getVisibleTimeRange: () =>
         stochPanel.getChart()?.timeScale().getVisibleLogicalRange() ?? null,
-      setOnTimeRangeChange: (callback: any) =>
+      setOnTimeRangeChange: (callback: TimeRangeChangeCallback) =>
         stochPanel.setOnTimeRangeChange(callback),
       fitContent: () => stochPanel.fitContent(),
     };
@@ -603,7 +615,7 @@ export const ChartContainer = forwardRef<
                 key="rsi"
                 ref={rsiPanelRef}
                 height={panelHeight}
-                config={panel.config}
+                config={panel.config as RSIPanelConfig | undefined}
                 showTimeScale={showTimeScale}
               />
             );
@@ -613,7 +625,7 @@ export const ChartContainer = forwardRef<
                 key="macd"
                 ref={macdPanelRef}
                 height={panelHeight}
-                config={panel.config}
+                config={panel.config as MACDPanelConfig | undefined}
                 showTimeScale={showTimeScale}
               />
             );
@@ -623,7 +635,7 @@ export const ChartContainer = forwardRef<
                 key="stoch"
                 ref={stochPanelRef}
                 height={panelHeight}
-                config={panel.config}
+                config={panel.config as StochasticPanelConfig | undefined}
                 showTimeScale={showTimeScale}
               />
             );
@@ -634,5 +646,3 @@ export const ChartContainer = forwardRef<
     </div>
   );
 });
-
-export default ChartContainer;

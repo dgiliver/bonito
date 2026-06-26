@@ -29,7 +29,7 @@ vi.mock("lightweight-charts", () => ({
   HistogramSeries: {},
 }));
 
-import AdvancedChart from "./AdvancedChart";
+import { AdvancedChart } from "./AdvancedChart";
 
 // Mock fetch
 const mockOHLCVData = {
