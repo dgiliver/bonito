@@ -2,7 +2,7 @@
  * IndicatorFactory - Factory pattern for creating indicator instances
  *
  * Maps indicator types to their corresponding classes.
- * This allows IntelligentChart to create indicators without knowing
+ * This allows IntelligentChartV2 to create indicators without knowing
  * the specific class implementations.
  */
 
