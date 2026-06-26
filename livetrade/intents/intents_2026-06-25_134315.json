@@ -1,0 +1,24 @@
+[
+  {
+    "symbol": "MU",
+    "side": "sell",
+    "dollar_amount": null,
+    "quantity": 0.6675568125062141,
+    "reason": "take profit triggered (intraday)",
+    "signal_price": 1221.9599609375,
+    "signal_date": "2026-06-25T13:43:15.445617Z",
+    "strategy_name": "ema_cross_rsi_atr_regime",
+    "generated_at": "2026-06-25T13:43:15.445805Z"
+  },
+  {
+    "symbol": "SNDK",
+    "side": "sell",
+    "dollar_amount": null,
+    "quantity": 0.32310417173576716,
+    "reason": "take profit triggered (intraday)",
+    "signal_price": 2258.39990234375,
+    "signal_date": "2026-06-25T13:43:15.445617Z",
+    "strategy_name": "ema_cross_rsi_atr_regime",
+    "generated_at": "2026-06-25T13:43:15.445835Z"
+  }
+]

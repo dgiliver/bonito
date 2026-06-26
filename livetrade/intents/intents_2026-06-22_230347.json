@@ -1,0 +1,35 @@
+[
+  {
+    "symbol": "HOOD",
+    "side": "buy",
+    "dollar_amount": 750.57,
+    "quantity": null,
+    "reason": "entry rule matched: ema_fast gt ema_slow, close gt ema_slow, rsi_14 lt 68.0",
+    "signal_price": 105.70999908447266,
+    "signal_date": "2026-06-22T04:00:00",
+    "strategy_name": "ema_cross_rsi_atr_regime",
+    "generated_at": "2026-06-22T23:03:47.921010Z"
+  },
+  {
+    "symbol": "TE",
+    "side": "buy",
+    "dollar_amount": 750.57,
+    "quantity": null,
+    "reason": "entry rule matched: ema_fast gt ema_slow, close gt ema_slow, rsi_14 lt 68.0",
+    "signal_price": 10.399999618530273,
+    "signal_date": "2026-06-22T04:00:00",
+    "strategy_name": "ema_cross_rsi_atr_regime",
+    "generated_at": "2026-06-22T23:03:47.946802Z"
+  },
+  {
+    "symbol": "TSM",
+    "side": "buy",
+    "dollar_amount": 750.57,
+    "quantity": null,
+    "reason": "entry rule matched: ema_fast gt ema_slow, close gt ema_slow, rsi_14 lt 68.0",
+    "signal_price": 467.6700134277344,
+    "signal_date": "2026-06-22T04:00:00",
+    "strategy_name": "ema_cross_rsi_atr_regime",
+    "generated_at": "2026-06-22T23:03:47.951945Z"
+  }
+]
