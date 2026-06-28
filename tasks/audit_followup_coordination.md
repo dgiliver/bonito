@@ -72,8 +72,8 @@ worth a rigorous pass (full audit: `scratchpad/BACKTEST_AUDIT.md`, reproducers
 
 | ID | Role | Task | Status | Result |
 |----|------|------|--------|--------|
-| A-1 | Planner | Experiment design for Q1 (regime A/B, account-level, pre-registered criterion) + Q2 (leakage scramble/shift design, null + threshold); file:line-exact | architect | dispatched | |
-| A-2 | Builder | Run Q1 comparison; build+run Q2 leakage harness; fix root cause if Q2 leaks | backend-dev | pending | |
+| A-1 | Planner | Experiment design for Q1 (regime A/B, account-level, pre-registered criterion) + Q2 (leakage scramble/shift design, null + threshold); file:line-exact | architect | done | Build-ready design delivered. Key calls: **Q1 must use the live/replay regime path** (`backtest_account`→`generate_intents`→`_regime_allows`→`signals.regime_allows_long`), NOT the engine's `_compute_regime_mask` the audit used — so the audit's 1.73-vs-1.53 number does NOT transfer; the account comparison stands alone. Account window is fixed 2022-01-03→2026-06-22 (universe data start) so the only account-level bear is 2022 (central confound, biases criterion toward "retain" on ties). Pre-registered Q1 criterion written verbatim (retain if Sharpe_ON≥OFF on both train+holdout, OR DD≥5pp lower on Full/Bear-2022 with ≤20pp return give-up; kill-switch safety override; one-shot, no variant-shopping). Q2: timing contract pinned (signals read bar i-1, fills opens[i], stops/TP same-bar closes[i]); tests A (future-truncation), B (future-scramble incl. gated-regime variant), C (stop/TP same-bar honesty) + per-indicator forward-window check; shuffle (D) scoped out as invalid; thresholds 0 divergences @ rtol=1e-12. Orchestrator independently confirmed the two linchpins (live regime path; backtest-account CLI flags). |
+| A-2 | Builder | Run Q1 comparison; build+run Q2 leakage harness; fix root cause if Q2 leaks | backend-dev | dispatched | |
 | A-3 | Tester | Q2 leakage probe → permanent non-vacuous regression test; test any fix | tdd-developer | pending | |
 | A-4 | Validator | Independently re-run both; verify criterion honored, tests non-vacuous, no live-config touch; PASS/FAIL | code-reviewer | pending | |
 
@@ -84,3 +84,22 @@ worth a rigorous pass (full audit: `scratchpad/BACKTEST_AUDIT.md`, reproducers
   scoped to Q1 (regime-filter value) + Q2 (look-ahead leakage proof), with
   live-config changes explicitly out of scope (recommendation only). Dispatching
   Planner (A-1).
+- Planner (A-1) done. Two findings beyond the brief: (1) **Q1's regime path ≠
+  the audit's.** The account replay uses `signals.regime_allows_long` (latest-
+  bar trailing mean), while the audit's `noregime` win came from the engine's
+  `_compute_regime_mask` (searchsorted over a convolved SMA) on single symbols —
+  different code, doesn't transfer. Q1 therefore stands on its own account-level
+  comparison, and the Builder must NOT cite the audit's 1.73-vs-1.53 as the
+  expected result. (2) **Only one account-level bear (2022)** exists (universe
+  data starts 2022-01-03), so the gate's whole thesis is tested on a single
+  drawdown — the pre-registered criterion deliberately biases toward "retain" on
+  ties because removing a safety gate needs strong evidence. Also surfaced: the
+  deployed strategy's description validates the EXIT rule (2026-06-12), NOT the
+  regime gate — so Q1 is genuinely un-pre-registered and open.
+- Orchestrator independently verified the two load-bearing claims before
+  dispatching the Builder: (a) `_regime_allows` → `signals.regime_allows_long`
+  and `_compute_regime_mask` is confined to `engine.py` (so the account replay
+  genuinely exercises the production regime path); (b) `bonito live
+  backtest-account` exposes `-u/--start/--end/--holdout/--intraday-stops`
+  exactly as the harness needs. Both confirmed. Dispatching Builder (A-2) with
+  the full plan embedded.
