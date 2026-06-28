@@ -73,8 +73,8 @@ worth a rigorous pass (full audit: `scratchpad/BACKTEST_AUDIT.md`, reproducers
 | ID | Role | Task | Status | Result |
 |----|------|------|--------|--------|
 | A-1 | Planner | Experiment design for Q1 (regime A/B, account-level, pre-registered criterion) + Q2 (leakage scramble/shift design, null + threshold); file:line-exact | architect | done | Build-ready design delivered. Key calls: **Q1 must use the live/replay regime path** (`backtest_account`→`generate_intents`→`_regime_allows`→`signals.regime_allows_long`), NOT the engine's `_compute_regime_mask` the audit used — so the audit's 1.73-vs-1.53 number does NOT transfer; the account comparison stands alone. Account window is fixed 2022-01-03→2026-06-22 (universe data start) so the only account-level bear is 2022 (central confound, biases criterion toward "retain" on ties). Pre-registered Q1 criterion written verbatim (retain if Sharpe_ON≥OFF on both train+holdout, OR DD≥5pp lower on Full/Bear-2022 with ≤20pp return give-up; kill-switch safety override; one-shot, no variant-shopping). Q2: timing contract pinned (signals read bar i-1, fills opens[i], stops/TP same-bar closes[i]); tests A (future-truncation), B (future-scramble incl. gated-regime variant), C (stop/TP same-bar honesty) + per-indicator forward-window check; shuffle (D) scoped out as invalid; thresholds 0 divergences @ rtol=1e-12. Orchestrator independently confirmed the two linchpins (live regime path; backtest-account CLI flags). |
-| A-2 | Builder | Run Q1 comparison; build+run Q2 leakage harness; fix root cause if Q2 leaks | backend-dev | dispatched | |
-| A-3 | Tester | Q2 leakage probe → permanent non-vacuous regression test; test any fix | tdd-developer | pending | |
+| A-2 | Builder | Run Q1 comparison; build+run Q2 leakage harness; fix root cause if Q2 leaks | backend-dev | done | **Q1 → RETAIN (overturns the audit's tentative "regime may be costing you").** Account replay 2022-01-03→2026-06-22: regime-**OFF** trips the 25% kill switch on 2022-12-22 (−19.5%, Sharpe −0.38) and never trades again; regime-**ON** never halts (+485%, Sharpe 1.63, DD 21.6%). Pre-registered criterion fires RETAIN three ways: safety override (OFF halts, ON doesn't) + (R) Sharpe_ON≥OFF on train+holdout + (D) ≥5pp lower Bear-2022 DD. Orchestrator verified halt status + setup integrity (OFF differs only in regime_filter/name) directly from result JSONs. The per-symbol audit missed this because it has no account-level kill switch / portfolio concentration and uses the engine regime path. Draft EXPERIMENT_LOG entry produced (not appended — human-only). **Q2 → PASS, 0 leaks.** 11 sub-checks (truncation/scramble/gated-regime/stop-TP/indicator) on synthetic + real SPY, 0 divergences, worst fill delta 0.0, no `src/` fix needed. Builder found+fixed a bug in the *probe* (Test B over-asserted: an exit decided after the scramble split legitimately depends on post-split bars; entry-at-227 was unchanged = the leak-relevant check passed) — diagnosis sound; Tester's leak-injection will confirm non-vacuity. No human-only file touched (git clean). |
+| A-3 | Tester | Q2 leakage probe → permanent non-vacuous regression test; test any fix | tdd-developer | dispatched | |
 | A-4 | Validator | Independently re-run both; verify criterion honored, tests non-vacuous, no live-config touch; PASS/FAIL | code-reviewer | pending | |
 
 ## Run log
@@ -103,3 +103,20 @@ worth a rigorous pass (full audit: `scratchpad/BACKTEST_AUDIT.md`, reproducers
   backtest-account` exposes `-u/--start/--end/--holdout/--intraday-stops`
   exactly as the harness needs. Both confirmed. Dispatching Builder (A-2) with
   the full plan embedded.
+- Builder (A-2) done. **Headline: the audit's surface finding was wrong at the
+  level that matters.** The per-symbol audit suggested the regime gate might be
+  costing return; the account-level replay (the actual live pipeline) shows the
+  opposite — without the gate the account over-commits into the 2022 bear,
+  trips the 25% kill switch (2022-12-22), and is dead for the rest of the
+  window (0 holdout trades), while the gated account survives and compounds to
+  +485%. Both finding and reason are clear: per-symbol backtests have no
+  portfolio kill switch and use a different regime code path. Verdict RETAIN,
+  triply-supported (safety override + (R) + (D)). Q2: engine proven leak-free
+  (0 divergences across 11 stress checks on synthetic + real data); the only
+  bugs were in the probe itself (an `AttributeError`, and a Test-B over-
+  assertion that an exit decided *after* the scramble split should be
+  invariant — it shouldn't, and the Builder correctly split entry/exit into
+  independent decision points). Orchestrator independently re-confirmed the
+  kill-switch result, the single-variable setup integrity, and that no human-
+  only file was touched, before accepting. Dispatching Tester (A-3) to lift the
+  probe into a permanent, deterministic, NON-VACUOUS `tests/test_lookahead.py`.
