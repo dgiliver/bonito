@@ -70,8 +70,8 @@ holdout 2025-01-01, intraday-stops ON):
 | ID | Role | Task | Status | Result |
 |----|------|------|--------|--------|
 | B-1 | Planner | Design Q4 + pre-register; spec Q3 re-validation; draft EXPERIMENT_LOG/lessons text | architect | done | 3-arm Q4 (status-quo / GOOGL→default / GOOGL→blocklist), pre-registered criterion (bench only if an arm beats status-quo Sharpe by >0.05 on BOTH train+holdout; else inconclusive→keep; kill-switch override). **Load-bearing correction (orchestrator-verified):** the anticipated "arm-b re-introduces a regime gate" confound is FALSE — deployed, cluster_GOOGL, cluster_AAPL and iren ALL carry the identical SPY-200 regime_filter, so arm (b) is a clean params-vs-params test. Builder must write the corrected note, not the anticipated caveat. Q3 re-validation spec'd (incl. the Q1=Q3-ON determinism cross-check). Verbatim EXPERIMENT_LOG (Q1 + Q3 as Rejected-table rows = "rejecting the removal") and lessons.md (account-vs-per-symbol meta-lesson) drafts produced. |
-| B-2 | Builder | Run Q4; write EXPERIMENT_LOG.md + lessons.md entries | backend-dev | dispatched | |
-| B-3 | Tester | Account-replay determinism + live-strategy-load regression tests | tdd-developer | pending | |
+| B-2 | Builder | Run Q4; write EXPERIMENT_LOG.md + lessons.md entries | backend-dev | done | **Q4 → INCONCLUSIVE → keep GOOGL→cluster_GOOGL (status quo)**, as pre-registered. 3 arms, none halt: (a) status-quo train 1.0421/holdout 2.5015; (b) GOOGL→default 0.9552/2.6181 (helps holdout +0.12, hurts train −0.09); (c) GOOGL→blocklist 1.0886/2.4988 (helps train +0.05, flat holdout −0.003). Neither alt clears the 0.05 floor on BOTH windows → no change. (Nice account-vs-per-symbol echo: GOOGL-alone P&L is *better* under default $485 vs $196, yet the account's train Sharpe drops.) Arm (a) reproduces Q3 ON to 1e-15 (determinism anchor). EXPERIMENT_LOG.md: 2 Rejected-table rows (Q1 regime, Q3 overrides w/ Q4 verdict). lessons.md: account-vs-per-symbol meta-lesson. Suite 837 passed; config/strategies untouched. Orchestrator verified the verdict from results.json + reviewed the doc diffs directly. |
+| B-3 | Tester | Account-replay determinism + live-strategy-load regression tests | tdd-developer | dispatched | |
 | B-4 | Validator | Independently re-run Q3+Q4; verify docs + tests; PASS/FAIL | code-reviewer | pending | |
 
 ## Run log
@@ -92,3 +92,13 @@ holdout 2025-01-01, intraday-stops ON):
   carry the same SPY-200 regime_filter, so arm (b) has no gate confound. Also
   confirmed `entry_blocklist` is a real entry-gating field (arm (c) valid).
   Dispatching Builder (B-2) with the full plan + the corrected note.
+- Builder (B-2) done. Q4 verdict INCONCLUSIVE → keep status quo (pre-registered
+  criterion held; neither GOOGL→default nor GOOGL→blocklist cleared the 0.05
+  Sharpe floor on both windows). Wrote the two EXPERIMENT_LOG rows + the
+  lessons.md meta-lesson; live config/strategies untouched; suite green. The
+  account-vs-per-symbol pattern recurred a *fourth* time within Q4 itself:
+  GOOGL→default earns more on GOOGL alone ($485 vs $196) yet lowers account
+  train Sharpe. Orchestrator independently confirmed the verdict from
+  results.json (arms a/b/c Sharpes + the INCONCLUSIVE string) and reviewed the
+  EXPERIMENT_LOG/lessons diffs directly (accurate, format-matching, the Q1
+  precision nuance present). Committed the docs. Dispatching Tester (B-3).
