@@ -72,7 +72,7 @@ holdout 2025-01-01, intraday-stops ON):
 | B-1 | Planner | Design Q4 + pre-register; spec Q3 re-validation; draft EXPERIMENT_LOG/lessons text | architect | done | 3-arm Q4 (status-quo / GOOGL→default / GOOGL→blocklist), pre-registered criterion (bench only if an arm beats status-quo Sharpe by >0.05 on BOTH train+holdout; else inconclusive→keep; kill-switch override). **Load-bearing correction (orchestrator-verified):** the anticipated "arm-b re-introduces a regime gate" confound is FALSE — deployed, cluster_GOOGL, cluster_AAPL and iren ALL carry the identical SPY-200 regime_filter, so arm (b) is a clean params-vs-params test. Builder must write the corrected note, not the anticipated caveat. Q3 re-validation spec'd (incl. the Q1=Q3-ON determinism cross-check). Verbatim EXPERIMENT_LOG (Q1 + Q3 as Rejected-table rows = "rejecting the removal") and lessons.md (account-vs-per-symbol meta-lesson) drafts produced. |
 | B-2 | Builder | Run Q4; write EXPERIMENT_LOG.md + lessons.md entries | backend-dev | done | **Q4 → INCONCLUSIVE → keep GOOGL→cluster_GOOGL (status quo)**, as pre-registered. 3 arms, none halt: (a) status-quo train 1.0421/holdout 2.5015; (b) GOOGL→default 0.9552/2.6181 (helps holdout +0.12, hurts train −0.09); (c) GOOGL→blocklist 1.0886/2.4988 (helps train +0.05, flat holdout −0.003). Neither alt clears the 0.05 floor on BOTH windows → no change. (Nice account-vs-per-symbol echo: GOOGL-alone P&L is *better* under default $485 vs $196, yet the account's train Sharpe drops.) Arm (a) reproduces Q3 ON to 1e-15 (determinism anchor). EXPERIMENT_LOG.md: 2 Rejected-table rows (Q1 regime, Q3 overrides w/ Q4 verdict). lessons.md: account-vs-per-symbol meta-lesson. Suite 837 passed; config/strategies untouched. Orchestrator verified the verdict from results.json + reviewed the doc diffs directly. |
 | B-3 | Tester | Account-replay determinism + live-strategy-load regression tests | tdd-developer | done | `tests/test_methodology_guards.py` (9 tests, synthetic/no-DuckDB, test-fast). Gap found: the existing `test_determinism_and_accounting` runs twice but only compares equity_curve + exit_prices — never final_equity/sharpe/per_symbol_pnl/halted/full-trade-equality. New `TestAccountReplayDeterminism` runs `backtest_account` twice on two independent ReplayStores and asserts exact equality on EVERY field (dicts via sorted-items to catch ordering; sanity-guarded so it can't pass vacuously). New `TestLiveStrategyConfigLoads` derives strategy paths from `config/universe.json` (not hard-coded) and asserts each loads via the real `load_strategy_for`. Non-vacuity proven for both (Tester's transient injections, restored). Suite 846 passed. **Orchestrator independently reproduced the strategy-load non-vacuity** — corrupted cluster_GOOGL.json → 2 tests RED, git-checkout restore → 9 green. |
-| B-4 | Validator | Independently re-run Q3+Q4; verify docs + tests; PASS/FAIL | code-reviewer | dispatched | |
+| B-4 | Validator | Independently re-run Q3+Q4; verify docs + tests; PASS/FAIL | code-reviewer | done | **PASS** (all 8 items). Wrote its OWN from-scratch re-derivation (not the Builder's scripts): Q3 KEEP reproduced to full float precision (train 1.04212/0.92746, holdout 2.50154/2.32556; IREN +$1,544.21 / AAPL +$233.66 / GOOGL −$51.71); Q4 INCONCLUSIVE reproduced (independently applied the 0.05 floor — b fails train, c fails both → keep). Determinism cross-check Q3-ON == Q4-(a) == Q1-ON bit-for-bit (final_equity 29264.511138397716 exact, so the DuckDB snapshot is unchanged — no caveat needed). Regime_filter identical across all 4 strategies confirmed (no gate confound; docs don't claim one). Doc numbers cross-checked, Q1 precision nuance present, no overclaim, format matches. Both test guards re-proven non-vacuous via its own injections (corrupt cluster_AAPL → RED; r2.final_equity+=0.01 → RED), restored. `git diff HEAD -- config/ strategies/ src/` empty; ruff clean; 846 passed. |
 
 ## Run log
 
@@ -109,3 +109,17 @@ holdout 2025-01-01, intraday-stops ON):
   file directly — assertions are meaningful and sanity-guarded against vacuous
   passes. Committed the test. Dispatching Validator (B-4) for the final
   independent PASS/FAIL.
+- Validator (B-4) done: **PASS.** Re-derived Q3 + Q4 from a from-scratch script,
+  matching bit-for-bit to full float precision; independently re-applied both
+  pre-registered criteria (KEEP, INCONCLUSIVE); reproduced both test
+  non-vacuity proofs with its own injections; confirmed docs accurate (no
+  overclaim, Q1 nuance present), the regime-filter confound is genuinely absent,
+  and no human-only file was touched. Tree clean, ruff clean, 846 passed.
+- **Phase 2 complete. All 4 roles done, Validator PASS.** All three deliverables
+  shipped: (1) Q3 overrides KEEP independently validated; (2) Q4 GOOGL bench →
+  INCONCLUSIVE/keep-status-quo (pre-registered, no manufactured change);
+  (3) EXPERIMENT_LOG (Q1 regime RETAIN + Q3 overrides KEEP) + lessons.md
+  (account-vs-per-symbol meta-lesson) written, and the methodology locked under
+  `tests/test_methodology_guards.py`. Live config/strategies untouched
+  throughout (human-only). Commits: 9a3aada, b339ddc, 0bcaece, 006e218, + this
+  closeout.
