@@ -69,8 +69,8 @@ holdout 2025-01-01, intraday-stops ON):
 
 | ID | Role | Task | Status | Result |
 |----|------|------|--------|--------|
-| B-1 | Planner | Design Q4 + pre-register; spec Q3 re-validation; draft EXPERIMENT_LOG/lessons text | architect | dispatched | |
-| B-2 | Builder | Run Q4; write EXPERIMENT_LOG.md + lessons.md entries | backend-dev | pending | |
+| B-1 | Planner | Design Q4 + pre-register; spec Q3 re-validation; draft EXPERIMENT_LOG/lessons text | architect | done | 3-arm Q4 (status-quo / GOOGL→default / GOOGL→blocklist), pre-registered criterion (bench only if an arm beats status-quo Sharpe by >0.05 on BOTH train+holdout; else inconclusive→keep; kill-switch override). **Load-bearing correction (orchestrator-verified):** the anticipated "arm-b re-introduces a regime gate" confound is FALSE — deployed, cluster_GOOGL, cluster_AAPL and iren ALL carry the identical SPY-200 regime_filter, so arm (b) is a clean params-vs-params test. Builder must write the corrected note, not the anticipated caveat. Q3 re-validation spec'd (incl. the Q1=Q3-ON determinism cross-check). Verbatim EXPERIMENT_LOG (Q1 + Q3 as Rejected-table rows = "rejecting the removal") and lessons.md (account-vs-per-symbol meta-lesson) drafts produced. |
+| B-2 | Builder | Run Q4; write EXPERIMENT_LOG.md + lessons.md entries | backend-dev | dispatched | |
 | B-3 | Tester | Account-replay determinism + live-strategy-load regression tests | tdd-developer | pending | |
 | B-4 | Validator | Independently re-run Q3+Q4; verify docs + tests; PASS/FAIL | code-reviewer | pending | |
 
@@ -82,3 +82,13 @@ holdout 2025-01-01, intraday-stops ON):
   human-only (recommendation only); EXPERIMENT_LOG/lessons explicitly in scope.
   (GitHub MCP disconnected this stretch — CI not queryable via MCP; git push
   unaffected.) Dispatching Planner (B-1).
+- Planner (B-1) done. Designed a 3-arm Q4 (status-quo / GOOGL→default /
+  GOOGL→blocklist) with a pre-registered noise-floored criterion, spec'd the Q3
+  re-validation (incl. a Q1=Q3-ON determinism cross-check), and drafted the
+  verbatim EXPERIMENT_LOG (Q1 + Q3) and lessons.md entries. **Caught a
+  load-bearing correction:** my dispatch anticipated arm (b) would re-introduce
+  a regime gate; the Planner found — and the orchestrator independently
+  confirmed via direct read — that deployed/cluster_GOOGL/cluster_AAPL/iren ALL
+  carry the same SPY-200 regime_filter, so arm (b) has no gate confound. Also
+  confirmed `entry_blocklist` is a real entry-gating field (arm (c) valid).
+  Dispatching Builder (B-2) with the full plan + the corrected note.
