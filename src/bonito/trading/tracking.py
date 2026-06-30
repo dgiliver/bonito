@@ -50,7 +50,9 @@ logger = logging.getLogger(__name__)
 MATCH_TOLERANCE_DAYS = 1
 
 # WARN thresholds — breaching any flips the weekly status.
-MAX_MEAN_FILL_BPS = 50.0  # mean |paper - replay| fill price gap
+MAX_MEAN_FILL_BPS = 50.0  # mean |paper - replay| fill price gap (paper mode)
+MAX_MEAN_FILL_BPS_LIVE = 50.0  # mean fill gap for live mode (equal for now — RFC D2;
+#   recalibrate from rehearsal data before scaling size)
 MAX_DECISION_DIVERGENCE = 0.20  # share of paper fills with no replay match
 MAX_EQUITY_GAP_PCT = 3.0  # |paper - replay| final equity, % of replay
 # Below this many matched fills the comparison is statistically meaningless —
@@ -82,6 +84,9 @@ class TrackingReport(BaseModel):
 
     paper_fills: int
     matched_fills: int
+    no_fill_count: int = Field(
+        default=0, description="Number of zero-qty (no_fill) events in the ledger"
+    )
     decision_divergence: float = Field(
         ..., description="Share of paper fills with no replay counterpart"
     )
@@ -200,6 +205,10 @@ def paper_equity_curve(
         day_cutoff = day + timedelta(days=1)
         while fill_i < len(fills) and fills[fill_i].filled_at.replace(tzinfo=None) < day_cutoff:
             f = fills[fill_i]
+            fill_i += 1
+            # D3: zero-qty no_fill sentinels carry no cash/position change.
+            if f.quantity == 0:
+                continue
             sym = f.symbol.upper()
             if f.side == "buy":
                 cash -= f.notional
@@ -210,7 +219,6 @@ def paper_equity_curve(
                 if abs(positions[sym]) < 1e-9:
                     del positions[sym]
             last_close.setdefault(sym, f.price)
-            fill_i += 1
         for sym in positions:
             price = closes.get(sym, {}).get(day)
             if price is not None:
@@ -237,24 +245,47 @@ def run_tracking(
             reasons=["paper ledger has no fills yet"],
             paper_fills=0,
             matched_fills=0,
+            no_fill_count=0,
             decision_divergence=0.0,
             paper_final_equity=ledger.starting_cash,
             replay_final_equity=ledger.starting_cash,
             equity_gap_pct=0.0,
         )
 
-    window_start = min(f.filled_at for f in ledger.fills).replace(
+    # D3: separate zero-qty no_fill sentinel events before any comparison.
+    # They are NOT passed to match_fills (keeps match_fills pure) and are
+    # NOT applied to the equity reconstruction in paper_equity_curve.
+    no_fill_events = [f for f in ledger.fills if f.quantity == 0]
+    real_fills = [f for f in ledger.fills if f.quantity != 0]
+    no_fill_count = len(no_fill_events)
+
+    # D2: use the live band when the universe is in live mode.
+    mean_band = MAX_MEAN_FILL_BPS_LIVE if universe.mode == "live" else MAX_MEAN_FILL_BPS
+
+    # Rebuild a ledger-like object with only real fills for the equity curve.
+    # We pass a filtered ledger view rather than mutating the real ledger.
+    class _FilteredLedger:
+        def __init__(self, src: PaperLedger, fills: list) -> None:
+            self.fills = fills
+            self.starting_cash = src.starting_cash
+
+    filtered_ledger = _FilteredLedger(ledger, real_fills)
+
+    window_start = min(f.filled_at for f in real_fills).replace(
         tzinfo=None, hour=0, minute=0, second=0, microsecond=0
-    )
+    ) if real_fills else end
+
     replay = ReplayStore.from_store(store, universe, end)
     result = backtest_account(universe, replay, window_start, end)
 
-    comparisons = match_fills(ledger.fills, replay_fill_events(result))
+    comparisons = match_fills(real_fills, replay_fill_events(result))
     matched = [c for c in comparisons if c.matched]
     deltas = np.array([abs(c.delta_bps) for c in matched]) if matched else np.array([])
     divergence = 1 - len(matched) / len(comparisons) if comparisons else 0.0
 
-    paper_dates, paper_equity = paper_equity_curve(ledger, store, universe, end)
+    paper_dates, paper_equity = paper_equity_curve(
+        filtered_ledger, store, universe, end  # type: ignore[arg-type]
+    )
     paper_final = paper_equity[-1] if paper_equity else ledger.starting_cash
     replay_final = result.final_equity
     equity_gap_pct = (paper_final - replay_final) / replay_final * 100 if replay_final else 0.0
@@ -271,14 +302,21 @@ def run_tracking(
         te_bps = round(float(np.mean(diffs)), 1)
 
     reasons: list[str] = []
+    if no_fill_count:
+        reasons.append(f"{no_fill_count} no_fill event(s) recorded in the ledger")
+
     if len(matched) < MIN_MATCHED_FILLS:
         status: Literal["OK", "WARN", "INSUFFICIENT"] = "INSUFFICIENT"
         reasons.append(f"only {len(matched)} matched fills (<{MIN_MATCHED_FILLS})")
     else:
         status = "OK"
-        if float(np.mean(deltas)) > MAX_MEAN_FILL_BPS:
+        if float(np.mean(deltas)) > mean_band:
             status = "WARN"
-            reasons.append(f"mean fill gap {np.mean(deltas):.0f}bps > {MAX_MEAN_FILL_BPS:.0f}bps")
+            # D2: name the band in the reason so live vs paper is clear.
+            band_label = "live band" if universe.mode == "live" else "paper band"
+            reasons.append(
+                f"mean fill gap {np.mean(deltas):.0f}bps > {mean_band:.0f}bps ({band_label})"
+            )
         if divergence > MAX_DECISION_DIVERGENCE:
             status = "WARN"
             reasons.append(f"decision divergence {divergence:.0%} > {MAX_DECISION_DIVERGENCE:.0%}")
@@ -297,6 +335,7 @@ def run_tracking(
         reasons=reasons,
         paper_fills=len(comparisons),
         matched_fills=len(matched),
+        no_fill_count=no_fill_count,
         decision_divergence=round(divergence, 4),
         mean_abs_fill_bps=round(float(np.mean(deltas)), 1) if len(deltas) else None,
         median_abs_fill_bps=round(float(np.median(deltas)), 1) if len(deltas) else None,

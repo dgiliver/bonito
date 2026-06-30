@@ -998,12 +998,16 @@ def live_signals(
     universe_path: str = typer.Option("config/universe.json", "--universe", "-u"),
 ) -> None:
     """Generate trade intents (no execution). Writes livetrade/intents/*.json."""
-    from bonito.trading.live_runner import generate_intents, save_intents
+    from bonito.trading.live_runner import LivePricingError, generate_intents, save_intents
     from bonito.trading.paper import DEFAULT_LEDGER_PATH
 
     universe = _load_universe(universe_path)
     ledger = _load_ledger(universe)
-    intents, prices = generate_intents(universe, _get_store(), ledger)
+    try:
+        intents, prices = generate_intents(universe, _get_store(), ledger)
+    except LivePricingError as exc:
+        console.print(f"[bold red]PRICING ERROR — aborting cycle:[/bold red] {exc}")
+        raise typer.Exit(1) from None
     ledger.save()  # persist high-water-mark updates
 
     if not intents:
@@ -1032,6 +1036,7 @@ def live_run(
     by the Claude session via the Robinhood MCP, never by this CLI.
     """
     from bonito.trading.live_runner import (
+        LivePricingError,
         execute_paper,
         generate_intents,
         refresh_data,
@@ -1053,7 +1058,11 @@ def live_run(
         console.print(f"Refreshed {ok}/{len(results)} symbols")
 
     ledger = _load_ledger(universe)
-    intents, prices = generate_intents(universe, store, ledger)
+    try:
+        intents, prices = generate_intents(universe, store, ledger)
+    except LivePricingError as exc:
+        console.print(f"[bold red]PRICING ERROR — aborting cycle:[/bold red] {exc}")
+        raise typer.Exit(1) from None
 
     if intents:
         path = save_intents(intents)
@@ -1187,24 +1196,35 @@ def live_reconcile(
     """
     import json as _json
 
-    from bonito.trading.live_runner import reconcile_positions
+    from bonito.trading.live_runner import reconcile_gate
 
     universe = _load_universe(universe_path)
     ledger = _load_ledger(universe)
     broker_positions = {k.upper(): float(v) for k, v in _json.loads(positions_json).items()}
 
-    report = reconcile_positions(ledger, broker_positions)
-    if report.in_sync:
-        console.print("[green]✓ Ledger and broker are in sync[/green]")
+    report = reconcile_gate(ledger, broker_positions)
+
+    if report.fatal_drift:
+        # D1: drift exceeds 0.5% tolerance — hard-halt new entries (exits still allowed).
+        console.print(
+            "[bold red]DRIFT — refusing new entries (exits still allowed)[/bold red]"
+        )
+        console.print(report.describe())
+        console.print(
+            "[dim]Resolve with `bonito live record-fill` using the actual fill data "
+            "from Robinhood order history (get_equity_orders, placed_agent=agentic).[/dim]"
+        )
+        raise typer.Exit(1)
+
+    if not report.in_sync:
+        # Sub-tolerance drift — surface it but proceed (D1 relaxation).
+        console.print(
+            "[yellow]sub-tolerance drift (<0.5%), proceeding[/yellow]"
+        )
+        console.print(report.describe())
         return
 
-    console.print("[bold red]DRIFT DETECTED — do not trade until resolved:[/bold red]")
-    console.print(report.describe())
-    console.print(
-        "[dim]Resolve with `bonito live record-fill` using the actual fill data "
-        "from Robinhood order history (get_equity_orders, placed_agent=agentic).[/dim]"
-    )
-    raise typer.Exit(1)
+    console.print("[green]✓ Ledger and broker are in sync[/green]")
 
 
 @live_app.command("preflight")
@@ -1371,17 +1391,33 @@ def live_record_fill(
     side: str = typer.Argument(..., help="buy or sell"),
     price: float = typer.Argument(..., help="Actual fill price from Robinhood"),
     dollar_amount: float = typer.Option(None, "--dollars", help="Notional for buys"),
+    shares: float = typer.Option(
+        None,
+        "--shares",
+        "--quantity",
+        help="Actual shares filled by the broker (D3); records the broker qty exactly",
+    ),
+    no_fill: bool = typer.Option(
+        False,
+        "--no-fill",
+        help="Record a rejected/unfilled intent (quantity=0 sentinel, no cash change)",
+    ),
     reason: str = typer.Option("live fill", "--reason"),
     broker_order_id: str = typer.Option(
-        ..., "--broker-order-id", help="Robinhood order id from get_equity_orders"
+        None,
+        "--broker-order-id",
+        help="Robinhood order id from get_equity_orders (required unless --no-fill)",
     ),
     universe_path: str = typer.Option("config/universe.json", "--universe", "-u"),
 ) -> None:
-    """Record a real Robinhood fill into the ledger (live mode bookkeeping)."""
+    """Record a real Robinhood fill into the ledger (live mode bookkeeping).
+
+    Use --shares to record the broker's actual quantity (partial fills, etc.).
+    Use --no-fill to record a rejection or unfilled intent as a zero-qty sentinel.
+    """
     from datetime import UTC as _UTC
     from datetime import datetime as _dt
 
-    from bonito.trading.live_runner import execute_paper
     from bonito.trading.signals import TradeIntent
 
     universe = _load_universe(universe_path)
@@ -1396,29 +1432,72 @@ def live_record_fill(
     ledger = _load_ledger(universe)
     symbol = symbol.upper()
 
+    # Validate --broker-order-id requirement (optional only on --no-fill).
+    if not no_fill and not broker_order_id:
+        console.print("[red]--broker-order-id is required unless --no-fill[/red]")
+        raise typer.Exit(1)
+
+    # --- no-fill sentinel path (D3) ---
+    if no_fill:
+        fill = ledger.record_no_fill(
+            symbol=symbol,
+            side=side,
+            reason=reason,
+            broker_order_id=broker_order_id,
+            signal_price=price,
+        )
+        ledger.save()
+        console.print(
+            f"[yellow]NO FILL recorded {side.upper()} {symbol} @ ${price:.2f} "
+            f"— {reason}[/yellow]"
+        )
+        return
+
+    # --- normal fill path ---
     if side == "buy" and not dollar_amount:
         console.print("[red]Buys require --dollars[/red]")
         raise typer.Exit(1)
 
-    quantity = ledger.positions[symbol].quantity if side == "sell" else None
-    intent = TradeIntent(
-        symbol=symbol,
-        side=side,  # type: ignore[arg-type]
-        dollar_amount=dollar_amount,
-        quantity=quantity,
-        reason=reason,
-        signal_price=price,
-        signal_date=_dt.now(_UTC),
-        strategy_name="live",
-        broker_order_id=broker_order_id,
-    )
-    strategies = {symbol: universe.load_strategy_for(symbol)} if side == "buy" else None
-    fills, errors = execute_paper(ledger, [intent], {symbol: price}, strategies=strategies)
-    for e in errors:
-        console.print(f"[red]{e}[/red]")
-        raise typer.Exit(1)
+    if side == "buy":
+        intent = TradeIntent(
+            symbol=symbol,
+            side="buy",  # type: ignore[arg-type]
+            dollar_amount=dollar_amount,
+            reason=reason,
+            signal_price=price,
+            signal_date=_dt.now(_UTC),
+            strategy_name="live",
+            broker_order_id=broker_order_id,
+        )
+        strategy = universe.load_strategy_for(symbol)
+        # D3: call apply_buy directly so execute_paper is not touched (replay surface).
+        try:
+            fill = ledger.apply_buy(intent, price, strategy=strategy, fill_quantity=shares)
+        except ValueError as exc:
+            console.print(f"[red]{exc}[/red]")
+            raise typer.Exit(1) from None
+    else:
+        quantity = ledger.positions[symbol].quantity if symbol in ledger.positions else None
+        intent = TradeIntent(
+            symbol=symbol,
+            side="sell",  # type: ignore[arg-type]
+            quantity=quantity,
+            reason=reason,
+            signal_price=price,
+            signal_date=_dt.now(_UTC),
+            strategy_name="live",
+            broker_order_id=broker_order_id,
+        )
+        # D3: call apply_sell directly so execute_paper is not touched (replay surface).
+        try:
+            fill = ledger.apply_sell(intent, price, fill_quantity=shares)
+        except ValueError as exc:
+            console.print(f"[red]{exc}[/red]")
+            raise typer.Exit(1) from None
+
     ledger.save()
-    console.print(f"Recorded {side.upper()} {symbol} @ ${price:.2f}")
+    qty_label = f"{fill.quantity:.4f} sh" if shares else f"${dollar_amount:.2f}" if dollar_amount else ""
+    console.print(f"Recorded {side.upper()} {symbol} {qty_label} @ ${price:.2f}")
 
 
 @app.command("dashboard")

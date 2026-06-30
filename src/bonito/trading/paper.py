@@ -131,16 +131,25 @@ class PaperLedger(BaseModel):
         intent: TradeIntent,
         fill_price: float,
         strategy: StrategyConfig | None = None,
+        *,
+        fill_quantity: float | None = None,
     ) -> PaperFill:
         """Execute a dollar-based buy at fill_price.
 
         Args:
             strategy: When given, pinned to the position — exits use this
                 exact config until the position closes (lock-until-exit).
+            fill_quantity: Actual shares filled by the broker (D3).  When
+                provided the position is opened at this exact quantity;
+                ``intent.dollar_amount`` still governs the cash debit so the
+                notional accounting stays consistent.  Must be > 0.
+                When None (default) the quantity is derived from
+                ``intent.dollar_amount / fill_price`` — byte-identical to
+                the original behaviour.
 
         Raises:
             ValueError: on insufficient cash, existing position, halted
-                ledger, or bad intent.
+                ledger, bad intent, or non-positive fill_quantity.
         """
         if intent.side != "buy":
             raise ValueError(f"apply_buy got a {intent.side} intent")
@@ -156,8 +165,10 @@ class PaperLedger(BaseModel):
             )
         if fill_price <= 0:
             raise ValueError(f"invalid fill price {fill_price}")
+        if fill_quantity is not None and fill_quantity <= 0:
+            raise ValueError(f"fill_quantity must be positive, got {fill_quantity}")
 
-        quantity = intent.dollar_amount / fill_price
+        quantity = fill_quantity if fill_quantity is not None else intent.dollar_amount / fill_price
         self.cash -= intent.dollar_amount
         now = datetime.now(UTC)
         self.positions[intent.symbol] = PaperPosition(
@@ -188,12 +199,29 @@ class PaperLedger(BaseModel):
         )
         return fill
 
-    def apply_sell(self, intent: TradeIntent, fill_price: float) -> PaperFill:
-        """Close the full position in intent.symbol at fill_price.
+    def apply_sell(
+        self,
+        intent: TradeIntent,
+        fill_price: float,
+        *,
+        fill_quantity: float | None = None,
+    ) -> PaperFill:
+        """Close (or partially close) the position in intent.symbol at fill_price.
+
+        Args:
+            fill_quantity: Actual shares sold by the broker (D3).  When
+                provided and less than the full position (minus dust), a
+                partial exit is recorded: PnL and cash are adjusted for
+                the sold quantity only and the remaining position is kept
+                at the original entry_price.  When >= pos.quantity (within
+                dust) the position is fully closed (existing behaviour).
+                When None (default) the full position is closed —
+                byte-identical to the original behaviour.
 
         Raises:
             ValueError: if no position is open or the intent is malformed.
         """
+        dust = 1e-4
         if intent.side != "sell":
             raise ValueError(f"apply_sell got a {intent.side} intent")
         pos = self.positions.get(intent.symbol)
@@ -202,16 +230,30 @@ class PaperLedger(BaseModel):
         if fill_price <= 0:
             raise ValueError(f"invalid fill price {fill_price}")
 
-        notional = pos.quantity * fill_price
-        pnl = (fill_price - pos.entry_price) * pos.quantity
+        # Determine sold quantity: full close when fill_quantity is None or covers the whole position.
+        sold_qty: float
+        full_close: bool
+        if fill_quantity is None or fill_quantity >= pos.quantity - dust:
+            sold_qty = pos.quantity
+            full_close = True
+        else:
+            sold_qty = fill_quantity
+            full_close = False
+
+        notional = sold_qty * fill_price
+        pnl = (fill_price - pos.entry_price) * sold_qty
         self.cash += notional
         self.realized_pnl += pnl
-        del self.positions[intent.symbol]
+
+        if full_close:
+            del self.positions[intent.symbol]
+        else:
+            pos.quantity -= sold_qty  # keep the position open at original entry_price
 
         fill = PaperFill(
             symbol=intent.symbol,
             side="sell",
-            quantity=pos.quantity,
+            quantity=sold_qty,
             price=fill_price,
             notional=notional,
             reason=intent.reason,
@@ -221,9 +263,43 @@ class PaperLedger(BaseModel):
         )
         self.fills.append(fill)
         logger.info(
-            f"Paper SELL {intent.symbol}: {pos.quantity:.4f} @ ${fill_price:.2f} "
-            f"(P&L ${pnl:+.2f}) — {intent.reason}"
+            f"Paper SELL {intent.symbol}: {sold_qty:.4f} @ ${fill_price:.2f} "
+            f"(P&L ${pnl:+.2f}{'  partial' if not full_close else ''}) — {intent.reason}"
         )
+        return fill
+
+    def record_no_fill(
+        self,
+        symbol: str,
+        side: str,
+        reason: str,
+        broker_order_id: str | None,
+        signal_price: float,
+    ) -> "PaperFill":
+        """Record an intent that was rejected or did not fill (D3).
+
+        No cash or position change — this is a pure audit event so
+        ``bonito live tracking`` can distinguish "chose not to trade" from
+        "tried and couldn't fill".  The fill lands in ``self.fills`` with
+        ``quantity=0.0`` and ``notional=0.0`` so zero-qty filters can
+        exclude it from bps calculations.
+
+        Returns the sentinel PaperFill for the caller to inspect/log.
+        """
+        now = datetime.now(UTC)
+        fill = PaperFill(
+            symbol=symbol.upper(),
+            side=side,  # type: ignore[arg-type]
+            quantity=0.0,
+            price=signal_price,
+            notional=0.0,
+            reason=f"no_fill: {reason}",
+            filled_at=now,
+            strategy_name="live",
+            broker_order_id=broker_order_id,
+        )
+        self.fills.append(fill)
+        logger.info(f"NO FILL recorded {side.upper()} {symbol.upper()} @ ${signal_price:.2f} — {reason}")
         return fill
 
     def update_high_water_mark(self, symbol: str, price: float) -> None:
