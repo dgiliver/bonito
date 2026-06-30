@@ -283,6 +283,15 @@ class TestReconcileD1:
         report = reconcile_gate(ledger, {"AAA": 1.5})  # 33% drift
         assert report.fatal_drift is True
 
+    def test_reconcile_gate_honors_custom_tolerance(self):
+        """reconcile_gate delegates the caller's tolerance_pct through to the
+        single reconcile_positions drift loop (no duplicated logic): a 0.4% drift
+        is below the 0.5% default but above a tightened 0.3% band.
+        """
+        ledger = self._ledger_with("AAA", qty=1.0)
+        assert reconcile_gate(ledger, {"AAA": 1.004}).fatal_drift is False
+        assert reconcile_gate(ledger, {"AAA": 1.004}, tolerance_pct=0.003).fatal_drift is True
+
     def test_exits_not_gated_by_reconcile(self, universe):
         """check_stops returns a sell intent for a stop-breached open position without
         any reconcile input on its path.

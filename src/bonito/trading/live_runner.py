@@ -752,6 +752,7 @@ def reconcile_positions(
     ledger: PaperLedger,
     broker_positions: dict[str, float],
     tolerance: float = 1e-4,
+    drift_tolerance_pct: float = DRIFT_TOLERANCE_PCT,
 ) -> ReconcileReport:
     """Compare ledger positions against the broker's actual holdings.
 
@@ -800,7 +801,7 @@ def reconcile_positions(
         if larger <= dust:
             continue  # both sides are dust — not fatal
         diff = abs(ledger_qty - broker_qty)
-        if diff > DRIFT_TOLERANCE_PCT * larger:
+        if diff > drift_tolerance_pct * larger:
             report.fatal_reasons.append(
                 f"{symbol}: ledger={ledger_qty:.4f} broker={broker_qty:.4f} "
                 f"diff={diff:.4f} ({diff/larger:.2%} of {larger:.4f})"
@@ -825,31 +826,7 @@ def reconcile_gate(
         tolerance_pct: fraction of the larger leg used as the fatal-drift
             threshold.  Defaults to DRIFT_TOLERANCE_PCT (0.5%).
     """
-    # tolerance_pct is passed through the module constant for now; the
-    # function signature exposes it so callers can tighten for tests.
-    report = reconcile_positions(ledger, broker_positions, tolerance=1e-4)
-    # Re-evaluate fatal_reasons with the caller's tolerance_pct if it differs.
-    if tolerance_pct != DRIFT_TOLERANCE_PCT:
-        dust = 1e-4
-        broker = {s.upper(): q for s, q in broker_positions.items() if q > dust}
-        all_symbols = (
-            set(broker.keys()) | {s for s, p in ledger.positions.items() if p.quantity > dust}
-        )
-        report.fatal_reasons = []
-        for symbol in sorted(all_symbols):
-            ledger_qty = ledger.positions[symbol].quantity if symbol in ledger.positions else 0.0
-            broker_qty = broker.get(symbol, 0.0)
-            larger = max(ledger_qty, broker_qty)
-            if larger <= dust:
-                continue
-            diff = abs(ledger_qty - broker_qty)
-            if diff > tolerance_pct * larger:
-                report.fatal_reasons.append(
-                    f"{symbol}: ledger={ledger_qty:.4f} broker={broker_qty:.4f} "
-                    f"diff={diff:.4f} ({diff/larger:.2%} of {larger:.4f})"
-                )
-        report.fatal_drift = bool(report.fatal_reasons)
-    return report
+    return reconcile_positions(ledger, broker_positions, drift_tolerance_pct=tolerance_pct)
 
 
 def save_intents(intents: list[TradeIntent], directory: Path = Path("livetrade/intents")) -> Path:
