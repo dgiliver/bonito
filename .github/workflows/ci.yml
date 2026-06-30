@@ -8,25 +8,36 @@ concurrency:
   group: ci-${{ github.ref }}
   cancel-in-progress: true
 
+env:
+  # Pin Python to 3.12: numba 0.61.x (pulled in via pandas-ta) does not support
+  # 3.13, and uv would otherwise pick the newest interpreter satisfying
+  # requires-python (>=3.12).
+  UV_PYTHON: "3.12"
+
 jobs:
   quality:
     runs-on: ubuntu-latest
     timeout-minutes: 20
     steps:
       - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
+      - name: Install uv
+        uses: astral-sh/setup-uv@v5
         with:
-          python-version: "3.12"
-          cache: pip
-      - name: Install
-        run: pip install -e ".[dev]"
+          enable-cache: true
+      - name: Install dependencies (from uv.lock — reproducible)
+        # Install the LOCKED dependency set, not a fresh resolve. `pip install -e`
+        # re-resolved every run and drifted the numpy/numba/pandas-ta native stack,
+        # segfaulting pytest (exit 139, crashing at test_vwap_computes) even on
+        # docs-only commits. uv.lock pins the known-good versions the suite is
+        # validated against; --frozen installs them verbatim.
+        run: uv sync --frozen --extra dev
       - name: Lint (ruff)
-        run: ruff check src/ tests/
+        run: uv run ruff check src/ tests/
       - name: Typecheck (mypy)
-        run: mypy src/
+        run: uv run mypy src/
         continue-on-error: true  # TODO(P1-2): 157 pre-existing errors; tighten once baseline cleared
       - name: Tests (fast)
         # test_full_flow_create_and_backtest_trailing needs real ingested SPY data
         # (data/market_data.duckdb is gitignored, absent on a clean checkout) - same
         # exclusion deploy-bot.yml already applies, for the same reason.
-        run: pytest tests/ -v -m "not slow" -k "not test_full_flow_create_and_backtest_trailing"
+        run: uv run pytest tests/ -v -m "not slow" -k "not test_full_flow_create_and_backtest_trailing"
