@@ -27,12 +27,24 @@ from .signals import TradeIntent
 
 logger = logging.getLogger(__name__)
 
+
+class LivePricingError(RuntimeError):
+    """Raised when a live position cannot be priced (no market quote).
+
+    Fail-closed: the kill switch must not mark equity off entry_price fallback
+    for real-money accounts — abort the cycle instead.
+    """
+
+
 DEFAULT_UNIVERSE_PATH = Path("config/universe.json")
 
 # Bars older than this are considered stale and the symbol is skipped.
 MAX_DATA_AGE_DAYS = 5
 # Robinhood's minimum dollar-based order is $1; below this we don't bother.
 MIN_ORDER_USD = 1.0
+# Drift beyond this fraction of the larger leg is a fatal entry-blocking divergence;
+# exits are NEVER gated — only new entries are blocked.
+DRIFT_TOLERANCE_PCT = 0.005
 # Extra history ingested for regime symbols so the SMA is defined from the
 # universe start (200 trading days ≈ 10 months; 550 calendar days is safe).
 REGIME_WARMUP_DAYS = 550
@@ -259,6 +271,20 @@ def generate_intents(
 
     # --- Portfolio kill switch: flatten and halt on excessive drawdown ---
     sells = {i.symbol for i in intents}
+
+    # D1 §5.4: in live mode every open position must be priced so the kill switch
+    # marks equity off current broker quotes, not the entry_price fallback.
+    # Fail-closed: abort the cycle rather than let the halt threshold be silently
+    # miscalculated.  Paper always has prices (it only holds what it bought), so
+    # this guard is live-gated and paper is byte-identical.
+    if universe.mode == "live":
+        unpriced = [s for s in ledger.positions if s not in prices]
+        if unpriced:
+            raise LivePricingError(
+                f"Cannot mark equity: no price for open position(s) {unpriced}. "
+                "Run `bonito live refresh` and retry, or exit position(s) manually."
+            )
+
     current_equity = ledger.equity(prices)
     threshold = universe.risk.max_drawdown_halt
     if threshold is not None:
@@ -371,6 +397,14 @@ def generate_intents(
         )
         buys += 1
         available -= dollar
+        # TODO(D4): gate on settled buying power once the MCP `get_accounts` is wired
+        # on the Routine side; for now log only so the broker is the backstop on
+        # T+1 settlement — revisit if rejections appear.
+        if universe.mode == "live":
+            logger.info(
+                f"D4 note: {symbol} buy ${dollar:.2f} queued — verify settled buying "
+                "power before placing (T+1 settlement may block this order)"
+            )
 
     return intents, prices
 
@@ -570,6 +604,17 @@ class ReconcileReport(BaseModel):
         default_factory=dict,
         description="Symbol → {ledger, broker} quantities that disagree",
     )
+    fatal_drift: bool = Field(
+        default=False,
+        description=(
+            "True when any position exceeds DRIFT_TOLERANCE_PCT mismatch. "
+            "Blocks new entries; exits are never gated."
+        ),
+    )
+    fatal_reasons: list[str] = Field(
+        default_factory=list,
+        description="Per-symbol descriptions of fatal drift (>0.5% of the larger leg)",
+    )
 
     def describe(self) -> str:
         if self.in_sync:
@@ -581,6 +626,8 @@ class ReconcileReport(BaseModel):
             lines.append(f"{sym}: open in ledger but not held at broker")
         for sym, d in self.quantity_mismatch.items():
             lines.append(f"{sym}: ledger={d['ledger']} broker={d['broker']}")
+        for reason in self.fatal_reasons:
+            lines.append(f"FATAL DRIFT: {reason}")
         return "\n".join(lines)
 
 
@@ -713,18 +760,26 @@ def reconcile_positions(
     and record-fill is exactly what this catches — nothing trades until a
     human (or an explicit record-fill) resolves the drift.
 
+    Populates both the fine-grained exact-match fields (`in_sync`,
+    `missing_in_ledger`, `missing_at_broker`, `quantity_mismatch`) and the
+    coarser D1 entry gate (`fatal_drift`, `fatal_reasons`).  `in_sync` retains
+    its original exact-match (1e-4) meaning so the 6 existing TestReconcile
+    tests are unchanged.  `fatal_drift` uses DRIFT_TOLERANCE_PCT (0.5%) and
+    only blocks new entries — exits are never gated.
+
     Args:
         broker_positions: Symbol → share quantity from the broker
             (e.g. Robinhood MCP get_equity_positions).
     """
-    broker = {s.upper(): q for s, q in broker_positions.items() if q > tolerance}
+    dust = 1e-4  # below this treat a position as zero for exact-match and drift checks
+    broker = {s.upper(): q for s, q in broker_positions.items() if q > dust}
     report = ReconcileReport(in_sync=True)
 
     for symbol, qty in broker.items():
         pos = ledger.positions.get(symbol)
         if pos is None:
             report.missing_in_ledger[symbol] = qty
-        elif abs(pos.quantity - qty) > tolerance:
+        elif abs(pos.quantity - qty) > dust:
             report.quantity_mismatch[symbol] = {"ledger": pos.quantity, "broker": qty}
 
     for symbol in ledger.positions:
@@ -734,6 +789,66 @@ def reconcile_positions(
     report.in_sync = not (
         report.missing_in_ledger or report.missing_at_broker or report.quantity_mismatch
     )
+
+    # --- D1 fatal-drift gate (entry-only, DRIFT_TOLERANCE_PCT) ---
+    # Compute over the union of all ledger+broker symbols with meaningful qty.
+    all_symbols = set(broker.keys()) | {s for s, p in ledger.positions.items() if p.quantity > dust}
+    for symbol in sorted(all_symbols):
+        ledger_qty = ledger.positions[symbol].quantity if symbol in ledger.positions else 0.0
+        broker_qty = broker.get(symbol, 0.0)
+        larger = max(ledger_qty, broker_qty)
+        if larger <= dust:
+            continue  # both sides are dust — not fatal
+        diff = abs(ledger_qty - broker_qty)
+        if diff > DRIFT_TOLERANCE_PCT * larger:
+            report.fatal_reasons.append(
+                f"{symbol}: ledger={ledger_qty:.4f} broker={broker_qty:.4f} "
+                f"diff={diff:.4f} ({diff/larger:.2%} of {larger:.4f})"
+            )
+    report.fatal_drift = bool(report.fatal_reasons)
+    return report
+
+
+def reconcile_gate(
+    ledger: PaperLedger,
+    broker_positions: dict[str, float],
+    *,
+    tolerance_pct: float = DRIFT_TOLERANCE_PCT,
+) -> ReconcileReport:
+    """Thin wrapper: call reconcile_positions and return the report.
+
+    This is the single D1 entry point for the Routine and CLI.  The caller
+    checks ``report.fatal_drift`` to block new entries; exits are always
+    permitted regardless of the report result.
+
+    Args:
+        tolerance_pct: fraction of the larger leg used as the fatal-drift
+            threshold.  Defaults to DRIFT_TOLERANCE_PCT (0.5%).
+    """
+    # tolerance_pct is passed through the module constant for now; the
+    # function signature exposes it so callers can tighten for tests.
+    report = reconcile_positions(ledger, broker_positions, tolerance=1e-4)
+    # Re-evaluate fatal_reasons with the caller's tolerance_pct if it differs.
+    if tolerance_pct != DRIFT_TOLERANCE_PCT:
+        dust = 1e-4
+        broker = {s.upper(): q for s, q in broker_positions.items() if q > dust}
+        all_symbols = (
+            set(broker.keys()) | {s for s, p in ledger.positions.items() if p.quantity > dust}
+        )
+        report.fatal_reasons = []
+        for symbol in sorted(all_symbols):
+            ledger_qty = ledger.positions[symbol].quantity if symbol in ledger.positions else 0.0
+            broker_qty = broker.get(symbol, 0.0)
+            larger = max(ledger_qty, broker_qty)
+            if larger <= dust:
+                continue
+            diff = abs(ledger_qty - broker_qty)
+            if diff > tolerance_pct * larger:
+                report.fatal_reasons.append(
+                    f"{symbol}: ledger={ledger_qty:.4f} broker={broker_qty:.4f} "
+                    f"diff={diff:.4f} ({diff/larger:.2%} of {larger:.4f})"
+                )
+        report.fatal_drift = bool(report.fatal_reasons)
     return report
 
 

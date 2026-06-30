@@ -462,10 +462,14 @@ intraday sweep modeled from daily OHLC, not 15-min quotes.
       stops 24/7 — no Claude session, laptop, or phone needed for
       intraday protection. Track stop order IDs in the live ledger.
       This REPLACES the need for an all-day /loop session in live mode.
-- [ ] ≥2 weeks of paper-vs-replay tracking (`bonito live tracking`,
-      automated in the weekly workflow): status OK, mean fill gap and
-      decision divergence within thresholds. This is the quantitative
-      basis for trusting replay numbers with real money.
+- [ ] ≥2 weeks of GREEN live-vs-replay tracking at 1-share size
+      (`bonito live tracking -u config/universe.live.json` OK every cycle)
+      AND `bonito live reconcile` clean (no fatal drift) every cycle.
+      This replaces the weaker "paper-vs-replay" criterion: live-at-min-size
+      exercises the real broker path (actual qty, T+1 settlement, real spread)
+      and is far stronger evidence before scaling size.
+      See RFC §9 rehearsal loop: reconcile → preflight → run → place (MCP) →
+      record actual fill → tracking → assert OK each cycle.
 - [x] Live MCP rehearsal on the Agentic account (••••8597, NEVER margin) —
       DONE 2026-06-12: RIVN 1-share round trip. Buy limit $15.75 → filled
       $15.7478 (~200ms); sell limit $15.74 → filled $15.7501 (price
