@@ -1,6 +1,6 @@
 # RFC: Live-vs-paper account-management fidelity
 
-Status: **DRAFT — decisions open (§8)**
+Status: **decisions RESOLVED (§8, user sign-off 2026-06-29) — ready for the 4-role build**
 Author: orchestrator + 4-role pipeline (proposed)
 Related: `docs/RFC_SETTLED_BAR_GUARD.md` (precedent), `tasks/todo.md` (pre-live gate),
 `src/bonito/trading/{live_runner,paper,tracking}.py`
@@ -143,7 +143,23 @@ log-only.)
 6. **End-to-end dry run** — a recorded mock broker order set replayed through
    reconcile → preflight → run, asserting the gate and the tracking verdict.
 
-## 8. Decisions (OPEN — for user sign-off before the build)
+## 8. Decisions (RESOLVED 2026-06-29 — user sign-off)
+
+**All five resolved to the recommended option:**
+- **D1 = hard-halt** new entries on drift > 0.5% of a position's shares
+  (fail-closed; exits/flatten always allowed).
+- **D2 = keep 50 bps** mean live-vs-replay band to start; always surface
+  worst-fill bps; recalibrate from rehearsal data before scaling size.
+- **D3 = record actual broker qty + `no_fill`** (ledger matches broker by
+  construction; partials and rejections logged explicitly).
+- **D4 = log-only** settlement/buying-power check (broker rejection is the
+  backstop; revisit if rejections appear).
+- **D5 = strengthen the go-live gate** to ≥2 weeks of green live-vs-replay
+  tracking at 1-share size, reconcile clean every cycle, then sign-off.
+
+Original options & rationale below.
+
+
 
 - **D1 — Drift gate severity & tolerance.** On ledger-vs-broker mismatch, does
   the cycle **hard-halt (fail-closed, refuse new entries)** or **WARN-and-continue**?
