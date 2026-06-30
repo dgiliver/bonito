@@ -443,6 +443,21 @@ intraday sweep modeled from daily OHLC, not 15-min quotes.
 
 ## Pre-live checklist (Phase 3 — every box needs doing before flags flip)
 
+> **STATUS 2026-06-30 — the code prerequisites are DONE.** Settled-bar guard,
+> proven-no-look-ahead engine, and the live-vs-paper fidelity plumbing (drift
+> gate, actual-fill recording, real-price kill-switch marking) are all merged
+> to `main` and validated. The live Routine prompt + rehearsal protocol are
+> ready in `docs/AUTONOMOUS_LIVE_ROUTINE.md`. What remains is **operational and
+> human-only**, in order:
+>   1. Connect Robinhood as a **claude.ai connector** (claude.ai/customize/connectors).
+>   2. Set 1-share risk caps in `config/universe.live.json` (e.g. max_position_usd ~$30–50).
+>   3. `/schedule` the live Routine from a **local** terminal; dogfood with
+>      `live_enabled:false` (places nothing), then flip `live_enabled:true` at 1-share.
+>   4. Run the rehearsal ≥2 weeks; every cycle green (reconcile clean + `live tracking` OK).
+>   5. Your sign-off → scale risk caps up gradually.
+> Items below are the older granular tracking; the live-vs-replay gate (D5)
+> supersedes the paper-only one.
+
 - [ ] ≥2 weeks of paper history → review ~2026-06-24: win rate, max DD,
       holding periods vs backtest; paper fill prices vs backtest's 0.1%
       commission assumption (Robinhood = commission-free + spread) →
