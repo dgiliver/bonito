@@ -89,6 +89,15 @@ your own machine or from [claude.ai/code/routines](https://claude.ai/code/routin
    Claude will collect the repo, environment, connectors, and the prompt
    (paste the prompt below). Include only the Robinhood connector.
 
+   **Pick a small model for the Routine.** The cycle is mechanical
+   orchestration — the strategy/decision logic runs in the deterministic CLI,
+   not the LLM — so Sonnet (or Haiku) is plenty and far cheaper per run than a
+   frontier model. A daily Routine plus a multi-week rehearsal makes per-run
+   cost add up; the token-discipline preamble in the prompt + a small model
+   keeps each run lean. (Bump back up only if a run starts needing real
+   judgment, which it shouldn't — every decision is either a CLI exit code or
+   a fail-closed STOP.)
+
    **Picking the time — a real tradeoff, not a free choice.** The live cycle
    *must* run during regular hours: Robinhood fractional/dollar orders only
    fill in RTH, so the after-close pattern the paper GitHub Action uses
@@ -125,6 +134,21 @@ You are running the Bonito daily live trading cycle on the Robinhood
 Agentic cash account, unattended. Follow these steps exactly. If any step
 aborts, STOP, commit nothing new, and end the run reporting what happened —
 never improvise an order.
+
+Token discipline (this runs daily, unattended — be lean):
+- Everything you need is in this prompt. Do NOT read source files, docs, or
+  CLAUDE.md, and do NOT explore the repo. Do NOT plan or narrate reasoning.
+- The strategy/decision logic is all inside `bonito live run` (deterministic,
+  no LLM) — your only job is to run the commands and place/record the orders
+  it emits. Don't second-guess or re-derive intents.
+- Run each command, check its exit code, move on. Do NOT echo full command
+  output or paste raw MCP/JSON blobs — pull only the field you need (fill
+  price, filled qty, order id).
+- Minimum tool calls: one get_accounts, one get_equity_positions to reconcile,
+  then per intent review→place→record, one `live tracking`, one commit. Never
+  re-fetch or re-run a step that already succeeded.
+- Final report ≤ 8 lines: what filled / didn't, reconcile + tracking status,
+  any abort reason. Nothing else.
 
 Setup:
 - `[ -d .venv ] || python3.12 -m venv .venv && .venv/bin/pip install -e "." --quiet`
