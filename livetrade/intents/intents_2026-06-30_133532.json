@@ -1,0 +1,14 @@
+[
+  {
+    "symbol": "AMD",
+    "side": "sell",
+    "dollar_amount": null,
+    "quantity": 1.3478483480509003,
+    "reason": "take profit triggered (intraday)",
+    "signal_price": 560.1900024414062,
+    "signal_date": "2026-06-30T13:35:32.173057Z",
+    "strategy_name": "ema_cross_rsi_atr_regime",
+    "generated_at": "2026-06-30T13:35:32.173168Z",
+    "broker_order_id": null
+  }
+]

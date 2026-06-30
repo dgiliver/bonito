@@ -1,5 +1,5 @@
 {
-  "cash": 140.64661282107204,
+  "cash": 895.6977822063512,
   "starting_cash": 5000.0,
   "positions": {
     "DELL": {
@@ -8,106 +8,6 @@
       "entry_price": 409.07000732421875,
       "entry_date": "2026-06-15T23:11:11.021279Z",
       "high_water_mark": 438.20989990234375,
-      "strategy_name": "ema_cross_rsi_atr_regime",
-      "strategy_hash": "da16575a5622",
-      "strategy_config": {
-        "name": "ema_cross_rsi_atr_regime",
-        "description": "EMA 10/26 cross + RSI<68, 2.0x ATR(14) trailing stop, 10% TP, SPY>SMA200 regime gate. Exit rule VALIDATED 2026-06-12: removing it degrades the account replay despite negative raw attribution (docs/EXPERIMENT_LOG.md) — do not strip it without fresh replay evidence.",
-        "version": "2.0",
-        "symbols": [
-          "SPY"
-        ],
-        "timeframe": "1d",
-        "indicators": [
-          {
-            "type": "ema",
-            "name": "ema_fast",
-            "params": {
-              "period": 10
-            }
-          },
-          {
-            "type": "ema",
-            "name": "ema_slow",
-            "params": {
-              "period": 26
-            }
-          },
-          {
-            "type": "rsi",
-            "name": "rsi_14",
-            "params": {
-              "period": 14
-            }
-          }
-        ],
-        "entry_rules": [
-          {
-            "conditions": [
-              {
-                "left": "ema_fast",
-                "comparison": "gt",
-                "right": "ema_slow",
-                "lookback": null
-              },
-              {
-                "left": "close",
-                "comparison": "gt",
-                "right": "ema_slow",
-                "lookback": null
-              },
-              {
-                "left": "rsi_14",
-                "comparison": "lt",
-                "right": 68.0,
-                "lookback": null
-              }
-            ],
-            "logic": "AND",
-            "side": "long"
-          }
-        ],
-        "exit_rules": [
-          {
-            "conditions": [
-              {
-                "left": "ema_fast",
-                "comparison": "crosses_below",
-                "right": "ema_slow",
-                "lookback": null
-              }
-            ],
-            "logic": "AND",
-            "side": "long"
-          }
-        ],
-        "position_size": {
-          "type": "percent_equity",
-          "value": 98.0
-        },
-        "max_positions": 1,
-        "stop_loss": {
-          "type": "trailing_atr",
-          "value": 2.0,
-          "atr_period": 14,
-          "trigger_percent": null
-        },
-        "take_profit": {
-          "type": "percent",
-          "value": 0.1
-        },
-        "regime_filter": {
-          "symbol": "SPY",
-          "sma_period": 200
-        }
-      }
-    },
-    "AMD": {
-      "symbol": "AMD",
-      "quantity": 1.3478483480509003,
-      "entry_price": 507.2900085449219,
-      "entry_date": "2026-06-16T23:05:06.004594Z",
-      "high_water_mark": 551.6300048828125,
       "strategy_name": "ema_cross_rsi_atr_regime",
       "strategy_hash": "da16575a5622",
       "strategy_config": {
@@ -607,7 +507,7 @@
       "quantity": 1.590540049247401,
       "entry_price": 432.3500061035156,
       "entry_date": "2026-06-26T22:54:55.168430Z",
-      "high_water_mark": 455.1000061035156,
+      "high_water_mark": 459.489990234375,
       "strategy_name": "ema_cross_rsi_atr_regime",
       "strategy_hash": "da16575a5622",
       "strategy_config": {
@@ -707,7 +607,7 @@
       "quantity": 5.3590240083333525,
       "entry_price": 128.32000732421875,
       "entry_date": "2026-06-26T22:54:55.168737Z",
-      "high_water_mark": 131.72000122070312,
+      "high_water_mark": 134.82000732421875,
       "strategy_name": "ema_cross_rsi_atr_regime",
       "strategy_hash": "da16575a5622",
       "strategy_config": {
@@ -1265,11 +1165,22 @@
       "filled_at": "2026-06-26T22:54:55.168737Z",
       "strategy_name": "ema_cross_rsi_atr_regime",
       "broker_order_id": null
+    },
+    {
+      "symbol": "AMD",
+      "side": "sell",
+      "quantity": 1.3478483480509003,
+      "price": 560.1900024414062,
+      "notional": 755.0511693852792,
+      "reason": "take profit triggered (intraday)",
+      "filled_at": "2026-06-30T13:35:32.179339Z",
+      "strategy_name": "ema_cross_rsi_atr_regime",
+      "broker_order_id": null
     }
   ],
-  "realized_pnl": 829.0666128210723,
+  "realized_pnl": 900.3677822063515,
   "peak_equity": 6004.595534551629,
   "halted": false,
   "halt_reason": "",
-  "updated_at": "2026-06-29T22:50:44.518470Z"
+  "updated_at": "2026-06-30T13:35:32.179738Z"
 }
