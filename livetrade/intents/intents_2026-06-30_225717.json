@@ -1,0 +1,50 @@
+[
+  {
+    "symbol": "TSM",
+    "side": "sell",
+    "dollar_amount": null,
+    "quantity": 1.590540049247401,
+    "reason": "take profit triggered",
+    "signal_price": 477.57000732421875,
+    "signal_date": "2026-06-30T04:00:00",
+    "strategy_name": "ema_cross_rsi_atr_regime",
+    "generated_at": "2026-06-30T22:57:17.096427Z",
+    "broker_order_id": null
+  },
+  {
+    "symbol": "ARM",
+    "side": "buy",
+    "dollar_amount": 740.44,
+    "quantity": null,
+    "reason": "entry rule matched: ema_fast gt ema_slow, close gt ema_slow, rsi_14 lt 68.0",
+    "signal_price": 354.57000732421875,
+    "signal_date": "2026-06-30T04:00:00",
+    "strategy_name": "ema_cross_rsi_atr_regime",
+    "generated_at": "2026-06-30T22:57:17.122221Z",
+    "broker_order_id": null
+  },
+  {
+    "symbol": "AMD",
+    "side": "buy",
+    "dollar_amount": 740.44,
+    "quantity": null,
+    "reason": "entry rule matched: ema_fast gt ema_slow, close gt ema_slow, rsi_14 lt 68.0",
+    "signal_price": 580.9099731445312,
+    "signal_date": "2026-06-30T04:00:00",
+    "strategy_name": "ema_cross_rsi_atr_regime",
+    "generated_at": "2026-06-30T22:57:17.140197Z",
+    "broker_order_id": null
+  },
+  {
+    "symbol": "WDC",
+    "side": "buy",
+    "dollar_amount": 74.29,
+    "quantity": null,
+    "reason": "entry rule matched: ema_fast gt ema_slow, close gt ema_slow, rsi_14 lt 68.0",
+    "signal_price": 638.719970703125,
+    "signal_date": "2026-06-30T04:00:00",
+    "strategy_name": "ema_cross_rsi_atr_regime",
+    "generated_at": "2026-06-30T22:57:17.157247Z",
+    "broker_order_id": null
+  }
+]
