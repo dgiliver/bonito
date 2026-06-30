@@ -52,8 +52,8 @@ job; orchestrator is sole writer of this doc).
 ## Task table
 | ID | Role | Task | Status | Result |
 |----|------|------|--------|--------|
-| F-1 | Planner | Re-verify RFC touchpoints; file:line diff plan + test plan; broker-positions-into-gate design; paper-safety guards | architect | dispatched | |
-| F-2 | Builder | Implement §5 (D1-D4) + D5 todo update | backend-dev | pending | |
+| F-1 | Planner | Re-verify RFC touchpoints; file:line diff plan + test plan; broker-positions-into-gate design; paper-safety guards | architect | done | RFC line numbers all accurate. **Key design (orchestrator-verified):** broker positions reach the D1 gate via the EXISTING `bonito live reconcile` step (the Routine already runs it fail-closed before preflight/run; `cli.py:1207` already exits 1 on drift) — so D1 is a refinement (0.5%-tolerance + `fatal_drift`/`reconcile_gate`, entry-only) NOT new plumbing; `preflight` stays broker-data-free. Kill-switch fail-closed goes in `generate_intents` (live-gated `LivePricingError`), NOT `equity()` (verified on the replay path `portfolio_backtest.py:302` → must stay byte-identical). D3: kw-only `fill_quantity=None` on apply_buy/sell + zero-qty `no_fill`; record-fill calls apply_buy/sell directly (execute_paper untouched). D2: `MAX_MEAN_FILL_BPS_LIVE=50` mode-aware band + zero-qty filter. 10 enumerated paper-safety guards; non-vacuous §7 test plan (incl. the monkeypatch test that's the only real proof of mode-awareness given equal bands). Orchestrator confirmed the 3 linchpins (reconcile-already-gates, equity-on-replay-path, apply_sell-ignores-intent.quantity). |
+| F-2 | Builder | Implement §5 (D1-D4) + D5 todo update | backend-dev | dispatched | |
 | F-3 | Tester | §7 test plan, non-vacuous | tdd-developer | pending | |
 | F-4 | Validator | Independent re-verify; PASS/FAIL | code-reviewer | pending | |
 
