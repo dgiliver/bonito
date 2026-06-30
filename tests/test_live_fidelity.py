@@ -387,9 +387,9 @@ class TestReconcileCLI:
         """ledger=1.0 AAA, broker=1.004 → 0.4% drift (sub-tolerance) → exit 0 + warning."""
         result = self._invoke_reconcile(tmp_path, '{"AAA": 1.004}')
         assert result.exit_code == 0
-        # Must surface the drift, not silently pass
-        output = (result.stdout or "") + (result.output or "")
-        assert "drift" in output.lower() or "sub" in output.lower() or "0.4" in output or "0.00" in output
+        # Must surface the drift explicitly, not silently pass
+        output = ((result.stdout or "") + (result.output or "")).lower()
+        assert "sub-tolerance" in output and "drift" in output
 
     def test_in_sync_exit_0(self, tmp_path):
         """ledger=1.0 AAA, broker=1.0 AAA → perfectly in sync → exit 0."""
