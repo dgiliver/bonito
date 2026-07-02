@@ -1,5 +1,5 @@
 {
-  "cash": 2828.75019055914,
+  "cash": 766.5501905591397,
   "starting_cash": 5000.0,
   "positions": {
     "DELL": {
@@ -408,6 +408,306 @@
       "entry_price": 638.719970703125,
       "entry_date": "2026-06-30T22:57:17.165773Z",
       "high_water_mark": 638.719970703125,
+      "strategy_name": "ema_cross_rsi_atr_regime",
+      "strategy_hash": "da16575a5622",
+      "strategy_config": {
+        "name": "ema_cross_rsi_atr_regime",
+        "description": "EMA 10/26 cross + RSI<68, 2.0x ATR(14) trailing stop, 10% TP, SPY>SMA200 regime gate. Exit rule VALIDATED 2026-06-12: removing it degrades the account replay despite negative raw attribution (docs/EXPERIMENT_LOG.md) — do not strip it without fresh replay evidence.",
+        "version": "2.0",
+        "symbols": [
+          "SPY"
+        ],
+        "timeframe": "1d",
+        "indicators": [
+          {
+            "type": "ema",
+            "name": "ema_fast",
+            "params": {
+              "period": 10
+            }
+          },
+          {
+            "type": "ema",
+            "name": "ema_slow",
+            "params": {
+              "period": 26
+            }
+          },
+          {
+            "type": "rsi",
+            "name": "rsi_14",
+            "params": {
+              "period": 14
+            }
+          }
+        ],
+        "entry_rules": [
+          {
+            "conditions": [
+              {
+                "left": "ema_fast",
+                "comparison": "gt",
+                "right": "ema_slow",
+                "lookback": null
+              },
+              {
+                "left": "close",
+                "comparison": "gt",
+                "right": "ema_slow",
+                "lookback": null
+              },
+              {
+                "left": "rsi_14",
+                "comparison": "lt",
+                "right": 68.0,
+                "lookback": null
+              }
+            ],
+            "logic": "AND",
+            "side": "long"
+          }
+        ],
+        "exit_rules": [
+          {
+            "conditions": [
+              {
+                "left": "ema_fast",
+                "comparison": "crosses_below",
+                "right": "ema_slow",
+                "lookback": null
+              }
+            ],
+            "logic": "AND",
+            "side": "long"
+          }
+        ],
+        "position_size": {
+          "type": "percent_equity",
+          "value": 98.0
+        },
+        "max_positions": 1,
+        "stop_loss": {
+          "type": "trailing_atr",
+          "value": 2.0,
+          "atr_period": 14,
+          "trigger_percent": null
+        },
+        "take_profit": {
+          "type": "percent",
+          "value": 0.1
+        },
+        "regime_filter": {
+          "symbol": "SPY",
+          "sma_period": 200
+        }
+      }
+    },
+    "HOOD": {
+      "symbol": "HOOD",
+      "quantity": 6.097755517876693,
+      "entry_price": 112.7300033569336,
+      "entry_date": "2026-07-02T22:52:41.521078Z",
+      "high_water_mark": 112.7300033569336,
+      "strategy_name": "ema_cross_rsi_atr_regime",
+      "strategy_hash": "da16575a5622",
+      "strategy_config": {
+        "name": "ema_cross_rsi_atr_regime",
+        "description": "EMA 10/26 cross + RSI<68, 2.0x ATR(14) trailing stop, 10% TP, SPY>SMA200 regime gate. Exit rule VALIDATED 2026-06-12: removing it degrades the account replay despite negative raw attribution (docs/EXPERIMENT_LOG.md) — do not strip it without fresh replay evidence.",
+        "version": "2.0",
+        "symbols": [
+          "SPY"
+        ],
+        "timeframe": "1d",
+        "indicators": [
+          {
+            "type": "ema",
+            "name": "ema_fast",
+            "params": {
+              "period": 10
+            }
+          },
+          {
+            "type": "ema",
+            "name": "ema_slow",
+            "params": {
+              "period": 26
+            }
+          },
+          {
+            "type": "rsi",
+            "name": "rsi_14",
+            "params": {
+              "period": 14
+            }
+          }
+        ],
+        "entry_rules": [
+          {
+            "conditions": [
+              {
+                "left": "ema_fast",
+                "comparison": "gt",
+                "right": "ema_slow",
+                "lookback": null
+              },
+              {
+                "left": "close",
+                "comparison": "gt",
+                "right": "ema_slow",
+                "lookback": null
+              },
+              {
+                "left": "rsi_14",
+                "comparison": "lt",
+                "right": 68.0,
+                "lookback": null
+              }
+            ],
+            "logic": "AND",
+            "side": "long"
+          }
+        ],
+        "exit_rules": [
+          {
+            "conditions": [
+              {
+                "left": "ema_fast",
+                "comparison": "crosses_below",
+                "right": "ema_slow",
+                "lookback": null
+              }
+            ],
+            "logic": "AND",
+            "side": "long"
+          }
+        ],
+        "position_size": {
+          "type": "percent_equity",
+          "value": 98.0
+        },
+        "max_positions": 1,
+        "stop_loss": {
+          "type": "trailing_atr",
+          "value": 2.0,
+          "atr_period": 14,
+          "trigger_percent": null
+        },
+        "take_profit": {
+          "type": "percent",
+          "value": 0.1
+        },
+        "regime_filter": {
+          "symbol": "SPY",
+          "sma_period": 200
+        }
+      }
+    },
+    "TSM": {
+      "symbol": "TSM",
+      "quantity": 1.5832872540119516,
+      "entry_price": 434.1600036621094,
+      "entry_date": "2026-07-02T22:52:41.521373Z",
+      "high_water_mark": 434.1600036621094,
+      "strategy_name": "ema_cross_rsi_atr_regime",
+      "strategy_hash": "da16575a5622",
+      "strategy_config": {
+        "name": "ema_cross_rsi_atr_regime",
+        "description": "EMA 10/26 cross + RSI<68, 2.0x ATR(14) trailing stop, 10% TP, SPY>SMA200 regime gate. Exit rule VALIDATED 2026-06-12: removing it degrades the account replay despite negative raw attribution (docs/EXPERIMENT_LOG.md) — do not strip it without fresh replay evidence.",
+        "version": "2.0",
+        "symbols": [
+          "SPY"
+        ],
+        "timeframe": "1d",
+        "indicators": [
+          {
+            "type": "ema",
+            "name": "ema_fast",
+            "params": {
+              "period": 10
+            }
+          },
+          {
+            "type": "ema",
+            "name": "ema_slow",
+            "params": {
+              "period": 26
+            }
+          },
+          {
+            "type": "rsi",
+            "name": "rsi_14",
+            "params": {
+              "period": 14
+            }
+          }
+        ],
+        "entry_rules": [
+          {
+            "conditions": [
+              {
+                "left": "ema_fast",
+                "comparison": "gt",
+                "right": "ema_slow",
+                "lookback": null
+              },
+              {
+                "left": "close",
+                "comparison": "gt",
+                "right": "ema_slow",
+                "lookback": null
+              },
+              {
+                "left": "rsi_14",
+                "comparison": "lt",
+                "right": 68.0,
+                "lookback": null
+              }
+            ],
+            "logic": "AND",
+            "side": "long"
+          }
+        ],
+        "exit_rules": [
+          {
+            "conditions": [
+              {
+                "left": "ema_fast",
+                "comparison": "crosses_below",
+                "right": "ema_slow",
+                "lookback": null
+              }
+            ],
+            "logic": "AND",
+            "side": "long"
+          }
+        ],
+        "position_size": {
+          "type": "percent_equity",
+          "value": 98.0
+        },
+        "max_positions": 1,
+        "stop_loss": {
+          "type": "trailing_atr",
+          "value": 2.0,
+          "atr_period": 14,
+          "trigger_percent": null
+        },
+        "take_profit": {
+          "type": "percent",
+          "value": 0.1
+        },
+        "regime_filter": {
+          "symbol": "SPY",
+          "sma_period": 200
+        }
+      }
+    },
+    "LLY": {
+      "symbol": "LLY",
+      "quantity": 0.5662693120948767,
+      "entry_price": 1213.9100341796875,
+      "entry_date": "2026-07-02T22:52:41.521539Z",
+      "high_water_mark": 1213.9100341796875,
       "strategy_name": "ema_cross_rsi_atr_regime",
       "strategy_hash": "da16575a5622",
       "strategy_config": {
@@ -1064,11 +1364,44 @@
       "filled_at": "2026-07-02T15:55:20.499986Z",
       "strategy_name": "ema_cross_rsi_atr_regime",
       "broker_order_id": null
+    },
+    {
+      "symbol": "HOOD",
+      "side": "buy",
+      "quantity": 6.097755517876693,
+      "price": 112.7300033569336,
+      "notional": 687.4,
+      "reason": "entry rule matched: ema_fast gt ema_slow, close gt ema_slow, rsi_14 lt 68.0",
+      "filled_at": "2026-07-02T22:52:41.521078Z",
+      "strategy_name": "ema_cross_rsi_atr_regime",
+      "broker_order_id": null
+    },
+    {
+      "symbol": "TSM",
+      "side": "buy",
+      "quantity": 1.5832872540119516,
+      "price": 434.1600036621094,
+      "notional": 687.4,
+      "reason": "entry rule matched: ema_fast gt ema_slow, close gt ema_slow, rsi_14 lt 68.0",
+      "filled_at": "2026-07-02T22:52:41.521373Z",
+      "strategy_name": "ema_cross_rsi_atr_regime",
+      "broker_order_id": null
+    },
+    {
+      "symbol": "LLY",
+      "side": "buy",
+      "quantity": 0.5662693120948767,
+      "price": 1213.9100341796875,
+      "notional": 687.4,
+      "reason": "entry rule matched: ema_fast gt ema_slow, close gt ema_slow, rsi_14 lt 68.0",
+      "filled_at": "2026-07-02T22:52:41.521539Z",
+      "strategy_name": "ema_cross_rsi_atr_regime",
+      "broker_order_id": null
     }
   ],
   "realized_pnl": 831.2001905591401,
   "peak_equity": 6004.595534551629,
   "halted": false,
   "halt_reason": "",
-  "updated_at": "2026-07-02T18:58:38.423560Z"
+  "updated_at": "2026-07-02T22:52:41.521957Z"
 }
