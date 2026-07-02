@@ -1,0 +1,14 @@
+[
+  {
+    "symbol": "HOOD",
+    "side": "sell",
+    "dollar_amount": null,
+    "quantity": 7.100274396939698,
+    "reason": "take profit triggered (intraday)",
+    "signal_price": 116.7300033569336,
+    "signal_date": "2026-07-02T13:33:40.911147Z",
+    "strategy_name": "ema_cross_rsi_atr_regime",
+    "generated_at": "2026-07-02T13:33:40.911303Z",
+    "broker_order_id": null
+  }
+]
