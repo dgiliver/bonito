@@ -522,6 +522,53 @@ def compute_position_atrs(
     return atrs
 
 
+def compute_stop_levels(
+    universe: UniverseConfig,
+    ledger: PaperLedger,
+    store: MarketDataStore,
+    as_of: datetime | None = None,
+) -> dict[str, dict]:
+    """Current stop-loss / take-profit price for each open position.
+
+    For broker-side GTC orders: unlike check_stops (which fires an intent
+    once a live quote crosses the level), this reports the level itself so
+    the Routine can place/replace a real stop order that Robinhood enforces
+    without polling. Trailing stop types ratchet with high_water_mark, so
+    this must be recomputed (and the broker order replaced) every cycle.
+
+    Positions without enough stored bars for an ATR stop are omitted —
+    the caller should leave any existing broker stop in place rather than
+    guessing a level.
+    """
+    atrs = compute_position_atrs(universe, ledger, store, as_of)
+    levels: dict[str, dict] = {}
+    for symbol, pos in ledger.positions.items():
+        strategy = _position_strategy(pos, universe)
+        stop_price = None
+        if strategy.stop_loss:
+            stop_price = signals.stop_level(
+                "long",
+                pos.entry_price,
+                strategy.stop_loss,
+                tracked_extreme=pos.high_water_mark,
+                atr=atrs.get(symbol),
+            )
+        take_profit_price = (
+            signals.take_profit_level("long", pos.entry_price, strategy.take_profit)
+            if strategy.take_profit
+            else None
+        )
+        if stop_price is None and take_profit_price is None:
+            continue
+        levels[symbol] = {
+            "quantity": pos.quantity,
+            "stop_price": stop_price,
+            "stop_type": strategy.stop_loss.type.value if strategy.stop_loss else None,
+            "take_profit_price": take_profit_price,
+        }
+    return levels
+
+
 def check_stops(
     universe: UniverseConfig,
     ledger: PaperLedger,

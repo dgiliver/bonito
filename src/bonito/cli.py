@@ -1180,6 +1180,28 @@ def _sweep_stops(universe, ledger, prices: dict[str, float], execute: bool) -> N
     ledger.save()
 
 
+@live_app.command("stop-levels")
+def live_stop_levels(
+    universe_path: str = typer.Option("config/universe.json", "--universe", "-u"),
+) -> None:
+    """Print each open position's current stop-loss/take-profit price as JSON.
+
+    For placing/refreshing broker-side GTC stop orders: unlike `sweep`,
+    which polls a live quote against the stop, this reports the level
+    itself. Trailing stops ratchet with the high-water mark, so re-run
+    (and replace any existing broker order) every cycle. Output:
+    {"SYMBOL": {"quantity", "stop_price", "stop_type", "take_profit_price"}}.
+    """
+    import json as _json
+
+    from bonito.trading.live_runner import compute_stop_levels
+
+    universe = _load_universe(universe_path)
+    ledger = _load_ledger(universe)
+    levels = compute_stop_levels(universe, ledger, _get_store())
+    print(_json.dumps(levels, indent=2))
+
+
 @live_app.command("reconcile")
 def live_reconcile(
     positions_json: str = typer.Argument(

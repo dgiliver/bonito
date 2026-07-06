@@ -145,9 +145,12 @@ Token discipline (this runs daily, unattended — be lean):
   output or paste raw MCP/JSON blobs — pull only the field you need (fill
   price, filled qty, order id).
 - Minimum tool calls: one get_accounts, one get_equity_positions to reconcile,
-  then per intent review→place→record, one `live tracking`, one commit. Never
-  re-fetch or re-run a step that already succeeded.
-- Final report ≤ 8 lines: what filled / didn't, reconcile + tracking status,
+  then per intent review→place→record, one get_equity_orders (to find existing
+  stop order ids) plus per-symbol cancel→place for the stop refresh, one
+  `live tracking`, one commit. Never re-fetch or re-run a step that already
+  succeeded.
+- Final report ≤ 8 lines: what filled / didn't, stops placed/replaced,
+  reconcile + tracking status,
   any abort reason. Nothing else.
 
 Setup:
@@ -192,17 +195,36 @@ Setup:
    On any order error: STOP, report what filled and what didn't, do not retry.
 7. Reconcile again (get_equity_positions vs ledger). Report any FATAL
    mismatch; do not silently fix it.
-8. Fidelity check (the rehearsal gate): `.venv/bin/bonito live tracking
+8. Refresh broker-side stops: `.venv/bin/bonito live stop-levels
+   -u config/universe.live.json` prints JSON per open position
+   ({quantity, stop_price, stop_type, take_profit_price}; a symbol is
+   omitted if a level can't be computed yet — leave any existing broker
+   stop on that symbol alone). For every symbol it DOES list:
+   - Cancel that symbol's existing GTC stop order, if any (cancel_equity_order),
+     using the order id from get_equity_orders.
+   - Place a new GTC stop order (place_equity_order, time_in_force GTC,
+     trigger stop, quantity = the position's full current share count) at
+     `stop_price`. Skip a symbol entirely if you can't find/confirm its
+     existing order id — do not stack duplicate stops.
+   Do this every cycle, even when nothing else traded: trailing stop types
+   ratchet with the high-water mark, so yesterday's stop price is stale.
+   This is what gives 24/7 protection between cycles — Robinhood enforces
+   the order with no session running. take_profit_price is informational
+   only (Robinhood stop orders don't natively express a take-profit leg);
+   skip placing anything for it unless you've been told otherwise.
+9. Fidelity check (the rehearsal gate): `.venv/bin/bonito live tracking
    -u config/universe.live.json`. Status must be OK. WARN = live fills are
    diverging from the replay beyond the fill-bps band — report it; during the
    rehearsal a WARN is a gate failure to investigate before the next cycle.
-9. Persist: `.venv/bin/bonito live status -u config/universe.live.json`,
-   then `git add livetrade/ && git commit -m "chore(livetrade): live cycle
-   $(date -u +%F)" && git push`.
+10. Persist: `.venv/bin/bonito live status -u config/universe.live.json`,
+    then `git add livetrade/ && git commit -m "chore(livetrade): live cycle
+    $(date -u +%F)" && git push`.
 
-Hard rules: never place an order not in the intents file; never trade the
-margin account; never run `bonito live resume`; never edit mode or
-live_enabled. If the kill switch is latched, report and stop.
+Hard rules: never place a market/limit order that isn't in the intents file;
+the only other orders you may place are the GTC stop orders in step 8, and
+only at the `stop_price` that command prints; never trade the margin
+account; never run `bonito live resume`; never edit mode or live_enabled.
+If the kill switch is latched, report and stop.
 ```
 
 ## Rehearsal protocol — the go-live gate
@@ -243,12 +265,21 @@ dogfood chain is clean.
 ## Intraday stops under a Routine
 
 A Routine can't poll every 15 minutes (one-hour minimum interval), so
-intraday protection should NOT depend on a sweep Routine. Use **broker-side
-GTC stop orders** instead (pre-live checklist item): the daily Routine
-places a stop order at Robinhood after each entry and cancel/replaces to
-ratchet trailing stops. Robinhood enforces those 24/7 with no session
-running at all — strictly better than a polling sweep, and it keeps the
-daily Routine within the run cap.
+intraday protection does NOT depend on a sweep Routine. Instead, step 8
+above uses `bonito live stop-levels` — a deterministic CLI command (same
+stop math as the paper `sweep`, via `compute_stop_levels` in
+`src/bonito/trading/live_runner.py`) that prints each open position's
+current stop price — to place/cancel-and-replace a real **GTC stop order**
+on Robinhood every cycle. Robinhood then enforces that order 24/7 with no
+session running at all: strictly better than a polling sweep (protection
+doesn't lapse between cycles or if a cycle is ever skipped), and it keeps
+the daily Routine within the one-run-per-day cadence.
+
+Note this only covers fixed/percent/ATR/trailing stops. `take_profit_price`
+is reported for visibility but not auto-placed — Robinhood's basic stop
+order doesn't express a one-cancels-other take-profit leg, and the daily
+cycle's own exit logic already sells on a take-profit signal at the next
+open.
 
 ## Your footprint once this is live
 

@@ -650,6 +650,70 @@ class TestComputePositionAtrs:
         assert compute_position_atrs(universe, ledger, FakeStore({}), as_of=AS_OF) == {}
 
 
+class TestComputeStopLevels:
+    def test_trailing_percent_and_take_profit(self, universe):
+        from bonito.trading.live_runner import compute_stop_levels
+
+        ledger = PaperLedger(cash=0.0, starting_cash=150.0)
+        _open_position(ledger, "AAA", quantity=0.5, entry_price=100.0, hwm=110.0)
+
+        levels = compute_stop_levels(universe, ledger, FakeStore({}), as_of=AS_OF)
+
+        assert levels["AAA"]["quantity"] == 0.5
+        assert levels["AAA"]["stop_type"] == "trailing_percent"
+        assert levels["AAA"]["stop_price"] == pytest.approx(110.0 * 0.95)
+        assert levels["AAA"]["take_profit_price"] == pytest.approx(110.0)
+
+    def test_ratchets_with_high_water_mark(self, universe):
+        """Same position, higher hwm -> a higher (tighter) stop -- proves the
+        level isn't just derived from entry_price, so the Routine actually
+        needs to replace the broker order each cycle, not set-and-forget."""
+        from bonito.trading.live_runner import compute_stop_levels
+
+        low_hwm_ledger = PaperLedger(cash=0.0, starting_cash=150.0)
+        _open_position(low_hwm_ledger, "AAA", quantity=0.5, entry_price=100.0, hwm=100.0)
+        high_hwm_ledger = PaperLedger(cash=0.0, starting_cash=150.0)
+        _open_position(high_hwm_ledger, "AAA", quantity=0.5, entry_price=100.0, hwm=120.0)
+
+        low = compute_stop_levels(universe, low_hwm_ledger, FakeStore({}), as_of=AS_OF)
+        high = compute_stop_levels(universe, high_hwm_ledger, FakeStore({}), as_of=AS_OF)
+
+        assert high["AAA"]["stop_price"] > low["AAA"]["stop_price"]
+
+    def test_atr_stop_omitted_without_bars(self, universe, tmp_path):
+        """Mirrors compute_position_atrs: no bars -> can't compute a level,
+        so the symbol is omitted rather than guessing a stop price."""
+        from bonito.trading.live_runner import compute_stop_levels
+
+        atr_strategy = {
+            **ALWAYS_ENTER_STRATEGY,
+            "name": "atr_stop",
+            "stop_loss": {"type": "trailing_atr", "value": 2.0, "atr_period": 14},
+            "take_profit": None,
+        }
+        path = tmp_path / "atr_stop.json"
+        path.write_text(json.dumps(atr_strategy))
+        universe.symbol_strategies = {"AAA": str(path)}
+
+        ledger = PaperLedger(cash=0.0, starting_cash=150.0)
+        _open_position(ledger, "AAA", quantity=1.0, entry_price=100.0)
+
+        assert compute_stop_levels(universe, ledger, FakeStore({}), as_of=AS_OF) == {}
+
+    def test_no_stop_or_take_profit_configured_is_omitted(self, universe, tmp_path):
+        from bonito.trading.live_runner import compute_stop_levels
+
+        no_exit_strategy = {**ALWAYS_ENTER_STRATEGY, "stop_loss": None, "take_profit": None}
+        path = tmp_path / "no_exit.json"
+        path.write_text(json.dumps(no_exit_strategy))
+        universe.symbol_strategies = {"AAA": str(path)}
+
+        ledger = PaperLedger(cash=0.0, starting_cash=150.0)
+        _open_position(ledger, "AAA", quantity=1.0, entry_price=100.0)
+
+        assert compute_stop_levels(universe, ledger, FakeStore({}), as_of=AS_OF) == {}
+
+
 class TestRefreshSubset:
     class RecordingStore(FakeStore):
         def __init__(self):
