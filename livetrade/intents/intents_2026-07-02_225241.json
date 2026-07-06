@@ -1,0 +1,38 @@
+[
+  {
+    "symbol": "HOOD",
+    "side": "buy",
+    "dollar_amount": 687.4,
+    "quantity": null,
+    "reason": "entry rule matched: ema_fast gt ema_slow, close gt ema_slow, rsi_14 lt 68.0",
+    "signal_price": 112.7300033569336,
+    "signal_date": "2026-07-02T04:00:00",
+    "strategy_name": "ema_cross_rsi_atr_regime",
+    "generated_at": "2026-07-02T22:52:41.463957Z",
+    "broker_order_id": null
+  },
+  {
+    "symbol": "TSM",
+    "side": "buy",
+    "dollar_amount": 687.4,
+    "quantity": null,
+    "reason": "entry rule matched: ema_fast gt ema_slow, close gt ema_slow, rsi_14 lt 68.0",
+    "signal_price": 434.1600036621094,
+    "signal_date": "2026-07-02T04:00:00",
+    "strategy_name": "ema_cross_rsi_atr_regime",
+    "generated_at": "2026-07-02T22:52:41.488945Z",
+    "broker_order_id": null
+  },
+  {
+    "symbol": "LLY",
+    "side": "buy",
+    "dollar_amount": 687.4,
+    "quantity": null,
+    "reason": "entry rule matched: ema_fast gt ema_slow, close gt ema_slow, rsi_14 lt 68.0",
+    "signal_price": 1213.9100341796875,
+    "signal_date": "2026-07-02T04:00:00",
+    "strategy_name": "ema_cross_rsi_atr_regime",
+    "generated_at": "2026-07-02T22:52:41.513893Z",
+    "broker_order_id": null
+  }
+]

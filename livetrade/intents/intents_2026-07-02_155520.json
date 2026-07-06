@@ -1,0 +1,26 @@
+[
+  {
+    "symbol": "MU",
+    "side": "sell",
+    "dollar_amount": null,
+    "quantity": 0.5897853962245476,
+    "reason": "stop loss triggered (intraday)",
+    "signal_price": 994.7399291992188,
+    "signal_date": "2026-07-02T15:55:20.492892Z",
+    "strategy_name": "ema_cross_rsi_atr_regime",
+    "generated_at": "2026-07-02T15:55:20.493142Z",
+    "broker_order_id": null
+  },
+  {
+    "symbol": "SNDK",
+    "side": "sell",
+    "dollar_amount": null,
+    "quantity": 0.3065267665952891,
+    "reason": "stop loss triggered (intraday)",
+    "signal_price": 1806.2000732421875,
+    "signal_date": "2026-07-02T15:55:20.492892Z",
+    "strategy_name": "ema_cross_rsi_atr_regime",
+    "generated_at": "2026-07-02T15:55:20.493177Z",
+    "broker_order_id": null
+  }
+]

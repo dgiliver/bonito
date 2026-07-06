@@ -1,0 +1,14 @@
+[
+  {
+    "symbol": "INTC",
+    "side": "sell",
+    "dollar_amount": null,
+    "quantity": 5.3590240083333525,
+    "reason": "take profit triggered (intraday)",
+    "signal_price": 141.7200927734375,
+    "signal_date": "2026-06-30T17:23:28.477593Z",
+    "strategy_name": "ema_cross_rsi_atr_regime",
+    "generated_at": "2026-06-30T17:23:28.477808Z",
+    "broker_order_id": null
+  }
+]
