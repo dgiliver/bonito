@@ -4,7 +4,7 @@
   "broker": "robinhood",
   "account_nickname": "Agentic",
   "mode": "live",
-  "live_enabled": false,
+  "live_enabled": true,
   "symbols": [
     "TSLA",
     "PLTR",
