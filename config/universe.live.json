@@ -4,7 +4,7 @@
   "broker": "robinhood",
   "account_nickname": "Agentic",
   "mode": "live",
-  "live_enabled": false,
+  "live_enabled": true,
   "symbols": [
     "TSLA",
     "PLTR",
@@ -40,11 +40,7 @@
     "AXON",
     "CORZ"
   ],
-  "entry_allowlist": [
-    "COST",
-    "MSFT",
-    "TSM"
-  ],
+  "entry_allowlist": null,
   "strategy_path": "strategies/deployed_strategy.json",
   "symbol_strategies": {
     "AAPL": "strategies/cluster_AAPL_54746177d5a1.json",

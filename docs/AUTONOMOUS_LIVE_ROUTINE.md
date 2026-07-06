@@ -89,6 +89,15 @@ your own machine or from [claude.ai/code/routines](https://claude.ai/code/routin
    Claude will collect the repo, environment, connectors, and the prompt
    (paste the prompt below). Include only the Robinhood connector.
 
+   **Pick a small model for the Routine.** The cycle is mechanical
+   orchestration — the strategy/decision logic runs in the deterministic CLI,
+   not the LLM — so Sonnet (or Haiku) is plenty and far cheaper per run than a
+   frontier model. A daily Routine plus a multi-week rehearsal makes per-run
+   cost add up; the token-discipline preamble in the prompt + a small model
+   keeps each run lean. (Bump back up only if a run starts needing real
+   judgment, which it shouldn't — every decision is either a CLI exit code or
+   a fail-closed STOP.)
+
    **Picking the time — a real tradeoff, not a free choice.** The live cycle
    *must* run during regular hours: Robinhood fractional/dollar orders only
    fill in RTH, so the after-close pattern the paper GitHub Action uses
@@ -126,6 +135,21 @@ Agentic cash account, unattended. Follow these steps exactly. If any step
 aborts, STOP, commit nothing new, and end the run reporting what happened —
 never improvise an order.
 
+Token discipline (this runs daily, unattended — be lean):
+- Everything you need is in this prompt. Do NOT read source files, docs, or
+  CLAUDE.md, and do NOT explore the repo. Do NOT plan or narrate reasoning.
+- The strategy/decision logic is all inside `bonito live run` (deterministic,
+  no LLM) — your only job is to run the commands and place/record the orders
+  it emits. Don't second-guess or re-derive intents.
+- Run each command, check its exit code, move on. Do NOT echo full command
+  output or paste raw MCP/JSON blobs — pull only the field you need (fill
+  price, filled qty, order id).
+- Minimum tool calls: one get_accounts, one get_equity_positions to reconcile,
+  then per intent review→place→record, one `live tracking`, one commit. Never
+  re-fetch or re-run a step that already succeeded.
+- Final report ≤ 8 lines: what filled / didn't, reconcile + tracking status,
+  any abort reason. Nothing else.
+
 Setup:
 - `[ -d .venv ] || python3.12 -m venv .venv && .venv/bin/pip install -e "." --quiet`
 - `git pull origin <branch>` to get the latest ledger.
@@ -138,8 +162,11 @@ Setup:
    same fail-closed posture as every other step below.
 2. Reconcile: get_equity_positions for that account → build
    {"SYMBOL": qty} JSON ({} if flat) → `.venv/bin/bonito live reconcile
-   '<json>' -u config/universe.live.json`. Non-zero exit = drift: STOP,
-   report, do not trade.
+   '<json>' -u config/universe.live.json`. Exit 1 = FATAL drift (>0.5% of a
+   position's shares, or a position in one side but not the other): STOP,
+   report, do not trade. Exit 0 with a "sub-tolerance drift" warning is fine
+   to proceed — the 0.5% gate absorbs fractional-rounding noise. The drift
+   gate blocks new entries only; it never blocks an exit.
 3. Refresh data: `.venv/bin/bonito live refresh -u config/universe.live.json`.
 4. Preflight: `.venv/bin/bonito live preflight -u config/universe.live.json`.
    Non-zero exit = ABORT: STOP and report (kill switch, data outage, or
@@ -149,15 +176,27 @@ Setup:
    places NOTHING itself.
 6. Execute ONLY the intents in the newest intents file, sells before buys:
    for each, Robinhood review_equity_order then place_equity_order (fresh
-   UUID ref_id), then `.venv/bin/bonito live record-fill SYMBOL SIDE PRICE
-   --dollars N --broker-order-id ID` (or `... SIDE PRICE --broker-order-id ID`
-   for sells) with the ACTUAL fill price and the order id from
-   place_equity_order's response (or get_equity_orders if not returned
-   directly). On any order error: STOP, report what filled and what didn't,
-   do not retry.
-7. Reconcile again (get_equity_positions vs ledger). Report any mismatch;
-   do not silently fix it.
-8. Persist: `.venv/bin/bonito live status -u config/universe.live.json`,
+   UUID ref_id). After the order resolves, read its ACTUAL filled quantity
+   and price (from place_equity_order's response, or get_equity_orders), then
+   record it:
+   - Filled (including a PARTIAL fill): `.venv/bin/bonito live record-fill
+     SYMBOL SIDE PRICE --shares <ACTUAL filled quantity> --broker-order-id ID
+     -u config/universe.live.json`. Use the broker's actual share count via
+     `--shares` (NOT `--dollars`): a partial fill or fractional rounding makes
+     dollars/price wrong, and `--shares` makes the ledger match the broker
+     exactly, so step 7's reconcile stays clean.
+   - Rejected / did NOT fill: `.venv/bin/bonito live record-fill SYMBOL SIDE
+     PRICE --no-fill -u config/universe.live.json` (PRICE = the intended/last
+     price; no order id needed). Logs the divergence as an explicit no-fill
+     instead of silently assuming the position exists.
+   On any order error: STOP, report what filled and what didn't, do not retry.
+7. Reconcile again (get_equity_positions vs ledger). Report any FATAL
+   mismatch; do not silently fix it.
+8. Fidelity check (the rehearsal gate): `.venv/bin/bonito live tracking
+   -u config/universe.live.json`. Status must be OK. WARN = live fills are
+   diverging from the replay beyond the fill-bps band — report it; during the
+   rehearsal a WARN is a gate failure to investigate before the next cycle.
+9. Persist: `.venv/bin/bonito live status -u config/universe.live.json`,
    then `git add livetrade/ && git commit -m "chore(livetrade): live cycle
    $(date -u +%F)" && git push`.
 
@@ -165,6 +204,41 @@ Hard rules: never place an order not in the intents file; never trade the
 margin account; never run `bonito live resume`; never edit mode or
 live_enabled. If the kill switch is latched, report and stop.
 ```
+
+## Rehearsal protocol — the go-live gate
+
+Going live is **graduated, not a binary flip**. The gate (pre-live checklist /
+`RFC_LIVE_FIDELITY.md` D5) is **≥2 weeks of green live-vs-replay tracking at
+1-share size**, every cycle, before any real size.
+
+**Sizing for the rehearsal (you set this — human-only).** In
+`config/universe.live.json`, set risk caps so each position is ~1 share: e.g.
+`max_position_usd` to a tiny value (~$30–50 covers 1 share of most universe
+names) and leave `position_pct_equity` null so it doesn't override. Blast
+radius is then a few dollars per name while the real execution path is proven.
+
+**Per-cycle pass criteria** (the Routine asserts these; any failure stops the
+cycle, places nothing further, reports):
+- Step 2 reconcile → exit 0, no FATAL drift.
+- Step 4 preflight → OK (no kill switch / flag mismatch / data outage).
+- Step 8 `live tracking` → status **OK** (live fills within the fill-bps band
+  of the replay; no decision divergence beyond tolerance).
+
+**The gate:** run every weekday. **≥2 consecutive weeks where every cycle is
+green** (reconcile clean + tracking OK) is the quantitative basis to trust the
+live account tracks paper/backtest.
+
+**Then, and only then:** your sign-off → keep `live_enabled: true` and **raise
+the risk caps gradually** (e.g. double the cap, watch a few cycles, repeat),
+re-checking `live tracking` at each step. The decision logic never changes —
+only the size — because the strategy pipeline is shared code and the fidelity
+work guarantees the live path matches the replay.
+
+**Dogfood first (zero risk):** create the Routine with `live_enabled: false`
+for a day or two. It reconciles, preflights, and generates intents but places
+NOTHING — proving container-on-schedule + connector auth + the full chain
+before any real order. Flip to `live_enabled: true` at 1-share size once the
+dogfood chain is clean.
 
 ## Intraday stops under a Routine
 
