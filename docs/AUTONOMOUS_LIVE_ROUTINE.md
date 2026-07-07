@@ -49,7 +49,7 @@ Routine until that sign-off.
    domain allowlisting. Domain access alone is NOT sufficient if the
    environment's outbound HTTPS goes through a TLS-intercepting proxy (as
    Claude Code cloud environments do) — see the `YF_DISABLE_CURL_CFFI=1`
-   step in Setup below; without it, refresh can silently ingest nothing
+   prefix on step 3 below; without it, refresh can silently ingest nothing
    while still exiting 0.
 5. The ••••8597 cash-only account scoping is **NOT enforced by any code in
    `src/bonito/`** — Bonito's own pipeline never contacts Robinhood at all;
@@ -159,17 +159,13 @@ Token discipline (this runs daily, unattended — be lean):
 Setup:
 - `[ -d .venv ] || python3.12 -m venv .venv && .venv/bin/pip install -e "." --quiet`
 - `git pull origin <branch>` to get the latest ledger.
-- `export YF_DISABLE_CURL_CFFI=1` — this sandbox's outbound HTTPS goes through
-  a TLS-intercepting proxy, which breaks yfinance's default `curl_cffi` backend
-  (browser-TLS-impersonation resets the connection before reaching Yahoo).
-  This forces yfinance's plain-`requests`-with-realistic-User-Agent fallback,
-  which works fine through the proxy. Without it, `bonito live refresh` can
-  silently ingest zero bars for every symbol (exits 0 — yfinance swallows the
-  connection reset as "no data" rather than raising) and preflight aborts the
-  whole cycle on a false "data outage."
 - Run every step in the foreground and wait for it to finish before moving on
   — do not background any command (including `refresh`). Two overlapping
-  `bonito` invocations will contend for DuckDB's single-writer lock.
+  `bonito` invocations will contend for DuckDB's single-writer lock. Also:
+  do not rely on a plain `export` to carry an env var from one step to the
+  next — each step may run as a separate shell, so step 3 below sets
+  `YF_DISABLE_CURL_CFFI=1` inline on the one command that needs it, not as
+  a standalone export.
 
 1. Resolve the account: Robinhood get_accounts → the one with
    agentic_allowed: true (nickname "Agentic", ••••8597). NEVER the margin
@@ -184,7 +180,16 @@ Setup:
    report, do not trade. Exit 0 with a "sub-tolerance drift" warning is fine
    to proceed — the 0.5% gate absorbs fractional-rounding noise. The drift
    gate blocks new entries only; it never blocks an exit.
-3. Refresh data: `.venv/bin/bonito live refresh -u config/universe.live.json`.
+3. Refresh data: `YF_DISABLE_CURL_CFFI=1 .venv/bin/bonito live refresh
+   -u config/universe.live.json`. The env var forces yfinance's plain-
+   `requests`-with-realistic-User-Agent fallback instead of its default
+   `curl_cffi` backend — this sandbox's outbound HTTPS goes through a
+   TLS-intercepting proxy, which breaks `curl_cffi`'s browser-TLS-
+   impersonation (it resets the connection before reaching Yahoo).
+   Without this, refresh can silently ingest zero bars for every symbol
+   while still exiting 0 (yfinance swallows the connection reset as "no
+   data" rather than raising), and preflight then aborts the whole cycle
+   on a false "data outage."
 4. Preflight: `.venv/bin/bonito live preflight -u config/universe.live.json`.
    Non-zero exit = ABORT: STOP and report (kill switch, data outage, or
    flag mismatch). Do not trade.
