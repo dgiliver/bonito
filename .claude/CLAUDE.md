@@ -33,6 +33,7 @@ bonito live reconcile '<{"SYMBOL":qty}>' [-u ...]        # Check broker position
 bonito live record-fill SYMBOL buy PRICE --dollars N --broker-order-id ID  # Record a live fill
 bonito live status [-u ...]                              # Print current positions + P&L
 bonito live sweep [--execute] [-u ...]                   # Intraday stop sweep
+bonito live stop-levels [-u ...]                         # Per-position stop/TP price, for broker-side GTC orders
 bonito live tracking [-u ...]                            # Paper-vs-replay fidelity check
 bonito live backtest-universe [-u ...]                   # Per-symbol strategy validation
 bonito live backtest-account [-u ...]                    # Full account-level replay
