@@ -150,8 +150,7 @@ Token discipline (this runs daily, unattended — be lean):
   `live tracking`, one commit. Never re-fetch or re-run a step that already
   succeeded.
 - Final report ≤ 8 lines: what filled / didn't, stops placed/replaced,
-  reconcile + tracking status,
-  any abort reason. Nothing else.
+  reconcile + tracking status, any abort reason. Nothing else.
 
 Setup:
 - `[ -d .venv ] || python3.12 -m venv .venv && .venv/bin/pip install -e "." --quiet`
@@ -200,12 +199,18 @@ Setup:
    ({quantity, stop_price, stop_type, take_profit_price}; a symbol is
    omitted if a level can't be computed yet — leave any existing broker
    stop on that symbol alone). For every symbol it DOES list:
-   - Cancel that symbol's existing GTC stop order, if any (cancel_equity_order),
-     using the order id from get_equity_orders.
+   - If `stop_price` is `null` for that symbol, do not cancel or place
+     anything for it — leave any existing broker stop alone.
+   - Otherwise, cancel that symbol's existing GTC stop order if one exists
+     (cancel_equity_order, using the order id from get_equity_orders). If
+     get_equity_orders shows no existing stop for this symbol, that's the
+     normal case for a newly-opened position — place the first one. Only
+     skip placing (without canceling anything) if an existing stop *does*
+     show up but you can't confirm which order is the current/valid one —
+     do not stack a duplicate on top of an unconfirmed order.
    - Place a new GTC stop order (place_equity_order, time_in_force GTC,
      trigger stop, quantity = the position's full current share count) at
-     `stop_price`. Skip a symbol entirely if you can't find/confirm its
-     existing order id — do not stack duplicate stops.
+     `stop_price`.
    Do this every cycle, even when nothing else traded: trailing stop types
    ratchet with the high-water mark, so yesterday's stop price is stale.
    This is what gives 24/7 protection between cycles — Robinhood enforces
