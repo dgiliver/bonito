@@ -248,7 +248,7 @@ radius is then a few dollars per name while the real execution path is proven.
 cycle, places nothing further, reports):
 - Step 2 reconcile → exit 0, no FATAL drift.
 - Step 4 preflight → OK (no kill switch / flag mismatch / data outage).
-- Step 8 `live tracking` → status **OK** (live fills within the fill-bps band
+- Step 9 `live tracking` → status **OK** (live fills within the fill-bps band
   of the replay; no decision divergence beyond tolerance).
 
 **The gate:** run every weekday. **≥2 consecutive weeks where every cycle is

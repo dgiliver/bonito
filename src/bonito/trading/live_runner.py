@@ -553,6 +553,11 @@ def compute_stop_levels(
                 tracked_extreme=pos.high_water_mark,
                 atr=atrs.get(symbol),
             )
+            if stop_price is None:
+                # Configured stop couldn't be priced (e.g. ATR stop, no bars
+                # yet) -- omit rather than report a take-profit-only entry
+                # that would read as "safe to touch the stop" to the caller.
+                continue
         take_profit_price = (
             signals.take_profit_level("long", pos.entry_price, strategy.take_profit)
             if strategy.take_profit

@@ -700,6 +700,33 @@ class TestComputeStopLevels:
 
         assert compute_stop_levels(universe, ledger, FakeStore({}), as_of=AS_OF) == {}
 
+    def test_atr_stop_omitted_without_bars_even_with_take_profit_configured(
+        self, universe, tmp_path
+    ):
+        """Regression: deployed_strategy.json (and most live symbols) pair a
+        trailing_atr stop with a percent take_profit -- the exact combination
+        that must NOT fall through to a "stop_price: null" entry when bars
+        are missing. A caller acting on stop_price alone for every listed
+        symbol would otherwise cancel a good existing broker stop and then
+        fail to replace it, during the very data-outage this guard exists
+        for."""
+        from bonito.trading.live_runner import compute_stop_levels
+
+        atr_and_tp_strategy = {
+            **ALWAYS_ENTER_STRATEGY,
+            "name": "atr_stop_with_tp",
+            "stop_loss": {"type": "trailing_atr", "value": 2.0, "atr_period": 14},
+            "take_profit": {"type": "percent", "value": 0.10},
+        }
+        path = tmp_path / "atr_stop_with_tp.json"
+        path.write_text(json.dumps(atr_and_tp_strategy))
+        universe.symbol_strategies = {"AAA": str(path)}
+
+        ledger = PaperLedger(cash=0.0, starting_cash=150.0)
+        _open_position(ledger, "AAA", quantity=1.0, entry_price=100.0)
+
+        assert compute_stop_levels(universe, ledger, FakeStore({}), as_of=AS_OF) == {}
+
     def test_no_stop_or_take_profit_configured_is_omitted(self, universe, tmp_path):
         from bonito.trading.live_runner import compute_stop_levels
 
