@@ -243,7 +243,14 @@ Setup:
    rehearsal a WARN is a gate failure to investigate before the next cycle.
 10. Persist: `.venv/bin/bonito live status -u config/universe.live.json`,
     then `git add livetrade/ && git commit -m "chore(livetrade): live cycle
-    $(date -u +%F)" && git push`.
+    $(date -u +%F)" && git push origin HEAD:main`. Use `HEAD:main` explicitly
+    — this container may check out its own dedicated working branch rather
+    than `main` directly, and a bare `git push` would silently land the
+    ledger update there instead of on `main`, where tomorrow's cycle
+    actually reads from. If this push is rejected (e.g. branch protection),
+    STOP and report it — do not fall back to a bare `git push`; a ledger
+    update that isn't on `main` is invisible to the next cycle and will
+    surface as a false reconcile drift.
 
 Hard rules: never place a market/limit order that isn't in the intents file;
 the only other orders you may place are the GTC stop orders in step 8, and
