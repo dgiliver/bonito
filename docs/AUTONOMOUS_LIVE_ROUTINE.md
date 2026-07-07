@@ -158,7 +158,10 @@ Token discipline (this runs daily, unattended — be lean):
 
 Setup:
 - `[ -d .venv ] || python3.12 -m venv .venv && .venv/bin/pip install -e "." --quiet`
-- `git pull origin <branch>` to get the latest ledger.
+- `git pull origin main` to get the latest ledger. Explicit `main`, not
+  whatever branch this container happens to have checked out — same
+  reasoning as step 10's push below: anchor to `main`, don't rely on
+  incidental branch-forking behavior.
 - Run every step in the foreground and wait for it to finish before moving on
   — do not background any command (including `refresh`). Two overlapping
   `bonito` invocations will contend for DuckDB's single-writer lock. Also:
