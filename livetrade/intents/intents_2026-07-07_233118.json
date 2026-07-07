@@ -1,0 +1,38 @@
+[
+  {
+    "symbol": "ARM",
+    "side": "sell",
+    "dollar_amount": null,
+    "quantity": 2.088275896734102,
+    "reason": "exit rule matched",
+    "signal_price": 300.42999267578125,
+    "signal_date": "2026-07-07T04:00:00",
+    "strategy_name": "ema_cross_rsi_atr_regime",
+    "generated_at": "2026-07-07T23:31:18.008152Z",
+    "broker_order_id": null
+  },
+  {
+    "symbol": "NOW",
+    "side": "buy",
+    "dollar_amount": 677.53,
+    "quantity": null,
+    "reason": "entry rule matched: ema_fast gt ema_slow, close gt ema_slow, rsi_14 lt 68.0",
+    "signal_price": 110.7300033569336,
+    "signal_date": "2026-07-07T04:00:00",
+    "strategy_name": "ema_cross_rsi_atr_regime",
+    "generated_at": "2026-07-07T23:31:18.110922Z",
+    "broker_order_id": null
+  },
+  {
+    "symbol": "GOOGL",
+    "side": "buy",
+    "dollar_amount": 511.9,
+    "quantity": null,
+    "reason": "entry rule matched: ema_fast gt ema_slow, close gt ema_slow, rsi_14 lt 60.0",
+    "signal_price": 367.0299987792969,
+    "signal_date": "2026-07-07T04:00:00",
+    "strategy_name": "c_ema20-50_rsi60_atr1.5_tp10",
+    "generated_at": "2026-07-07T23:31:18.189300Z",
+    "broker_order_id": null
+  }
+]
