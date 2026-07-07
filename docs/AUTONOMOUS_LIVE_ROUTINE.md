@@ -46,7 +46,11 @@ Routine until that sign-off.
 4. The environment's network access allows Yahoo Finance
    (`query1.finance.yahoo.com`, `query2.finance.yahoo.com`) for the data
    refresh. Robinhood MCP traffic routes through Anthropic and needs no
-   domain allowlisting.
+   domain allowlisting. Domain access alone is NOT sufficient if the
+   environment's outbound HTTPS goes through a TLS-intercepting proxy (as
+   Claude Code cloud environments do) — see the `YF_DISABLE_CURL_CFFI=1`
+   step in Setup below; without it, refresh can silently ingest nothing
+   while still exiting 0.
 5. The ••••8597 cash-only account scoping is **NOT enforced by any code in
    `src/bonito/`** — Bonito's own pipeline never contacts Robinhood at all;
    it only emits intents (`livetrade/intents/*.json`). The Robinhood MCP
@@ -155,6 +159,17 @@ Token discipline (this runs daily, unattended — be lean):
 Setup:
 - `[ -d .venv ] || python3.12 -m venv .venv && .venv/bin/pip install -e "." --quiet`
 - `git pull origin <branch>` to get the latest ledger.
+- `export YF_DISABLE_CURL_CFFI=1` — this sandbox's outbound HTTPS goes through
+  a TLS-intercepting proxy, which breaks yfinance's default `curl_cffi` backend
+  (browser-TLS-impersonation resets the connection before reaching Yahoo).
+  This forces yfinance's plain-`requests`-with-realistic-User-Agent fallback,
+  which works fine through the proxy. Without it, `bonito live refresh` can
+  silently ingest zero bars for every symbol (exits 0 — yfinance swallows the
+  connection reset as "no data" rather than raising) and preflight aborts the
+  whole cycle on a false "data outage."
+- Run every step in the foreground and wait for it to finish before moving on
+  — do not background any command (including `refresh`). Two overlapping
+  `bonito` invocations will contend for DuckDB's single-writer lock.
 
 1. Resolve the account: Robinhood get_accounts → the one with
    agentic_allowed: true (nickname "Agentic", ••••8597). NEVER the margin
