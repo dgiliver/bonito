@@ -1,0 +1,14 @@
+[
+  {
+    "symbol": "TE",
+    "side": "sell",
+    "dollar_amount": null,
+    "quantity": 72.17019495487929,
+    "reason": "stop loss triggered (intraday)",
+    "signal_price": 7.244999885559082,
+    "signal_date": "2026-07-07T15:41:12.278360Z",
+    "strategy_name": "ema_cross_rsi_atr_regime",
+    "generated_at": "2026-07-07T15:41:12.278648Z",
+    "broker_order_id": null
+  }
+]
