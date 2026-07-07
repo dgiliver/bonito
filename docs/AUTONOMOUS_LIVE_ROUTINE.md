@@ -250,16 +250,26 @@ Setup:
     — this container may check out its own dedicated working branch rather
     than `main` directly, and a bare `git push` would silently land the
     ledger update there instead of on `main`, where tomorrow's cycle
-    actually reads from. If this push is rejected (e.g. branch protection),
-    STOP and report it — do not fall back to a bare `git push`; a ledger
-    update that isn't on `main` is invisible to the next cycle and will
-    surface as a false reconcile drift.
+    actually reads from. If this push is rejected (e.g. branch protection
+    or non-fast-forward), STOP and report it — do not retry with `--force`
+    and do not `git commit --amend` for any reason (including a wrong commit
+    author/identity — leave it, it doesn't matter for this artifact-only
+    commit and is not worth an amend). `main` is shared with other
+    automation (the intraday-stop-sweep and paper-trading GitHub Actions);
+    a forced push here can silently discard a commit one of them made in
+    the same window, with no warning to anyone. A ledger update that isn't
+    on `main` is invisible to the next cycle and will surface as a false
+    reconcile drift — annoying but safe (fails closed); force-pushing to
+    "fix" that is not — never do it.
 
 Hard rules: never place a market/limit order that isn't in the intents file;
 the only other orders you may place are the GTC stop orders in step 8, and
 only at the `stop_price` that command prints; never trade the margin
-account; never run `bonito live resume`; never edit mode or live_enabled.
-If the kill switch is latched, report and stop.
+account; never run `bonito live resume`; never edit mode or live_enabled;
+never use `git push --force`/`-f` or `git commit --amend` for any step in
+this prompt — `main` is shared with other automation, and a forced push
+can silently discard someone else's commit with no warning. If the kill
+switch is latched, report and stop.
 ```
 
 ## Rehearsal protocol — the go-live gate
