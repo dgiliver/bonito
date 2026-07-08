@@ -1,0 +1,21 @@
+{
+  "generated_at": "2026-07-08T19:47:13.478030",
+  "window_start": "2026-07-08T19:47:13.466551",
+  "window_end": "2026-07-08T19:47:13.466551",
+  "status": "INSUFFICIENT",
+  "reasons": [
+    "paper ledger has no fills yet"
+  ],
+  "paper_fills": 0,
+  "matched_fills": 0,
+  "no_fill_count": 0,
+  "decision_divergence": 0.0,
+  "mean_abs_fill_bps": null,
+  "median_abs_fill_bps": null,
+  "worst_fill_bps": null,
+  "paper_final_equity": 150.0,
+  "replay_final_equity": 150.0,
+  "equity_gap_pct": 0.0,
+  "mean_daily_tracking_error_bps": null,
+  "fills": []
+}
