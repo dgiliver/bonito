@@ -1,0 +1,14 @@
+[
+  {
+    "symbol": "SNDK",
+    "side": "buy",
+    "dollar_amount": 689.28,
+    "quantity": null,
+    "reason": "entry rule matched: ema_fast gt ema_slow, close gt ema_slow, rsi_14 lt 68.0",
+    "signal_price": 1858.27001953125,
+    "signal_date": "2026-07-09T04:00:00",
+    "strategy_name": "ema_cross_rsi_atr_regime",
+    "generated_at": "2026-07-09T23:47:53.396563Z",
+    "broker_order_id": null
+  }
+]
