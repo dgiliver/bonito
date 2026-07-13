@@ -1,0 +1,26 @@
+[
+  {
+    "symbol": "WDC",
+    "side": "sell",
+    "dollar_amount": null,
+    "quantity": 0.11631075182793957,
+    "reason": "exit rule matched",
+    "signal_price": 555.5499877929688,
+    "signal_date": "2026-07-13T04:00:00",
+    "strategy_name": "ema_cross_rsi_atr_regime",
+    "generated_at": "2026-07-13T23:27:46.317125Z",
+    "broker_order_id": null
+  },
+  {
+    "symbol": "DELL",
+    "side": "buy",
+    "dollar_amount": 669.65,
+    "quantity": null,
+    "reason": "entry rule matched: ema_fast gt ema_slow, close gt ema_slow, rsi_14 lt 68.0",
+    "signal_price": 427.1099853515625,
+    "signal_date": "2026-07-13T04:00:00",
+    "strategy_name": "ema_cross_rsi_atr_regime",
+    "generated_at": "2026-07-13T23:27:46.372943Z",
+    "broker_order_id": null
+  }
+]
