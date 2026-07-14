@@ -1,0 +1,38 @@
+[
+  {
+    "symbol": "SNDK",
+    "side": "sell",
+    "dollar_amount": null,
+    "quantity": 0.37092564199785744,
+    "reason": "exit rule matched",
+    "signal_price": 1757.8199462890625,
+    "signal_date": "2026-07-14T04:00:00",
+    "strategy_name": "ema_cross_rsi_atr_regime",
+    "generated_at": "2026-07-14T23:27:05.546894Z",
+    "broker_order_id": null
+  },
+  {
+    "symbol": "AMAT",
+    "side": "buy",
+    "dollar_amount": 678.31,
+    "quantity": null,
+    "reason": "entry rule matched: ema_fast gt ema_slow, close gt ema_slow, rsi_14 lt 68.0",
+    "signal_price": 595.7000122070312,
+    "signal_date": "2026-07-14T04:00:00",
+    "strategy_name": "ema_cross_rsi_atr_regime",
+    "generated_at": "2026-07-14T23:27:05.680275Z",
+    "broker_order_id": null
+  },
+  {
+    "symbol": "META",
+    "side": "buy",
+    "dollar_amount": 79.79,
+    "quantity": null,
+    "reason": "entry rule matched: ema_fast gt ema_slow, close gt ema_slow, rsi_14 lt 68.0",
+    "signal_price": 661.0399780273438,
+    "signal_date": "2026-07-14T04:00:00",
+    "strategy_name": "ema_cross_rsi_atr_regime",
+    "generated_at": "2026-07-14T23:27:05.700671Z",
+    "broker_order_id": null
+  }
+]
