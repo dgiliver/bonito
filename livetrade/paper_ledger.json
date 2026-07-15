@@ -1,5 +1,5 @@
 {
-  "cash": 752.0268859123239,
+  "cash": 1411.4976755588687,
   "starting_cash": 5000.0,
   "positions": {
     "AMD": {
@@ -202,106 +202,6 @@
         }
       }
     },
-    "TSM": {
-      "symbol": "TSM",
-      "quantity": 1.5832872540119516,
-      "entry_price": 434.1600036621094,
-      "entry_date": "2026-07-02T22:52:41.521373Z",
-      "high_water_mark": 459.340087890625,
-      "strategy_name": "ema_cross_rsi_atr_regime",
-      "strategy_hash": "da16575a5622",
-      "strategy_config": {
-        "name": "ema_cross_rsi_atr_regime",
-        "description": "EMA 10/26 cross + RSI<68, 2.0x ATR(14) trailing stop, 10% TP, SPY>SMA200 regime gate. Exit rule VALIDATED 2026-06-12: removing it degrades the account replay despite negative raw attribution (docs/EXPERIMENT_LOG.md) — do not strip it without fresh replay evidence.",
-        "version": "2.0",
-        "symbols": [
-          "SPY"
-        ],
-        "timeframe": "1d",
-        "indicators": [
-          {
-            "type": "ema",
-            "name": "ema_fast",
-            "params": {
-              "period": 10
-            }
-          },
-          {
-            "type": "ema",
-            "name": "ema_slow",
-            "params": {
-              "period": 26
-            }
-          },
-          {
-            "type": "rsi",
-            "name": "rsi_14",
-            "params": {
-              "period": 14
-            }
-          }
-        ],
-        "entry_rules": [
-          {
-            "conditions": [
-              {
-                "left": "ema_fast",
-                "comparison": "gt",
-                "right": "ema_slow",
-                "lookback": null
-              },
-              {
-                "left": "close",
-                "comparison": "gt",
-                "right": "ema_slow",
-                "lookback": null
-              },
-              {
-                "left": "rsi_14",
-                "comparison": "lt",
-                "right": 68.0,
-                "lookback": null
-              }
-            ],
-            "logic": "AND",
-            "side": "long"
-          }
-        ],
-        "exit_rules": [
-          {
-            "conditions": [
-              {
-                "left": "ema_fast",
-                "comparison": "crosses_below",
-                "right": "ema_slow",
-                "lookback": null
-              }
-            ],
-            "logic": "AND",
-            "side": "long"
-          }
-        ],
-        "position_size": {
-          "type": "percent_equity",
-          "value": 98.0
-        },
-        "max_positions": 1,
-        "stop_loss": {
-          "type": "trailing_atr",
-          "value": 2.0,
-          "atr_period": 14,
-          "trigger_percent": null
-        },
-        "take_profit": {
-          "type": "percent",
-          "value": 0.1
-        },
-        "regime_filter": {
-          "symbol": "SPY",
-          "sma_period": 200
-        }
-      }
-    },
     "NOW": {
       "symbol": "NOW",
       "quantity": 6.1187571521695885,
@@ -407,7 +307,7 @@
       "quantity": 1.3947088840218116,
       "entry_price": 367.0299987792969,
       "entry_date": "2026-07-07T23:31:18.197249Z",
-      "high_water_mark": 367.0299987792969,
+      "high_water_mark": 367.375,
       "strategy_name": "c_ema20-50_rsi60_atr1.5_tp10",
       "strategy_hash": "7fa6fdd674c8",
       "strategy_config": {
@@ -707,7 +607,7 @@
       "quantity": 0.12070374357403768,
       "entry_price": 661.0399780273438,
       "entry_date": "2026-07-14T23:27:05.708511Z",
-      "high_water_mark": 661.0399780273438,
+      "high_water_mark": 673.5,
       "strategy_name": "ema_cross_rsi_atr_regime",
       "strategy_hash": "da16575a5622",
       "strategy_config": {
@@ -1529,11 +1429,22 @@
       "filled_at": "2026-07-14T23:27:05.708511Z",
       "strategy_name": "ema_cross_rsi_atr_regime",
       "broker_order_id": null
+    },
+    {
+      "symbol": "TSM",
+      "side": "sell",
+      "quantity": 1.5832872540119516,
+      "price": 416.5199890136719,
+      "notional": 659.4707896465447,
+      "reason": "stop loss triggered (intraday)",
+      "filled_at": "2026-07-15T14:43:41.820189Z",
+      "strategy_name": "ema_cross_rsi_atr_regime",
+      "broker_order_id": null
     }
   ],
-  "realized_pnl": 484.4468859123242,
+  "realized_pnl": 456.517675558869,
   "peak_equity": 6004.595534551629,
   "halted": false,
   "halt_reason": "",
-  "updated_at": "2026-07-14T23:27:05.709002Z"
+  "updated_at": "2026-07-15T14:43:41.820575Z"
 }
