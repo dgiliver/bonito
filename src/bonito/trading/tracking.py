@@ -236,21 +236,6 @@ def run_tracking(
 ) -> TrackingReport:
     """Compare the paper ledger against a replay of the same window."""
     end = end or datetime.now().replace(hour=0, minute=0, second=0, microsecond=0)
-    if not ledger.fills:
-        return TrackingReport(
-            generated_at=datetime.now(),
-            window_start=end,
-            window_end=end,
-            status="INSUFFICIENT",
-            reasons=["paper ledger has no fills yet"],
-            paper_fills=0,
-            matched_fills=0,
-            no_fill_count=0,
-            decision_divergence=0.0,
-            paper_final_equity=ledger.starting_cash,
-            replay_final_equity=ledger.starting_cash,
-            equity_gap_pct=0.0,
-        )
 
     # D3: separate zero-qty no_fill sentinel events before any comparison.
     # They are NOT passed to match_fills (keeps match_fills pure) and are
@@ -258,6 +243,31 @@ def run_tracking(
     no_fill_events = [f for f in ledger.fills if f.quantity == 0]
     real_fills = [f for f in ledger.fills if f.quantity != 0]
     no_fill_count = len(no_fill_events)
+
+    if not real_fills:
+        # backtest_account() raises on an empty/zero-width window, so a
+        # ledger with only no_fill sentinels (no real fills yet) must be
+        # caught here rather than falling through — same as the
+        # genuinely-empty-ledger case, just with the no_fill count reported.
+        insufficient_reasons = ["paper ledger has no fills yet"]
+        if no_fill_count:
+            insufficient_reasons = [
+                f"paper ledger has no real fills yet ({no_fill_count} no_fill event(s) recorded)"
+            ]
+        return TrackingReport(
+            generated_at=datetime.now(),
+            window_start=end,
+            window_end=end,
+            status="INSUFFICIENT",
+            reasons=insufficient_reasons,
+            paper_fills=0,
+            matched_fills=0,
+            no_fill_count=no_fill_count,
+            decision_divergence=0.0,
+            paper_final_equity=ledger.starting_cash,
+            replay_final_equity=ledger.starting_cash,
+            equity_gap_pct=0.0,
+        )
 
     # D2: use the live band when the universe is in live mode.
     mean_band = MAX_MEAN_FILL_BPS_LIVE if universe.mode == "live" else MAX_MEAN_FILL_BPS
@@ -271,9 +281,13 @@ def run_tracking(
 
     filtered_ledger = _FilteredLedger(ledger, real_fills)
 
-    window_start = min(f.filled_at for f in real_fills).replace(
-        tzinfo=None, hour=0, minute=0, second=0, microsecond=0
-    ) if real_fills else end
+    window_start = (
+        min(f.filled_at for f in real_fills).replace(
+            tzinfo=None, hour=0, minute=0, second=0, microsecond=0
+        )
+        if real_fills
+        else end
+    )
 
     replay = ReplayStore.from_store(store, universe, end)
     result = backtest_account(universe, replay, window_start, end)
@@ -284,7 +298,10 @@ def run_tracking(
     divergence = 1 - len(matched) / len(comparisons) if comparisons else 0.0
 
     paper_dates, paper_equity = paper_equity_curve(
-        filtered_ledger, store, universe, end  # type: ignore[arg-type]
+        filtered_ledger,  # type: ignore[arg-type]
+        store,
+        universe,
+        end,
     )
     paper_final = paper_equity[-1] if paper_equity else ledger.starting_cash
     replay_final = result.final_equity

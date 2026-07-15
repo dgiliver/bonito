@@ -1,3 +1,62 @@
+# Live Trading Investigation (2026-07-13) — schedule/settlement bug found
+
+**Correction to the 06-25 pre-live checklist note below ("3:45pm ET is fine
+to keep" / "the schedule no longer affects correctness"): that conclusion
+was wrong.** Verified today both empirically (two consecutive live runs
+against fresh data, deterministic) and at the code level
+(`_regime_allows`, `live_runner.py:438-452`): `_is_forming()` compares
+`now_et` against 16:15 ET on the SAME calendar date as the latest ingested
+bar. `bonito live refresh` always ingests through "today" as the newest
+row, and the live Routine fires at 3:45pm ET — before the 16:00 ET close,
+let alone the 16:15 settle threshold. **Every single weekday cycle sees
+today's bar as forming, by construction, with no exception for regular
+(non-half) trading days** — not "how often a pre-close run suppresses a
+trade" (occasional, as the 06-25 note assumed), but every time,
+permanently, under the current schedule. Confirmed via 6 real consecutive
+trading days (7/7–7/13) of zero live entries while paper (cron 22:30 UTC /
+6:30pm ET, after settlement) traded normally throughout the same window.
+
+- [ ] **Move the live Routine's trigger time to after 4:15pm ET** (e.g.
+      near paper's 6:30pm ET). This is a claude.ai Routine setting, not a
+      code change — requires the user to do it directly. Until this
+      moves, live can never open a new position, hold an exit via its own
+      strategy rules, or ratchet a trailing stop — all three gated by the
+      identical forming-bar check (the exit loop in `generate_intents`
+      skips `ledger.update_high_water_mark()` under the same condition,
+      `live_runner.py:243`).
+- [ ] Once the schedule is fixed, re-verify a full cycle end-to-end before
+      trusting the ≥2-week rehearsal clock below to mean anything — every
+      cycle so far has had zero fills to measure, so no day of the
+      existing streak counts toward real fidelity validation.
+- [ ] **Decide**: live has no continuous intraday mechanism to ratchet the
+      trailing-stop high-water-mark or catch take-profit —
+      `check_stops()`/`bonito live sweep` (what powers paper's 15-min
+      GitHub Actions sweep) is never invoked anywhere in the live
+      Routine's 10 steps. Even post schedule-fix, live's trailing stop
+      only tightens once/day; paper's tightens every 15 min. The GTC
+      broker order still enforces continuously at whatever level was last
+      set — a "less optimal, not unprotected" gap. Worth a deliberate
+      decision once a position is actually open, not before.
+- [ ] (Cheap, no downside) **Enable GitHub branch protection on `main`**
+      blocking force-pushes — currently a prompt-only rule ("never
+      `git push --force`") in `docs/AUTONOMOUS_LIVE_ROUTINE.md`; a repo
+      setting would make it a guarantee instead of an instruction.
+      Flagged by `pr-reviewer` during the routine-hardening pass (PR #16).
+
+## Separate: local `autoresearch_trading.py` research routine (different machine/session)
+- [ ] Commit the uncommitted changes on `/Users/dgiliver/personal_projects/bonito`
+      — kill filters now check validation (not just train), overfit-gate
+      guard-clause loophole removed, 5% position-size floor, 2 earlier
+      pre-existing fixes (retired model ID, fragile JSON parsing), and the
+      new test file (`tests/test_autoresearch_kill_filters.py`).
+- [ ] Decide whether to keep the daily SPY research routine running at all
+      — not wired to the live/paper config (writes to Obsidian + Claude
+      memory only), redundant with the weekly `bonito research auto`
+      that IS wired via `sync_live_config()`. Leaning toward stopping it.
+- [ ] Follow up on the indicator-name-hallucination bug (12/100 iterations
+      crashed on wrong indicator column names) — already flagged as a
+      separate task in that local session.
+
 # Full Codebase + Docs Audit (2026-06-18) — tech-lead pass, pending sign-off
 
 Full audit across architecture, backend, frontend, security, docs/CI (5
@@ -514,6 +573,14 @@ intraday sweep modeled from daily OHLC, not 15-min quotes.
       Accepted residual: half-day sessions (~9/yr) close at 13:00 ET, so the
       guard reads them as forming until 16:15 ET and any run in that window
       skips — a missed trade, never a mis-trade (see `tasks/lessons.md`).
+      ⚠️ **CORRECTED 2026-07-13 — this "3:45pm ET is fine" conclusion was
+      wrong, see the top of this file.** "How often a pre-close run
+      suppresses a trade" was the wrong framing: 3:45pm ET is BEFORE the
+      16:00 ET close on every regular trading day, so the guard reads it
+      as forming every single time, not occasionally. Confirmed via 6
+      real consecutive live days (7/7–7/13) of zero entries. The
+      half-day residual noted above is real but was never the actual
+      gap — the gap is every ordinary day too.
 
 # Per-Cluster Strategy Research (2026-06-10/11)
 
