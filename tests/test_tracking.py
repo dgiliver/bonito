@@ -239,6 +239,23 @@ class TestRunTracking:
         assert report.status == "INSUFFICIENT"
         assert report.paper_fills == 0
 
+    def test_only_no_fill_events_is_insufficient_not_a_crash(self, tmp_path):
+        # Regression: backtest_account() raises on a zero-width window when
+        # window_start falls back to `end` because real_fills is empty --
+        # a ledger holding only no_fill sentinels (every order rejected,
+        # nothing ever executed) must hit the same early INSUFFICIENT
+        # return as a genuinely empty ledger, not fall through into a crash.
+        ledger = PaperLedger(cash=1000.0, starting_cash=1000.0)
+        ledger.fills = [
+            fill("AAA", "buy", 100.0, day(2), qty=0.0),
+            fill("AAA", "buy", 100.0, day(3), qty=0.0),
+        ]
+        report = run_tracking(self.universe(tmp_path), ledger, FakeStore({}), end=day(5))
+        assert report.status == "INSUFFICIENT"
+        assert report.paper_fills == 0
+        assert report.no_fill_count == 2
+        assert "no_fill event(s) recorded" in report.reasons[0]
+
     def test_divergent_fills_reported(self, tmp_path):
         ledger = PaperLedger(cash=900.0, starting_cash=1000.0)
         ledger.fills = [fill("AAA", "buy", 100.0, day(2))]
