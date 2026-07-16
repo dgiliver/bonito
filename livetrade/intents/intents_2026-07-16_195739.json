@@ -1,0 +1,26 @@
+[
+  {
+    "symbol": "DELL",
+    "side": "sell",
+    "dollar_amount": null,
+    "quantity": 1.5678631335411137,
+    "reason": "stop loss triggered (intraday)",
+    "signal_price": 391.45001220703125,
+    "signal_date": "2026-07-16T19:57:39.935745Z",
+    "strategy_name": "ema_cross_rsi_atr_regime",
+    "generated_at": "2026-07-16T19:57:39.935963Z",
+    "broker_order_id": null
+  },
+  {
+    "symbol": "GOOGL",
+    "side": "sell",
+    "dollar_amount": null,
+    "quantity": 1.3947088840218116,
+    "reason": "stop loss triggered (intraday)",
+    "signal_price": 353.81500244140625,
+    "signal_date": "2026-07-16T19:57:39.935745Z",
+    "strategy_name": "c_ema20-50_rsi60_atr1.5_tp10",
+    "generated_at": "2026-07-16T19:57:39.936002Z",
+    "broker_order_id": null
+  }
+]
