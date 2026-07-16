@@ -1,0 +1,38 @@
+[
+  {
+    "symbol": "ASML",
+    "side": "buy",
+    "dollar_amount": 645.61,
+    "quantity": null,
+    "reason": "entry rule matched: ema_fast gt ema_slow, close gt ema_slow, rsi_14 lt 68.0",
+    "signal_price": 1784.8699951171875,
+    "signal_date": "2026-07-16T04:00:00",
+    "strategy_name": "ema_cross_rsi_atr_regime",
+    "generated_at": "2026-07-16T23:28:05.500452Z",
+    "broker_order_id": null
+  },
+  {
+    "symbol": "LLY",
+    "side": "buy",
+    "dollar_amount": 645.61,
+    "quantity": null,
+    "reason": "entry rule matched: ema_fast gt ema_slow, close gt ema_slow, rsi_14 lt 68.0",
+    "signal_price": 1169.1700439453125,
+    "signal_date": "2026-07-16T04:00:00",
+    "strategy_name": "ema_cross_rsi_atr_regime",
+    "generated_at": "2026-07-16T23:28:05.509142Z",
+    "broker_order_id": null
+  },
+  {
+    "symbol": "AMZN",
+    "side": "buy",
+    "dollar_amount": 645.61,
+    "quantity": null,
+    "reason": "entry rule matched: ema_fast gt ema_slow, close gt ema_slow, rsi_14 lt 68.0",
+    "signal_price": 249.88999938964844,
+    "signal_date": "2026-07-16T04:00:00",
+    "strategy_name": "ema_cross_rsi_atr_regime",
+    "generated_at": "2026-07-16T23:28:05.524412Z",
+    "broker_order_id": null
+  }
+]
