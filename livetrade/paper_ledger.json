@@ -1,107 +1,7 @@
 {
-  "cash": 555.5970204582828,
+  "cash": 1170.3727299097236,
   "starting_cash": 5000.0,
   "positions": {
-    "HOOD": {
-      "symbol": "HOOD",
-      "quantity": 6.097755517876693,
-      "entry_price": 112.7300033569336,
-      "entry_date": "2026-07-02T22:52:41.521078Z",
-      "high_water_mark": 118.05000305175781,
-      "strategy_name": "ema_cross_rsi_atr_regime",
-      "strategy_hash": "da16575a5622",
-      "strategy_config": {
-        "name": "ema_cross_rsi_atr_regime",
-        "description": "EMA 10/26 cross + RSI<68, 2.0x ATR(14) trailing stop, 10% TP, SPY>SMA200 regime gate. Exit rule VALIDATED 2026-06-12: removing it degrades the account replay despite negative raw attribution (docs/EXPERIMENT_LOG.md) — do not strip it without fresh replay evidence.",
-        "version": "2.0",
-        "symbols": [
-          "SPY"
-        ],
-        "timeframe": "1d",
-        "indicators": [
-          {
-            "type": "ema",
-            "name": "ema_fast",
-            "params": {
-              "period": 10
-            }
-          },
-          {
-            "type": "ema",
-            "name": "ema_slow",
-            "params": {
-              "period": 26
-            }
-          },
-          {
-            "type": "rsi",
-            "name": "rsi_14",
-            "params": {
-              "period": 14
-            }
-          }
-        ],
-        "entry_rules": [
-          {
-            "conditions": [
-              {
-                "left": "ema_fast",
-                "comparison": "gt",
-                "right": "ema_slow",
-                "lookback": null
-              },
-              {
-                "left": "close",
-                "comparison": "gt",
-                "right": "ema_slow",
-                "lookback": null
-              },
-              {
-                "left": "rsi_14",
-                "comparison": "lt",
-                "right": 68.0,
-                "lookback": null
-              }
-            ],
-            "logic": "AND",
-            "side": "long"
-          }
-        ],
-        "exit_rules": [
-          {
-            "conditions": [
-              {
-                "left": "ema_fast",
-                "comparison": "crosses_below",
-                "right": "ema_slow",
-                "lookback": null
-              }
-            ],
-            "logic": "AND",
-            "side": "long"
-          }
-        ],
-        "position_size": {
-          "type": "percent_equity",
-          "value": 98.0
-        },
-        "max_positions": 1,
-        "stop_loss": {
-          "type": "trailing_atr",
-          "value": 2.0,
-          "atr_period": 14,
-          "trigger_percent": null
-        },
-        "take_profit": {
-          "type": "percent",
-          "value": 0.1
-        },
-        "regime_filter": {
-          "symbol": "SPY",
-          "sma_period": 200
-        }
-      }
-    },
     "NOW": {
       "symbol": "NOW",
       "quantity": 6.1187571521695885,
@@ -607,7 +507,7 @@
       "quantity": 0.5521951262293872,
       "entry_price": 1169.1700439453125,
       "entry_date": "2026-07-16T23:28:05.529876Z",
-      "high_water_mark": 1169.1700439453125,
+      "high_water_mark": 1184.9100341796875,
       "strategy_name": "ema_cross_rsi_atr_regime",
       "strategy_hash": "da16575a5622",
       "strategy_config": {
@@ -1617,11 +1517,22 @@
       "filled_at": "2026-07-16T23:28:05.529991Z",
       "strategy_name": "ema_cross_rsi_atr_regime",
       "broker_order_id": null
+    },
+    {
+      "symbol": "HOOD",
+      "side": "sell",
+      "quantity": 6.097755517876693,
+      "price": 100.81999969482422,
+      "notional": 614.7757094514409,
+      "reason": "stop loss triggered (intraday)",
+      "filled_at": "2026-07-17T14:26:47.870903Z",
+      "strategy_name": "ema_cross_rsi_atr_regime",
+      "broker_order_id": null
     }
   ],
-  "realized_pnl": 282.66702045828356,
+  "realized_pnl": 210.0427299097245,
   "peak_equity": 6004.595534551629,
   "halted": false,
   "halt_reason": "",
-  "updated_at": "2026-07-16T23:28:05.530234Z"
+  "updated_at": "2026-07-17T14:26:47.871327Z"
 }
