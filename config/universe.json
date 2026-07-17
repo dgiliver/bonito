@@ -38,7 +38,12 @@
     "META",
     "AMZN",
     "AXON",
-    "CORZ"
+    "CORZ",
+    "DASH",
+    "MSTR",
+    "UNH",
+    "RBLX",
+    "NVDA"
   ],
   "strategy_path": "strategies/deployed_strategy.json",
   "symbol_strategies": {
