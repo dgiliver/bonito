@@ -51,6 +51,9 @@
     "GOOGL": "strategies/cluster_GOOGL_7fa6fdd674c8.json",
     "IREN": "strategies/iren_ema8-21_rsi68_atr1.5_tpnone.json"
   },
+  "entry_blocklist": [
+    "NVDA"
+  ],
   "data": {
     "timeframe": "1d",
     "start_date": "2022-01-01"
