@@ -234,6 +234,18 @@ Setup:
    - Place a new GTC stop order (place_equity_order, time_in_force GTC,
      trigger stop, quantity = the position's full current share count) at
      `stop_price`.
+   - VERIFY, don't assume: after every cancel+place for a symbol, call
+     get_equity_orders for that symbol and confirm a stop_market order
+     now exists in a live state (queued/confirmed/new — not cancelled/
+     rejected/failed) at the `stop_price` you just placed. A
+     place_equity_order call returning without an error is NOT sufficient
+     confirmation by itself — this exact gap let 3 real positions
+     (2026-07-16) sit with no broker-side stop for over a day before
+     anyone noticed. If verification fails, retry the cancel+place once.
+     If it still fails, that is a real failure: name the specific
+     symbol(s) explicitly in the final report — never fold an unverified
+     or failed stop into "stops placed" or "stops updated," and never
+     report step 8 as complete when any symbol failed verification.
    Do this every cycle, even when nothing else traded: trailing stop types
    ratchet with the high-water mark, so yesterday's stop price is stale.
    This is what gives 24/7 protection between cycles — Robinhood enforces
@@ -268,8 +280,11 @@ only at the `stop_price` that command prints; never trade the margin
 account; never run `bonito live resume`; never edit mode or live_enabled;
 never use `git push --force`/`-f` or `git commit --amend` for any step in
 this prompt — `main` is shared with other automation, and a forced push
-can silently discard someone else's commit with no warning. If the kill
-switch is latched, report and stop.
+can silently discard someone else's commit with no warning; never report
+a broker-side stop as placed or refreshed in step 8 without confirming
+via get_equity_orders that it actually exists — a successful-looking
+place_equity_order call is not proof by itself. If the kill switch is
+latched, report and stop.
 ```
 
 ## Rehearsal protocol — the go-live gate
