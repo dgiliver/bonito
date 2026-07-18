@@ -254,7 +254,9 @@ Setup:
        cancel step would find nothing to cancel (same lag) and the place
        step would fire again, leaving two live stops on one position.
        Only if this second, passive check also finds nothing should you
-       retry the actual cancel+place, and only once.
+       retry the actual cancel+place, and only once. Then call
+       get_equity_orders once more to check the retry's result before
+       concluding anything.
      - More than one matching order found: do NOT treat this as success.
        This is its own failure mode (a likely duplicate) — name it
        explicitly in the final report; do not attempt to cancel either
