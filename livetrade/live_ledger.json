@@ -4,10 +4,10 @@
   "positions": {
     "PLTR": {
       "symbol": "PLTR",
-      "quantity": 0.1401554791448647,
-      "entry_price": 133.78,
-      "entry_date": "2026-07-16T20:48:50.693749Z",
-      "high_water_mark": 133.78,
+      "quantity": 0.142196,
+      "entry_price": 131.86,
+      "entry_date": "2026-07-17T13:30:00.688000Z",
+      "high_water_mark": 131.86,
       "strategy_name": "live",
       "strategy_hash": "da16575a5622",
       "strategy_config": {
@@ -104,10 +104,10 @@
     },
     "HOOD": {
       "symbol": "HOOD",
-      "quantity": 0.1771039954661377,
-      "entry_price": 105.87,
-      "entry_date": "2026-07-16T20:48:51.524310Z",
-      "high_water_mark": 105.87,
+      "quantity": 0.18692,
+      "entry_price": 100.31,
+      "entry_date": "2026-07-17T13:30:00.690000Z",
+      "high_water_mark": 100.31,
       "strategy_name": "live",
       "strategy_hash": "da16575a5622",
       "strategy_config": {
@@ -204,10 +204,10 @@
     },
     "ASML": {
       "symbol": "ASML",
-      "quantity": 0.010515394537603051,
-      "entry_price": 1783.1,
-      "entry_date": "2026-07-16T20:48:52.380547Z",
-      "high_water_mark": 1783.1,
+      "quantity": 0.010805,
+      "entry_price": 1735.31,
+      "entry_date": "2026-07-17T13:30:01.515000Z",
+      "high_water_mark": 1735.31,
       "strategy_name": "live",
       "strategy_hash": "da16575a5622",
       "strategy_config": {
@@ -340,33 +340,33 @@
     {
       "symbol": "PLTR",
       "side": "buy",
-      "quantity": 0.1401554791448647,
-      "price": 133.78,
+      "quantity": 0.142196,
+      "price": 131.86,
       "notional": 18.75,
       "reason": "live fill",
-      "filled_at": "2026-07-16T20:48:50.693749Z",
+      "filled_at": "2026-07-17T13:30:00.688000Z",
       "strategy_name": "live",
       "broker_order_id": "6a594367-f82c-4d83-a6d9-90023aece9f0"
     },
     {
       "symbol": "HOOD",
       "side": "buy",
-      "quantity": 0.1771039954661377,
-      "price": 105.87,
+      "quantity": 0.18692,
+      "price": 100.31,
       "notional": 18.75,
       "reason": "live fill",
-      "filled_at": "2026-07-16T20:48:51.524310Z",
+      "filled_at": "2026-07-17T13:30:00.690000Z",
       "strategy_name": "live",
       "broker_order_id": "6a59436f-24f5-4d10-8d14-d4ed5f7d82c7"
     },
     {
       "symbol": "ASML",
       "side": "buy",
-      "quantity": 0.010515394537603051,
-      "price": 1783.1,
+      "quantity": 0.010805,
+      "price": 1735.31,
       "notional": 18.75,
       "reason": "live fill",
-      "filled_at": "2026-07-16T20:48:52.380547Z",
+      "filled_at": "2026-07-17T13:30:01.515000Z",
       "strategy_name": "live",
       "broker_order_id": "6a594377-10a4-4182-8c29-b1641b9bb981"
     }
@@ -375,5 +375,5 @@
   "peak_equity": 150.0,
   "halted": false,
   "halt_reason": "",
-  "updated_at": "2026-07-16T20:48:52.380863Z"
+  "updated_at": "2026-07-18T21:38:16.266164Z"
 }
