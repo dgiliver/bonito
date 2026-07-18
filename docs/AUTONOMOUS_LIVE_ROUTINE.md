@@ -150,9 +150,13 @@ Token discipline (this runs daily, unattended — be lean):
   price, filled qty, order id).
 - Minimum tool calls: one get_accounts, one get_equity_positions to reconcile,
   then per intent review→place→record, one get_equity_orders (to find existing
-  stop order ids) plus per-symbol cancel→place for the stop refresh, one
-  `live tracking`, one commit. Never re-fetch or re-run a step that already
-  succeeded.
+  stop order ids) plus per-symbol cancel→place→verify (one more get_equity_orders
+  call per symbol — see step 8) for the stop refresh, one `live tracking`, one
+  commit. Never re-fetch or re-run a step that already succeeded — EXCEPT step
+  8's per-symbol verification call, which is mandatory, not a redundant
+  re-fetch: it's the only way to know cancel+place actually worked, and
+  skipping it to save a call is exactly what let 3 real positions sit
+  unprotected for a day (2026-07-16).
 - Final report ≤ 8 lines: what filled / didn't, stops placed/replaced,
   reconcile + tracking status, any abort reason. Nothing else.
 
@@ -234,18 +238,32 @@ Setup:
    - Place a new GTC stop order (place_equity_order, time_in_force GTC,
      trigger stop, quantity = the position's full current share count) at
      `stop_price`.
-   - VERIFY, don't assume: after every cancel+place for a symbol, call
-     get_equity_orders for that symbol and confirm a stop_market order
-     now exists in a live state (queued/confirmed/new — not cancelled/
-     rejected/failed) at the `stop_price` you just placed. A
-     place_equity_order call returning without an error is NOT sufficient
-     confirmation by itself — this exact gap let 3 real positions
-     (2026-07-16) sit with no broker-side stop for over a day before
-     anyone noticed. If verification fails, retry the cancel+place once.
-     If it still fails, that is a real failure: name the specific
-     symbol(s) explicitly in the final report — never fold an unverified
-     or failed stop into "stops placed" or "stops updated," and never
-     report step 8 as complete when any symbol failed verification.
+   - VERIFY, don't assume: after every stop refresh (cancel-if-existing,
+     then place) for a symbol, call get_equity_orders for that symbol and
+     confirm EXACTLY ONE stop_market order exists in a live state
+     (queued/confirmed/new — not cancelled/rejected/failed) at the
+     `stop_price` you just placed. A place_equity_order call returning
+     without an error is NOT sufficient confirmation by itself — this
+     exact gap let 3 real positions (2026-07-16) sit with no broker-side
+     stop for over a day before anyone noticed.
+     - Zero matching orders found: do NOT immediately retry cancel+place.
+       Wait briefly and call get_equity_orders again ONCE, passively (no
+       cancel, no place) — the order may simply not be visible yet
+       (broker-side eventual consistency), and retrying cancel+place
+       before ruling that out risks creating a genuine duplicate: the
+       cancel step would find nothing to cancel (same lag) and the place
+       step would fire again, leaving two live stops on one position.
+       Only if this second, passive check also finds nothing should you
+       retry the actual cancel+place, and only once.
+     - More than one matching order found: do NOT treat this as success.
+       This is its own failure mode (a likely duplicate) — name it
+       explicitly in the final report; do not attempt to cancel either
+       one yourself without being certain which is current.
+     - Still zero (or still duplicated) after the one retry: that is a
+       real failure. Name the specific symbol(s) explicitly in the final
+       report — never fold an unverified, failed, or duplicated stop into
+       "stops placed" or "stops updated," and never report step 8 as
+       complete when any symbol failed verification.
    Do this every cycle, even when nothing else traded: trailing stop types
    ratchet with the high-water mark, so yesterday's stop price is stale.
    This is what gives 24/7 protection between cycles — Robinhood enforces
