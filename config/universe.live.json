@@ -1,6 +1,6 @@
 {
   "name": "robinhood-agentic-live-DRAFT",
-  "description": "DRAFT live config for the $150 Agentic cash account. NOT ACTIVE: live_enabled stays false until explicit user sign-off (pre-live checklist in tasks/todo.md). Structure synced 2026-06-12 with replay-validated paper config (8 slots x 12.5% equity, NVDA dropped, per-symbol strategies) \u2014 see docs/EXPERIMENT_LOG.md. Re-verify entry_allowlist against the latest backtest-universe holdout passers at flip time.",
+  "description": "Live config for the $150 Agentic cash account. ACTIVE since 2026-07-06 sign-off (live_enabled=true) \u2014 mode/live_enabled/risk caps are human-only, never touched by automation. Structure originally synced 2026-06-12 with the replay-validated paper config (8 slots x 12.5% equity, per-symbol strategies); 2026-07-17 added 5 Renaissance-13F-sourced symbols (DASH/MSTR/UNH/RBLX/NVDA) mirroring the paper universe, with NVDA immediately entry_blocklist'd \u2014 see docs/EXPERIMENT_LOG.md for both. Re-verify entry_allowlist against the latest backtest-universe holdout passers periodically.",
   "broker": "robinhood",
   "account_nickname": "Agentic",
   "mode": "live",
@@ -38,9 +38,17 @@
     "META",
     "AMZN",
     "AXON",
-    "CORZ"
+    "CORZ",
+    "DASH",
+    "MSTR",
+    "UNH",
+    "RBLX",
+    "NVDA"
   ],
   "entry_allowlist": null,
+  "entry_blocklist": [
+    "NVDA"
+  ],
   "strategy_path": "strategies/deployed_strategy.json",
   "symbol_strategies": {
     "AAPL": "strategies/cluster_AAPL_54746177d5a1.json",
