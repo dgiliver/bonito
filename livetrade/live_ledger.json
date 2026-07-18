@@ -7,7 +7,7 @@
       "quantity": 0.142196,
       "entry_price": 131.86,
       "entry_date": "2026-07-17T13:30:00.688000Z",
-      "high_water_mark": 131.86,
+      "high_water_mark": 132.3800048828125,
       "strategy_name": "live",
       "strategy_hash": "da16575a5622",
       "strategy_config": {
@@ -207,7 +207,7 @@
       "quantity": 0.010805,
       "entry_price": 1735.31,
       "entry_date": "2026-07-17T13:30:01.515000Z",
-      "high_water_mark": 1735.31,
+      "high_water_mark": 1747.5799560546875,
       "strategy_name": "live",
       "strategy_hash": "da16575a5622",
       "strategy_config": {
@@ -369,11 +369,44 @@
       "filled_at": "2026-07-17T13:30:01.515000Z",
       "strategy_name": "live",
       "broker_order_id": "6a594377-10a4-4182-8c29-b1641b9bb981"
+    },
+    {
+      "symbol": "LLY",
+      "side": "buy",
+      "quantity": 0.0,
+      "price": 1176.75,
+      "notional": 0.0,
+      "reason": "no_fill: live fill",
+      "filled_at": "2026-07-18T21:49:29.304020Z",
+      "strategy_name": "live",
+      "broker_order_id": null
+    },
+    {
+      "symbol": "META",
+      "side": "buy",
+      "quantity": 0.0,
+      "price": 640.25,
+      "notional": 0.0,
+      "reason": "no_fill: live fill",
+      "filled_at": "2026-07-18T21:49:32.914401Z",
+      "strategy_name": "live",
+      "broker_order_id": null
+    },
+    {
+      "symbol": "AMZN",
+      "side": "buy",
+      "quantity": 0.0,
+      "price": 246.74,
+      "notional": 0.0,
+      "reason": "no_fill: live fill",
+      "filled_at": "2026-07-18T21:49:33.764578Z",
+      "strategy_name": "live",
+      "broker_order_id": null
     }
   ],
   "realized_pnl": 0.0,
-  "peak_equity": 150.0,
+  "peak_equity": 150.14103162835693,
   "halted": false,
   "halt_reason": "",
-  "updated_at": "2026-07-18T21:38:16.266164Z"
+  "updated_at": "2026-07-18T21:49:33.764760Z"
 }

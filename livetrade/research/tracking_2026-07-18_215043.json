@@ -1,0 +1,50 @@
+{
+  "generated_at": "2026-07-18T21:50:43.687748",
+  "window_start": "2026-07-17T00:00:00",
+  "window_end": "2026-07-18T21:50:43.345552",
+  "status": "INSUFFICIENT",
+  "reasons": [
+    "6 no_fill event(s) recorded in the ledger",
+    "only 1 matched fills (<10)"
+  ],
+  "paper_fills": 3,
+  "matched_fills": 1,
+  "no_fill_count": 6,
+  "decision_divergence": 0.6667,
+  "mean_abs_fill_bps": 39.3,
+  "median_abs_fill_bps": 39.3,
+  "worst_fill_bps": 39.3,
+  "paper_final_equity": 150.14,
+  "replay_final_equity": 150.0,
+  "equity_gap_pct": 0.09,
+  "mean_daily_tracking_error_bps": null,
+  "fills": [
+    {
+      "symbol": "PLTR",
+      "side": "buy",
+      "paper_date": "2026-07-17T13:30:00.688000",
+      "paper_price": 131.86,
+      "replay_price": 132.3800048828125,
+      "delta_bps": -39.28,
+      "matched": true
+    },
+    {
+      "symbol": "HOOD",
+      "side": "buy",
+      "paper_date": "2026-07-17T13:30:00.690000",
+      "paper_price": 100.31,
+      "replay_price": null,
+      "delta_bps": null,
+      "matched": false
+    },
+    {
+      "symbol": "ASML",
+      "side": "buy",
+      "paper_date": "2026-07-17T13:30:01.515000",
+      "paper_price": 1735.31,
+      "replay_price": null,
+      "delta_bps": null,
+      "matched": false
+    }
+  ]
+}

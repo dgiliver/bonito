@@ -1,0 +1,38 @@
+[
+  {
+    "symbol": "LLY",
+    "side": "buy",
+    "dollar_amount": 18.77,
+    "quantity": null,
+    "reason": "entry rule matched: ema_fast gt ema_slow, close gt ema_slow, rsi_14 lt 68.0",
+    "signal_price": 1179.1099853515625,
+    "signal_date": "2026-07-17T04:00:00",
+    "strategy_name": "ema_cross_rsi_atr_regime",
+    "generated_at": "2026-07-18T21:48:22.109535Z",
+    "broker_order_id": null
+  },
+  {
+    "symbol": "META",
+    "side": "buy",
+    "dollar_amount": 18.77,
+    "quantity": null,
+    "reason": "entry rule matched: ema_fast gt ema_slow, close gt ema_slow, rsi_14 lt 68.0",
+    "signal_price": 646.010009765625,
+    "signal_date": "2026-07-17T04:00:00",
+    "strategy_name": "ema_cross_rsi_atr_regime",
+    "generated_at": "2026-07-18T21:48:22.138605Z",
+    "broker_order_id": null
+  },
+  {
+    "symbol": "AMZN",
+    "side": "buy",
+    "dollar_amount": 18.77,
+    "quantity": null,
+    "reason": "entry rule matched: ema_fast gt ema_slow, close gt ema_slow, rsi_14 lt 68.0",
+    "signal_price": 247.22999572753906,
+    "signal_date": "2026-07-17T04:00:00",
+    "strategy_name": "ema_cross_rsi_atr_regime",
+    "generated_at": "2026-07-18T21:48:22.143497Z",
+    "broker_order_id": null
+  }
+]
