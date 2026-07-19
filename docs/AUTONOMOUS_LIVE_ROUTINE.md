@@ -280,9 +280,13 @@ Setup:
        complete when any symbol failed verification.
    Do this every cycle, even when nothing else traded: trailing stop types
    ratchet with the high-water mark, so yesterday's stop price is stale.
-   This is what gives 24/7 protection between cycles — Robinhood enforces
-   the order with no session running. take_profit_price is informational
-   only (Robinhood stop orders don't natively express a take-profit leg);
+   This does NOT give 24/7 protection — a GFD stop expires at that
+   session's close, so there is a real gap between market open and
+   whenever this cycle runs, every day, that a GTC order would not have
+   had. Report that gap as a known, accepted limitation if asked about
+   coverage — do not describe this as continuous protection.
+   take_profit_price is informational only (Robinhood stop orders don't
+   natively express a take-profit leg);
    skip placing anything for it unless you've been told otherwise.
 9. Fidelity check (the rehearsal gate): `.venv/bin/bonito live tracking
    -u config/universe.live.json`. Status must be OK. WARN = live fills are
@@ -364,10 +368,12 @@ stop math as the paper `sweep`, via `compute_stop_levels` in
 current stop price — to place/cancel-and-replace a broker-side stop order
 on Robinhood every cycle.
 
-**This was originally designed around GTC and does NOT currently work as
-described below — corrected 2026-07-18, see docs/EXPERIMENT_LOG.md.**
-GTC stop orders are rejected outright for this account: every position is
-fractional by construction ($18-ish slots on a $150 account), and
+**This section originally described GTC-based coverage as working. It
+does not — corrected 2026-07-18, see docs/EXPERIMENT_LOG.md.** The rest
+of this section reflects the current, corrected behavior, not the stale
+original claim. GTC stop orders are rejected outright for this account:
+every position is fractional by construction ($18-ish slots on a $150
+account), and
 Robinhood rejected all 3 real GTC stop attempts on 2026-07-18 with
 "Invalid time in force for fractional order." Step 8 now tries GFD
 instead, which is UNCONFIRMED, not a verified fix. Even if GFD is
