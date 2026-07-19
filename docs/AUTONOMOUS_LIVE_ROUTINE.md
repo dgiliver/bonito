@@ -228,16 +228,28 @@ Setup:
    stop on that symbol alone). For every symbol it DOES list:
    - If `stop_price` is `null` for that symbol, do not cancel or place
      anything for it — leave any existing broker stop alone.
-   - Otherwise, cancel that symbol's existing GTC stop order if one exists
+   - Otherwise, cancel that symbol's existing stop order if one exists
      (cancel_equity_order, using the order id from get_equity_orders). If
      get_equity_orders shows no existing stop for this symbol, that's the
      normal case for a newly-opened position — place the first one. Only
      skip placing (without canceling anything) if an existing stop *does*
      show up but you can't confirm which order is the current/valid one —
      do not stack a duplicate on top of an unconfirmed order.
-   - Place a new GTC stop order (place_equity_order, time_in_force GTC,
-     trigger stop, quantity = the position's full current share count) at
-     `stop_price`.
+   - Place a new stop order (place_equity_order, trigger stop, quantity =
+     the position's full current share count) at `stop_price`. Use
+     time_in_force GFD, not GTC — GTC was rejected on 2026-07-18 for all
+     3 positions with "Invalid time in force for fractional order" (every
+     position in this account is fractional by construction — $18-ish
+     slots on a $150 account). GFD is UNCONFIRMED, not a known-working
+     fix — it's the best available next experiment, not a verified
+     solution (see docs/EXPERIMENT_LOG.md 2026-07-18 for why: evidence on
+     whether Robinhood's fractional-order rules allow ANY stop order,
+     regardless of time-in-force, is genuinely mixed, and this account's
+     orders route through Robinhood's new Agentic Trading MCP — live only
+     since ~May 2026 — which has no public track record to check against).
+     If GFD is ALSO rejected, that is a real, expected-possible outcome,
+     not a bug in this prompt — report the exact rejection text and stop;
+     do not try further time_in_force values without being told to.
    - VERIFY, don't assume: after every stop refresh (cancel-if-existing,
      then place) for a symbol, call get_equity_orders for that symbol and
      confirm EXACTLY ONE stop_market order exists in a live state
@@ -295,7 +307,7 @@ Setup:
     "fix" that is not — never do it.
 
 Hard rules: never place a market/limit order that isn't in the intents file;
-the only other orders you may place are the GTC stop orders in step 8, and
+the only other orders you may place are the stop orders in step 8, and
 only at the `stop_price` that command prints; never trade the margin
 account; never run `bonito live resume`; never edit mode or live_enabled;
 never use `git push --force`/`-f` or `git commit --amend` for any step in
@@ -349,11 +361,27 @@ intraday protection does NOT depend on a sweep Routine. Instead, step 8
 above uses `bonito live stop-levels` — a deterministic CLI command (same
 stop math as the paper `sweep`, via `compute_stop_levels` in
 `src/bonito/trading/live_runner.py`) that prints each open position's
-current stop price — to place/cancel-and-replace a real **GTC stop order**
-on Robinhood every cycle. Robinhood then enforces that order 24/7 with no
-session running at all: strictly better than a polling sweep (protection
-doesn't lapse between cycles or if a cycle is ever skipped), and it keeps
-the daily Routine within the one-run-per-day cadence.
+current stop price — to place/cancel-and-replace a broker-side stop order
+on Robinhood every cycle.
+
+**This was originally designed around GTC and does NOT currently work as
+described below — corrected 2026-07-18, see docs/EXPERIMENT_LOG.md.**
+GTC stop orders are rejected outright for this account: every position is
+fractional by construction ($18-ish slots on a $150 account), and
+Robinhood rejected all 3 real GTC stop attempts on 2026-07-18 with
+"Invalid time in force for fractional order." Step 8 now tries GFD
+instead, which is UNCONFIRMED, not a verified fix. Even if GFD is
+accepted, it does not give the 24/7-no-lapse property this section
+originally claimed: GFD orders expire at each session's close and must be
+re-placed every cycle (already true of how step 8 runs, so no new
+process gap there) — but there IS a real, unavoidable gap between market
+open (9:30am ET) and whenever that day's cycle actually runs, every
+single day, since the prior day's GFD stop already expired at yesterday's
+close. GTC never had that gap; GFD structurally does. If continuous,
+gap-free protection turns out to matter more than the cost/complexity of
+an intraday polling mechanism, revisit the "second Routine" option
+discussed in chat 2026-07-18 rather than treating GFD as the final
+answer.
 
 Note this only covers fixed/percent/ATR/trailing stops. `take_profit_price`
 is reported for visibility but not auto-placed — Robinhood's basic stop
