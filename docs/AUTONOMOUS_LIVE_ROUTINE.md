@@ -280,11 +280,11 @@ Setup:
        complete when any symbol failed verification.
    Do this every cycle, even when nothing else traded: trailing stop types
    ratchet with the high-water mark, so yesterday's stop price is stale.
-   This does NOT give 24/7 protection — a GFD stop expires at that
-   session's close, so there is a real gap between market open and
-   whenever this cycle runs, every day, that a GTC order would not have
-   had. Report that gap as a known, accepted limitation if asked about
-   coverage — do not describe this as continuous protection.
+   This refresh does NOT give 24/7 protection — a GFD stop expires at
+   that session's close, so there is a real gap, every day, between
+   market open and whenever this cycle runs — a gap a GTC order would
+   not have had. Report that gap as a known, accepted limitation if
+   asked about coverage — do not describe this as continuous protection.
    take_profit_price is informational only (Robinhood stop orders don't
    natively express a take-profit leg);
    skip placing anything for it unless you've been told otherwise.
