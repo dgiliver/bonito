@@ -207,7 +207,7 @@
       "quantity": 4.98811324312593,
       "entry_price": 133.75999450683594,
       "entry_date": "2026-07-15T23:32:06.174559Z",
-      "high_water_mark": 135.1300048828125,
+      "high_water_mark": 135.90499877929688,
       "strategy_name": "ema_cross_rsi_atr_regime",
       "strategy_hash": "da16575a5622",
       "strategy_config": {
@@ -1556,5 +1556,5 @@
   "peak_equity": 6004.595534551629,
   "halted": false,
   "halt_reason": "",
-  "updated_at": "2026-07-20T16:43:01.460621Z"
+  "updated_at": "2026-07-20T18:33:42.192218Z"
 }
