@@ -242,7 +242,7 @@ Setup:
      position in this account is fractional by construction — $18-ish
      slots on a $150 account). GFD was tested for real on 2026-07-20 and
      was ALSO rejected, with a different error — "Invalid trigger for
-     fractional order" — proving the restriction is on the trigger:stop
+     fractional order" — proving the restriction is on the `trigger: stop`
      mechanism itself, not time-in-force (see docs/EXPERIMENT_LOG.md
      2026-07-18 and 2026-07-20, and docs/RFC_INTRADAY_LIVE_STOPS.md for
      the full finding and the proposed replacement, pending sign-off).
@@ -279,12 +279,19 @@ Setup:
        "stops placed" or "stops updated," and never report step 8 as
        complete when any symbol failed verification.
    Do this every cycle, even when nothing else traded: trailing stop types
-   ratchet with the high-water mark, so yesterday's stop price is stale.
-   This refresh does NOT give 24/7 protection — a GFD stop expires at
-   that session's close, so there is a real gap, every day, between
-   market open and whenever this cycle runs — a gap a GTC order would
-   not have had. Report that gap as a known, accepted limitation if
-   asked about coverage — do not describe this as continuous protection.
+   ratchet with the high-water mark, so yesterday's stop_price would be
+   stale even if an order could be placed at it. It currently can't: GFD
+   is confirmed rejected (same as GTC before it, above), so this step
+   places NO broker-side stop at all — there is no window, ever, where a
+   resting stop protects this account. That is total, not a bounded
+   same-day gap. (Historical note only: even if a stop order were
+   accepted, GFD would still leave a gap GTC wouldn't have — it expires
+   at session close and needs re-placing every cycle — but that
+   distinction is moot while every attempt is rejected outright.) If
+   asked about coverage, report plainly that no broker-side stop
+   coverage currently exists — do not describe this as continuous
+   protection, and do not describe it as a bounded daily gap either;
+   right now it is neither.
    take_profit_price is informational only (Robinhood stop orders don't
    natively express a take-profit leg);
    skip placing anything for it unless you've been told otherwise.

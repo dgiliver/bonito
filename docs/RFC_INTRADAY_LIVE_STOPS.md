@@ -555,7 +555,9 @@ src/bonito/cli.py
   :1153       _sweep_stops — --execute is paper-gated (:1174) by design; live never needed it
   :1184       live_stop_levels — compute_stop_levels' CLI surface, informational only here
 docs/AUTONOMOUS_LIVE_ROUTINE.md
-  step 8      to be replaced or dropped per D1; "Intraday stops under a Routine" section stale re: GFD status
+  step 8      to be replaced or dropped per D1; "Intraday stops under a
+              Routine" section was stale re: GFD status, corrected in
+              the same pass that added this RFC
 .github/workflows/intraday-stops.yml
   precedent for cadence/guard/retry shape; concurrency: group has no Routine equivalent (§6.5)
 docs/EXPERIMENT_LOG.md
