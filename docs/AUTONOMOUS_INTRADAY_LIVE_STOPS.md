@@ -45,16 +45,21 @@ decisions and only ever places sells.
 2. **Pick a small model** (Sonnet or Haiku) — same reasoning as the daily
    Routine: the decision logic lives entirely in the deterministic CLI,
    this Routine is mechanical orchestration on top of it.
-3. **Schedule buffer, not a free choice**: the last run (2:30pm ET) sits
-   75 minutes before the daily cycle's 3:45pm ET run, wider than the
-   45-minute gap paper's `intraday-stops.yml` keeps from its own daily
-   cycle — because live's daily cycle runs *during* this Routine's own
-   market-hours range (paper's runs safely after close), so a
-   same-window collision is a real, not just theoretical, possibility
-   here (see `docs/RFC_INTRADAY_LIVE_STOPS.md` §6.5). A stop breach in
-   the last ~75 minutes before close is still caught by the daily
-   cycle's own settled-close exit — a granularity difference in the last
-   hour, not a coverage gap.
+3. **Schedule buffer**: the last run (2:30pm ET) sits ~135 minutes before
+   the daily cycle's actual ~4:45pm ET run (see
+   `docs/AUTONOMOUS_LIVE_ROUTINE.md`'s "Picking the time" — the daily
+   cycle must run after 16:15 ET or it never trades at all, so it's well
+   outside this Routine's own 9:30am-2:30pm ET market-hours range, not
+   inside it). That's a more comfortable gap than this doc originally
+   assumed (it was drafted against a since-corrected 3:45pm ET premise),
+   but a same-window collision still isn't impossible — either Routine's
+   actual run time can drift from its nominal schedule, exactly as this
+   account's own daily cycle already did — which is why the retry-then-stop
+   push handling below exists regardless of how comfortable the nominal
+   gap looks (see `docs/RFC_INTRADAY_LIVE_STOPS.md` §6.5). A stop breach
+   between this Routine's last check and the 4pm ET close (~90 minutes)
+   is still caught by the daily cycle's own settled-close exit once it
+   runs — a granularity difference, not a coverage gap.
 4. **Dogfood before trusting the schedule**: use "Run now" once while you
    watch, ideally with no open positions or with a symbol you're
    comfortable testing an exit on, to confirm the full chain end to end
@@ -84,7 +89,7 @@ lean):
 Setup:
 - `[ -d .venv ] || python3.12 -m venv .venv && .venv/bin/pip install -e "." --quiet`
 - `git pull origin main` — explicit `main`, same reasoning as the daily
-  Routine's step 10.
+  Routine's step 9.
 - Run every step in the foreground; do not background anything, including
   step 4's sweep. Do not rely on a plain `export` to carry a variable
   between steps — each may run as a separate shell.

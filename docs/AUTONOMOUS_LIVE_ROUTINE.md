@@ -88,8 +88,13 @@ your own machine or from [claude.ai/code/routines](https://claude.ai/code/routin
    [claude.ai/customize/connectors](https://claude.ai/customize/connectors).
 2. From a local Claude Code terminal:
    ```
-   /schedule weekdays at 3:45pm ET, run the Bonito live trading cycle
+   /schedule weekdays at 4:45pm ET, run the Bonito live trading cycle
    ```
+   (See "Picking the time" below before changing this — an earlier
+   version of this doc recommended 3:45pm ET, which is wrong: it means
+   the cycle never trades at all, not just occasionally. 4:45pm ET is
+   the empirically-proven-working time for this account, not an
+   arbitrary pick.)
    Claude will collect the repo, environment, connectors, and the prompt
    (paste the prompt below). Include only the Robinhood connector.
 
@@ -102,38 +107,51 @@ your own machine or from [claude.ai/code/routines](https://claude.ai/code/routin
    judgment, which it shouldn't — every decision is either a CLI exit code or
    a fail-closed STOP.)
 
-   **Verify your actual configured time matches this section — a real
-   incident, not a hypothetical.** This account's Routine was found
-   configured for **4:45pm ET, not 3:45pm ET** — 45 minutes *after* the
-   close instead of 15 minutes before it. That single misconfiguration is
-   the confirmed root cause of at least 2 of this account's 3
-   ledger-drift incidents (see `docs/EXPERIMENT_LOG.md`): every
-   dollar-based order this Routine places after the 4pm ET close queues
-   as GFD and doesn't resolve until the next session's open, by which
-   point the cycle has already ended and nothing reconciles the stale
-   cycle-time record against the real fill. This doc recommending 3:45pm
-   ET does nothing on its own — go check the Routine's actual scheduled
-   time at [claude.ai/code/routines](https://claude.ai/code/routines) and
-   correct it if it drifted, the same way this account's did.
+   **Verify your actual configured time — this doc's own recommendation
+   below was wrong for a long time and nobody caught it.** This account's
+   Routine was found running at 4:45pm ET, not the 3:45pm ET this section
+   used to recommend. Go check the Routine's actual scheduled time at
+   [claude.ai/code/routines](https://claude.ai/code/routines) against
+   whatever this section says *right now* (read the rest of this
+   subsection before deciding whether to change anything — the
+   corrected reasoning below concludes 4:45pm-ish is actually the right
+   choice, not a bug to revert).
 
-   **Picking the time — a real tradeoff, not a free choice.** The live cycle
-   *must* run during regular hours: Robinhood fractional/dollar orders only
-   fill in RTH, so the after-close pattern the paper GitHub Action uses
-   (22:30 UTC, when the daily bar is settled) is NOT available here — copying
-   it would place orders that never fill. Every minute before the 4pm ET
-   close, `bonito live refresh` still pulls a still-*forming* daily bar from
-   Yahoo (last trade as the "close"). But `bonito live run` now guards every
-   entry/exit with `_is_forming` (the settled-bar guard): on a forming bar it
-   skips entries and holds exits rather than acting on an unsettled price.
-   Pre-close runs are correct by construction — at worst they no-op a symbol
-   whose settled signal would have fired, never trade a wrong price. Net: the
-   schedule no longer affects correctness, only opportunity — run too early
-   and the guard suppresses that day's trades (picked up next session or a
-   later run); run too late and an order risks slipping past 4pm. 3:45pm ET
-   keeps ~15 min of headroom while staying in RTH, intentionally biased
-   toward "miss a trade > mis-trade." The settled-bar guard is now
-   IMPLEMENTED; see `tasks/arm_fill_gap_coordination.md` Decision #3 and
-   `docs/RFC_SETTLED_BAR_GUARD.md`.
+   **Picking the time — not a free choice, and this doc had it wrong once
+   already.** `_is_forming()` requires `now_et >= 16:15 ET` on the SAME
+   calendar date as the bar to call it settled. A fixed schedule time
+   *before* 16:15 ET — 3:45pm ET, say — **never** satisfies that: 15:45 is
+   always less than 16:15, every single regular trading day, with zero
+   exceptions. That means entries never fire, exits never fire, and the
+   trailing stop never ratchets — not "the guard occasionally suppresses a
+   trade," as this section used to claim, but nothing ever happens, period.
+   This isn't hypothetical: confirmed empirically over 6 real consecutive
+   trading days of zero live entries under a pre-close schedule while paper
+   traded normally throughout (`tasks/todo.md`, 2026-07-13).
+
+   So the cycle has to run *after* 16:15 ET to ever do anything — but
+   Robinhood fractional/dollar orders only fill in RTH (before the 4pm ET
+   close), so any order this cycle places after 16:15 ET queues as GFD and
+   fills at the *next* session's open, not today. That's not "an order
+   risks slipping past 4pm" (a soft, occasional-sounding risk) — it is the
+   **guaranteed** outcome of every single order this cycle places, and it
+   has caused three real ledger-drift incidents so far (`docs/EXPERIMENT_LOG.md`).
+
+   **There is no schedule time that avoids both problems** — running
+   before 16:15 ET means the cycle never trades at all; running after it
+   means every order queues overnight. This account currently runs at
+   ~4:45pm ET, which is the *correct* choice of the two (a cycle that
+   trades correctly with a one-day-delayed fill record is far better than
+   one that never trades), but picking that time does not by itself fix
+   anything — the overnight-queuing consequence still needs its own
+   handling (capturing the broker order id on a pending fill and resolving
+   it automatically once it settles), which does not exist yet as of
+   2026-07-21. See `docs/RFC_INTRADAY_LIVE_STOPS.md` and
+   `docs/EXPERIMENT_LOG.md` for the open design question. The settled-bar
+   guard itself is correctly IMPLEMENTED and working as intended; see
+   `tasks/arm_fill_gap_coordination.md` Decision #3 and
+   `docs/RFC_SETTLED_BAR_GUARD.md` — this section was wrong about its
+   *scheduling implication*, not about the guard's own correctness.
 3. Confirm the environment allows the Yahoo domains and has
    `mode: live` + `live_enabled: true` in `config/universe.live.json`.
 4. Use **Run now** once while you watch, to confirm the full chain end to

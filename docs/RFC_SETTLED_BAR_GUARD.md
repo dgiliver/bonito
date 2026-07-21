@@ -8,6 +8,19 @@
 - **Implements option:** (b) "harden the code to act only on settled bars"
   — the code-change lever from Decision #3. Option (a) (schedule-only) needs
   no RFC.
+- **Addendum (2026-07-21):** the guard proposed here is correct and was
+  built as designed — but its interaction with the 3:45pm ET schedule this
+  RFC assumed as background context (§1) was more severe than anticipated:
+  a fixed schedule time before 16:15 ET means the guard reads the just-
+  ingested bar as forming on *every* regular trading day, unconditionally,
+  not just on the half-days this RFC's §5.1 discussed. That was confirmed
+  empirically (`tasks/todo.md`, 2026-07-13: 6 consecutive days of zero live
+  entries) and led to moving the schedule to ~4:45pm ET, which surfaces a
+  different, previously-unconnected problem (orders queuing overnight).
+  See `docs/AUTONOMOUS_LIVE_ROUTINE.md`'s "Picking the time" section and
+  `docs/RFC_INTRADAY_LIVE_STOPS.md` for the current understanding — not
+  a correction to this RFC's guard design, only to the schedule assumption
+  used as its motivating example.
 
 ---
 

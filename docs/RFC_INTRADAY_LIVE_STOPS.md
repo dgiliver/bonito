@@ -6,10 +6,15 @@
   below rather than a line-by-line confirmed sign-off; flag any of them to
   override. Built as `docs/AUTONOMOUS_INTRADAY_LIVE_STOPS.md`; the user
   still needs to create the Routine itself (§10 rollout, manual claude.ai
-  step) and separately fix the existing daily Routine's schedule time
-  (found misconfigured at 4:45pm ET instead of 3:45pm ET — see
-  `docs/EXPERIMENT_LOG.md` 2026-07-21 and the Setup section of
-  `docs/AUTONOMOUS_LIVE_ROUTINE.md`).
+  step). Also surfaced and corrected a stale claim in
+  `docs/AUTONOMOUS_LIVE_ROUTINE.md`: the daily cycle's actual ~4:45pm ET
+  schedule is CORRECT, not a misconfiguration — running before 16:15 ET
+  (the settled-bar guard's threshold) means the cycle never trades at
+  all, confirmed empirically over 6 days (`tasks/todo.md`, 2026-07-13);
+  running after it means every order queues overnight, which is what
+  actually needs fixing (§9 D1 is unaffected by this; the still-open
+  pending-fill-resolution work below now absorbs what a "fix the
+  schedule" plan would otherwise have tried to avoid).
 - **Author:** orchestrator pass, 2026-07-21
 - **Branch:** `claude/determined-shannon-0dhndr`
 - **Supersedes/extends:** `docs/AUTONOMOUS_LIVE_ROUTINE.md` step 8 (the daily
@@ -323,9 +328,15 @@ alongside the existing daily Routine.
 Routines have a one-hour minimum polling interval, so "intraday" here means
 hourly, not 15-minute like paper's sweep. Recommended: on the hour from
 market open through mid-afternoon (e.g. 9:30, 10:30, 11:30, 12:30, 13:30,
-14:30 ET), with the **last run comfortably before** the daily cycle's
-3:45pm ET run — wider buffer than paper's 45-minute gap to `main` from its
-own daily cycle (§6.5 explains why live needs more margin than paper did).
+14:30 ET), with the **last run before** the daily cycle's run — which
+must itself be after 16:15 ET (the settled-bar guard's threshold; running
+before it means the daily cycle never trades at all — see the corrected
+"Picking the time" section in `docs/AUTONOMOUS_LIVE_ROUTINE.md`), so
+realistically ~4:45pm ET or later. That puts this Routine's last check
+~135 minutes before the daily cycle in practice — narrower than paper's
+real ~150-minute gap to its own daily cycle once its in-job guard is
+accounted for, and accepted for the same structural reason regardless of
+the exact minute count (§6.5 explains why).
 A stop breach in the final run-up to close, after the last intraday check,
 is still caught by the daily cycle's own settled-close exit — a coverage
 *granularity* difference in the last ~hour, not a gap (§7).
@@ -377,19 +388,30 @@ Paper's `concurrency: group: livetrade-state` is a GitHub Actions queueing
 primitive with no equivalent in Claude Code Routines — two Routines are
 just two independently-scheduled cloud sessions with no shared lock. But
 paper's *schedule* also does most of the real work: its daily cycle runs at
-22:30 UTC, 45 minutes after `intraday-stops.yml`'s last possible tick
-(21:45 UTC) — genuinely disjoint in practice, which is why a real collision
-has essentially never happened.
+22:30 UTC. The cron's raw last tick is 21:45 UTC (45 min before), but the
+in-job guard trims actual execution to 9:30-16:00 ET — 20:00 UTC in EDT —
+so the real gap between paper's last EFFECTIVE sweep and its daily cycle is
+~150 minutes, not 45. Genuinely disjoint in practice either way, which is
+why a real collision has essentially never happened.
 
-**Live doesn't have that luxury.** The daily live cycle must run in RTH
-(3:45pm ET — Robinhood fractional/dollar orders only fill during market
-hours, so paper's after-close pattern isn't available), which sits *inside*
-the new Routine's own market-hours sweep range, not safely after it. Even
-with the buffer recommended in §6.1, the margin is real minutes, not
-tens of minutes — a same-window collision is a plausible event here in a
-way it never was for paper, and simply copying paper's pattern without
-naming that difference would be a plausible-looking mistake, not a safe
-port.
+**Live's daily cycle actually runs post-close, not in RTH — correcting
+this RFC's own earlier premise.** The settled-bar guard requires the bar
+to be settled (16:15 ET) before the daily cycle can act on anything, so
+it must run *after* the close — ~4:45pm ET in practice, not the 3:45pm ET
+this RFC originally assumed (see the corrected "Picking the time" section
+in `docs/AUTONOMOUS_LIVE_ROUTINE.md`). That puts the daily cycle *outside*
+this Routine's own market-hours sweep range (9:30am-2:30pm ET), not inside
+it — a ~135-minute gap in practice, closer to paper's own ~150-minute
+effective gap than the razor-thin one this RFC first argued. The collision
+risk is real but lower-probability than originally stated here; it isn't
+zero, since either Routine's actual run time can drift from its nominal
+schedule — this account's *own* daily cycle already drifted once, from a
+documented 3:45pm ET to an actual 4:45pm ET, unnoticed until this session
+traced a ledger-drift bug back to it. So the retry-then-stop design in D3
+below still stands, on more honest grounds: not because a collision is
+likely, but because the cost of getting a rare one wrong (an unrecorded
+real order) is asymmetric, and the fix is cheap and safe regardless of
+how often it's ever actually needed.
 
 The consequence that matters: if the new Routine's `git push` is rejected
 (non-fast-forward, because the daily cycle pushed first), and it just
@@ -506,9 +528,11 @@ rewritten to point at this RFC's mechanism, and a standing "retest if
 Robinhood's fractional-order support ever changes" follow-up is logged in
 `docs/EXPERIMENT_LOG.md` instead.
 
-**D2 — Schedule buffer before the daily cycle: 75 minutes.** The new
-Routine's last run lands at 2:30pm ET, 75 minutes before the daily
-cycle's (corrected) 3:45pm ET run — see `docs/AUTONOMOUS_INTRADAY_LIVE_STOPS.md`'s
+**D2 — Schedule buffer before the daily cycle: ~135 minutes in
+practice.** The new Routine's last run lands at 2:30pm ET; the daily
+cycle actually runs ~4:45pm ET (not the 3:45pm ET originally assumed here
+— see the Status line and §6.5), so the real gap is ~135 minutes, not the
+75 originally stated. See `docs/AUTONOMOUS_INTRADAY_LIVE_STOPS.md`'s
 Setup section. A stop breach in that last 75 minutes is caught by the
 daily cycle's own settled-close exit instead — granularity, not a gap.
 
@@ -579,7 +603,7 @@ docs/AUTONOMOUS_INTRADAY_LIVE_STOPS.md
 .github/workflows/intraday-stops.yml
   precedent for cadence/guard/retry shape; concurrency: group has no Routine equivalent (§6.5)
 docs/EXPERIMENT_LOG.md
-  2026-07-18 (x2), 2026-07-20 (x2), 2026-07-21 bug rows + matching
+  2026-07-18 (x2), 2026-07-20, 2026-07-21 bug rows + matching
   2026-07-20 Rejected row — the empirical + root-cause basis for this
   RFC and for the daily Routine's corrected schedule guidance
 ```
