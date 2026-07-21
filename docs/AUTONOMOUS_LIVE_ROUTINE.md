@@ -240,16 +240,16 @@ Setup:
      time_in_force GFD, not GTC — GTC was rejected on 2026-07-18 for all
      3 positions with "Invalid time in force for fractional order" (every
      position in this account is fractional by construction — $18-ish
-     slots on a $150 account). GFD is UNCONFIRMED, not a known-working
-     fix — it's the best available next experiment, not a verified
-     solution (see docs/EXPERIMENT_LOG.md 2026-07-18 for why: evidence on
-     whether Robinhood's fractional-order rules allow ANY stop order,
-     regardless of time-in-force, is genuinely mixed, and this account's
-     orders route through Robinhood's new Agentic Trading MCP — live only
-     since ~May 2026 — which has no public track record to check against).
-     If GFD is ALSO rejected, that is a real, expected-possible outcome,
-     not a bug in this prompt — report the exact rejection text and stop;
-     do not try further time_in_force values without being told to.
+     slots on a $150 account). GFD was tested for real on 2026-07-20 and
+     was ALSO rejected, with a different error — "Invalid trigger for
+     fractional order" — proving the restriction is on the trigger:stop
+     mechanism itself, not time-in-force (see docs/EXPERIMENT_LOG.md
+     2026-07-18 and 2026-07-20, and docs/RFC_INTRADAY_LIVE_STOPS.md for
+     the full finding and the proposed replacement, pending sign-off).
+     This step is therefore expected to fail every cycle until that RFC
+     is resolved and this step is replaced. Attempt it anyway for now,
+     report the exact rejection text, and do not try further
+     time_in_force values — there is no remaining value worth testing.
    - VERIFY, don't assume: after every stop refresh (cancel-if-existing,
      then place) for a symbol, call get_equity_orders for that symbol and
      confirm EXACTLY ONE stop_market order exists in a live state
@@ -360,34 +360,32 @@ dogfood chain is clean.
 
 ## Intraday stops under a Routine
 
-A Routine can't poll every 15 minutes (one-hour minimum interval), so
-intraday protection does NOT depend on a sweep Routine. Instead, step 8
-above uses `bonito live stop-levels` — a deterministic CLI command (same
-stop math as the paper `sweep`, via `compute_stop_levels` in
-`src/bonito/trading/live_runner.py`) that prints each open position's
-current stop price — to place/cancel-and-replace a broker-side stop order
-on Robinhood every cycle.
+**Status: superseded by `docs/RFC_INTRADAY_LIVE_STOPS.md`, pending
+sign-off — read that RFC for the current design; this section is kept for
+history, not as current guidance.** It originally argued that because a
+Routine can't poll every 15 minutes (one-hour minimum interval), intraday
+protection should NOT depend on a sweep Routine at all, and should instead
+rely entirely on step 8's broker-side stop order. That broker-side
+mechanism is now proven dead for this account (both GTC and GFD
+`trigger: stop` orders are rejected for fractional quantities — see
+docs/EXPERIMENT_LOG.md 2026-07-18 and 2026-07-20), so the conclusion this
+section drew no longer holds. The RFC proposes exactly the "second
+Routine" option this section once argued against: an hourly (not
+15-minute, given the one-hour polling floor) sweep that places a real
+market sell the instant Bonito's own stop/take-profit logic decides to
+exit, instead of a broker-side resting order.
 
-**This section originally described GTC-based coverage as working. It
-does not — corrected 2026-07-18, see docs/EXPERIMENT_LOG.md.** The rest
-of this section reflects the current, corrected behavior, not the stale
-original claim. GTC stop orders are rejected outright for this account:
-every position is fractional by construction ($18-ish slots on a $150
-account), and
-Robinhood rejected all 3 real GTC stop attempts on 2026-07-18 with
-"Invalid time in force for fractional order." Step 8 now tries GFD
-instead, which is UNCONFIRMED, not a verified fix. Even if GFD is
-accepted, it does not give the 24/7-no-lapse property this section
-originally claimed: GFD orders expire at each session's close and must be
-re-placed every cycle (already true of how step 8 runs, so no new
-process gap there) — but there IS a real, unavoidable gap between market
-open (9:30am ET) and whenever that day's cycle actually runs, every
-single day, since the prior day's GFD stop already expired at yesterday's
-close. GTC never had that gap; GFD structurally does. If continuous,
-gap-free protection turns out to matter more than the cost/complexity of
-an intraday polling mechanism, revisit the "second Routine" option
-discussed in chat 2026-07-18 rather than treating GFD as the final
-answer.
+For the record: step 8 uses `bonito live stop-levels` — a deterministic
+CLI command (same stop math as the paper `sweep`, via `compute_stop_levels`
+in `src/bonito/trading/live_runner.py`) that prints each open position's
+current stop price — to place/cancel-and-replace a broker-side stop order
+on Robinhood every cycle. GTC stop orders were rejected outright for this
+account on 2026-07-18 ("Invalid time in force for fractional order");
+switching to GFD was tried as the next real experiment and was ALSO
+rejected, on 2026-07-20, with a different error ("Invalid trigger for
+fractional order") — proving the restriction is on the trigger mechanism
+itself, not time-in-force, and that no remaining time-in-force value was
+worth testing.
 
 Note this only covers fixed/percent/ATR/trailing stops. `take_profit_price`
 is reported for visibility but not auto-placed — Robinhood's basic stop
