@@ -1,8 +1,15 @@
 # RFC: Intraday live stop protection (a second Routine)
 
-- **Status:** Draft — awaiting user decision (a new automated order-placement
-  mechanism is human-domain, same bar as `RFC_SETTLED_BAR_GUARD.md` and
-  `RFC_LIVE_FIDELITY.md`)
+- **Status:** Proceeding on all 4 recommendations in §9 (2026-07-21) — the
+  user asked to move to building the second Routine without objecting to
+  any of §9's specifics, so each is marked "proceeding per recommendation"
+  below rather than a line-by-line confirmed sign-off; flag any of them to
+  override. Built as `docs/AUTONOMOUS_INTRADAY_LIVE_STOPS.md`; the user
+  still needs to create the Routine itself (§10 rollout, manual claude.ai
+  step) and separately fix the existing daily Routine's schedule time
+  (found misconfigured at 4:45pm ET instead of 3:45pm ET — see
+  `docs/EXPERIMENT_LOG.md` 2026-07-21 and the Setup section of
+  `docs/AUTONOMOUS_LIVE_ROUTINE.md`).
 - **Author:** orchestrator pass, 2026-07-21
 - **Branch:** `claude/determined-shannon-0dhndr`
 - **Supersedes/extends:** `docs/AUTONOMOUS_LIVE_ROUTINE.md` step 8 (the daily
@@ -485,58 +492,67 @@ fractional-order policy ever changes.
 
 ---
 
-## 9. Decisions — need your sign-off
+## 9. Decisions
 
-**D1 — Step 8's fate.** Drop the daily broker-side stop-order attempt from
-the unattended prompt entirely (§6.6), given it now fails deterministically
-every cycle? Or keep attempting it daily regardless (in case Robinhood's
-policy changes silently)? *Recommendation: drop it from the daily
-unattended prompt; log a standing "retest if Robinhood's fractional-order
-support changes" follow-up in `EXPERIMENT_LOG.md` instead of a guaranteed-fail
-daily attempt.*
+All four proceeding per the stated recommendation (2026-07-21) — see the
+Status line above for what "resolved" means here.
 
-**D2 — Schedule buffer before the daily cycle.** §6.1 recommends the last
-intraday check land meaningfully before 3:45pm ET (e.g. 14:30 ET, a
-75-minute buffer) rather than crowding it, accepting a same-day granularity
-tradeoff in the final run-up to close. Is that buffer right, or should
-coverage extend closer to the close at the cost of a thinner collision
-margin with the daily cycle?
+**D1 — Step 8's fate: DROPPED.** Removed the daily broker-side
+stop-order attempt from the unattended prompt entirely (§6.6) — it now
+fails deterministically every cycle, so keeping it would just be a
+guaranteed-fail daily attempt. `docs/AUTONOMOUS_LIVE_ROUTINE.md`'s step 8
+is gone (steps renumbered), its "Intraday stops under a Routine" section
+rewritten to point at this RFC's mechanism, and a standing "retest if
+Robinhood's fractional-order support ever changes" follow-up is logged in
+`docs/EXPERIMENT_LOG.md` instead.
 
-**D3 — Push-conflict handling divergence (§6.5).** Confirm the new
-Routine should retry via bounded `git pull --rebase` before stopping on a
-rejected push — deliberately different from the daily Routine's
-stop-immediately rule — because giving up here can orphan an
-already-executed real order. This does not touch the daily Routine's own
-rule or the no-force-push branch protection; it only adds a safe,
-non-destructive retry step this Routine doesn't currently have.
+**D2 — Schedule buffer before the daily cycle: 75 minutes.** The new
+Routine's last run lands at 2:30pm ET, 75 minutes before the daily
+cycle's (corrected) 3:45pm ET run — see `docs/AUTONOMOUS_INTRADAY_LIVE_STOPS.md`'s
+Setup section. A stop breach in that last 75 minutes is caught by the
+daily cycle's own settled-close exit instead — granularity, not a gap.
 
-**D4 — Preflight as defense-in-depth.** Should the new Routine call
-`bonito live preflight` every run even though §7 shows the kill-switch
-check is usually moot for an exits-only path by the time it would fire?
-*Recommendation: yes — cheap, and still catches a live/live_enabled
-misconfiguration or a stale data feed independent of the kill switch.*
+**D3 — Push-conflict handling divergence: ADOPTED.** The new Routine
+retries via bounded `git pull --rebase` (3 attempts) before stopping on a
+rejected push, deliberately different from the daily Routine's
+stop-immediately rule, because giving up here can orphan an
+already-executed real order. Does not touch the daily Routine's own rule
+or the no-force-push branch protection.
+
+**D4 — Preflight as defense-in-depth: ADOPTED.** The new Routine calls
+`bonito live preflight` every run (step 3) even though §7 shows the
+kill-switch check is usually moot for an exits-only path by the time it
+would fire — cheap, and still catches a live/live_enabled
+misconfiguration or a stale data feed independent of the kill switch.
 
 ---
 
 ## 10. Rollout & gating
 
-1. Resolve §9 (user).
-2. Confirm §8 tests 1–4 (mode-parameterization, decoupling, rebase-retry,
-   idempotency) with real tests — this is mostly reuse, but "mostly" needs
-   verifying, not assuming.
-3. §8 test 5: dry run against the live ledger.
-4. Write the new Routine prompt (`docs/AUTONOMOUS_INTRADAY_LIVE_STOPS.md`,
-   mirroring `AUTONOMOUS_LIVE_ROUTINE.md`'s conventions: token-discipline
-   preamble, explicit `git push origin HEAD:main`, the no-force/no-amend
-   rule verbatim, the verify-don't-assume order pattern) and update
-   `AUTONOMOUS_LIVE_ROUTINE.md` step 8 + its "Intraday stops under a
-   Routine" section per the D1 outcome.
-5. §8 test 6: dogfood — create the Routine, "Run now" while watching,
-   before trusting the schedule.
-6. Once clean: get all 6 currently-unprotected positions their first real
-   coverage under the new mechanism.
-7. Log the adoption in `docs/EXPERIMENT_LOG.md`, same discipline as every
-   other change this session.
+1. ~~Resolve §9 (user).~~ Done 2026-07-21 — proceeding per recommendation
+   on all 4 (see Status line).
+2. ~~Write the new Routine prompt~~ Done —
+   `docs/AUTONOMOUS_INTRADAY_LIVE_STOPS.md`, and
+   `docs/AUTONOMOUS_LIVE_ROUTINE.md` step 8 removed (steps renumbered)
+   with its "Intraday stops under a Routine" section rewritten per D1.
+3. **Still open — §8 tests 1–4** (mode-parameterization, decoupling,
+   rebase-retry, idempotency): not yet written. This RFC's "no new
+   `src/bonito` code needed for detection" claim (§4) is backed by
+   reading the source, not yet by a test asserting it against a
+   live-mode fixture — do this before fully trusting the mechanism.
+4. **Still open — §8 test 5**: a dry run of `bonito live sweep
+   --no-refresh -u config/universe.live.json` against the real live
+   ledger, no order placement, to confirm current behavior matches §4's
+   description before the Routine is created.
+5. **User, manual**: create the Routine per
+   `docs/AUTONOMOUS_INTRADAY_LIVE_STOPS.md`'s Setup section; §8 test 6
+   (dogfood) happens here via "Run now."
+6. Once clean: get all 8 currently-open positions (grew from 6 to 8
+   since this RFC was first drafted — see `docs/EXPERIMENT_LOG.md`
+   2026-07-21) their first real coverage under the new mechanism.
+7. Log the adoption in `docs/EXPERIMENT_LOG.md` once the Routine is
+   created and dogfooded — not yet done (a doc existing isn't an
+   adoption; a working Routine is).
 
 ---
 
@@ -555,13 +571,15 @@ src/bonito/cli.py
   :1153       _sweep_stops — --execute is paper-gated (:1174) by design; live never needed it
   :1184       live_stop_levels — compute_stop_levels' CLI surface, informational only here
 docs/AUTONOMOUS_LIVE_ROUTINE.md
-  step 8      to be replaced or dropped per D1; "Intraday stops under a
-              Routine" section was stale re: GFD status, corrected in
-              the same pass that added this RFC
+  step 8      REMOVED per D1 (steps renumbered 9->8, 10->9); "Intraday
+              stops under a Routine" section rewritten to point at
+              docs/AUTONOMOUS_INTRADAY_LIVE_STOPS.md instead of this RFC
+docs/AUTONOMOUS_INTRADAY_LIVE_STOPS.md
+  the new Routine's prompt, built per this RFC's §6 design and §9 decisions
 .github/workflows/intraday-stops.yml
   precedent for cadence/guard/retry shape; concurrency: group has no Routine equivalent (§6.5)
 docs/EXPERIMENT_LOG.md
-  2026-07-18 (x2), 2026-07-20 bug rows + matching 2026-07-20 Rejected row —
-  the empirical basis for §2.1; this pass adds the queued-order-drift row
-  and the 2026-07-20 GFD-rejection row + Rejected row (the GTC row already existed)
+  2026-07-18 (x2), 2026-07-20 (x2), 2026-07-21 bug rows + matching
+  2026-07-20 Rejected row — the empirical + root-cause basis for this
+  RFC and for the daily Routine's corrected schedule guidance
 ```

@@ -102,6 +102,20 @@ your own machine or from [claude.ai/code/routines](https://claude.ai/code/routin
    judgment, which it shouldn't — every decision is either a CLI exit code or
    a fail-closed STOP.)
 
+   **Verify your actual configured time matches this section — a real
+   incident, not a hypothetical.** This account's Routine was found
+   configured for **4:45pm ET, not 3:45pm ET** — 45 minutes *after* the
+   close instead of 15 minutes before it. That single misconfiguration is
+   the confirmed root cause of at least 2 of this account's 3
+   ledger-drift incidents (see `docs/EXPERIMENT_LOG.md`): every
+   dollar-based order this Routine places after the 4pm ET close queues
+   as GFD and doesn't resolve until the next session's open, by which
+   point the cycle has already ended and nothing reconciles the stale
+   cycle-time record against the real fill. This doc recommending 3:45pm
+   ET does nothing on its own — go check the Routine's actual scheduled
+   time at [claude.ai/code/routines](https://claude.ai/code/routines) and
+   correct it if it drifted, the same way this account's did.
+
    **Picking the time — a real tradeoff, not a free choice.** The live cycle
    *must* run during regular hours: Robinhood fractional/dollar orders only
    fill in RTH, so the after-close pattern the paper GitHub Action uses
@@ -149,22 +163,18 @@ Token discipline (this runs daily, unattended — be lean):
   output or paste raw MCP/JSON blobs — pull only the field you need (fill
   price, filled qty, order id).
 - Minimum tool calls: one get_accounts, one get_equity_positions to reconcile,
-  then per intent review→place→record, one get_equity_orders (to find existing
-  stop order ids) plus per-symbol cancel→place→verify (one more get_equity_orders
-  call per symbol — see step 8) for the stop refresh, one `live tracking`, one
-  commit. Never re-fetch or re-run a step that already succeeded — EXCEPT step
-  8's per-symbol verification call, which is mandatory, not a redundant
-  re-fetch: it's the only way to know cancel+place actually worked, and
-  skipping it to save a call is exactly what let 3 real positions sit
-  unprotected for a day (2026-07-16).
-- Final report ≤ 8 lines: what filled / didn't, stops placed/replaced,
-  reconcile + tracking status, any abort reason. Nothing else.
+  then per intent review→place→record, one `live tracking`, one commit.
+  Never re-fetch or re-run a step that already succeeded.
+- Final report ≤ 8 lines: what filled / didn't, reconcile + tracking status,
+  any abort reason. Nothing else. Intraday stop-loss/take-profit protection
+  is handled by the separate hourly Routine in
+  `docs/AUTONOMOUS_INTRADAY_LIVE_STOPS.md`, not by this one.
 
 Setup:
 - `[ -d .venv ] || python3.12 -m venv .venv && .venv/bin/pip install -e "." --quiet`
 - `git pull origin main` to get the latest ledger. Explicit `main`, not
   whatever branch this container happens to have checked out — same
-  reasoning as step 10's push below: anchor to `main`, don't rely on
+  reasoning as step 9's push below: anchor to `main`, don't rely on
   incidental branch-forking behavior.
 - Run every step in the foreground and wait for it to finish before moving on
   — do not background any command (including `refresh`). Two overlapping
@@ -221,85 +231,11 @@ Setup:
    On any order error: STOP, report what filled and what didn't, do not retry.
 7. Reconcile again (get_equity_positions vs ledger). Report any FATAL
    mismatch; do not silently fix it.
-8. Refresh broker-side stops: `.venv/bin/bonito live stop-levels
-   -u config/universe.live.json` prints JSON per open position
-   ({quantity, stop_price, stop_type, take_profit_price}; a symbol is
-   omitted if a level can't be computed yet — leave any existing broker
-   stop on that symbol alone). For every symbol it DOES list:
-   - If `stop_price` is `null` for that symbol, do not cancel or place
-     anything for it — leave any existing broker stop alone.
-   - Otherwise, cancel that symbol's existing stop order if one exists
-     (cancel_equity_order, using the order id from get_equity_orders). If
-     get_equity_orders shows no existing stop for this symbol, that's the
-     normal case for a newly-opened position — place the first one. Only
-     skip placing (without canceling anything) if an existing stop *does*
-     show up but you can't confirm which order is the current/valid one —
-     do not stack a duplicate on top of an unconfirmed order.
-   - Place a new stop order (place_equity_order, trigger stop, quantity =
-     the position's full current share count) at `stop_price`. Use
-     time_in_force GFD, not GTC — GTC was rejected on 2026-07-18 for all
-     3 positions with "Invalid time in force for fractional order" (every
-     position in this account is fractional by construction — $18-ish
-     slots on a $150 account). GFD was tested for real on 2026-07-20 and
-     was ALSO rejected, with a different error — "Invalid trigger for
-     fractional order" — proving the restriction is on the `trigger: stop`
-     mechanism itself, not time-in-force (see docs/EXPERIMENT_LOG.md
-     2026-07-18 and 2026-07-20, and docs/RFC_INTRADAY_LIVE_STOPS.md for
-     the full finding and the proposed replacement, pending sign-off).
-     This step is therefore expected to fail every cycle until that RFC
-     is resolved and this step is replaced. Attempt it anyway for now,
-     report the exact rejection text, and do not try further
-     time_in_force values — there is no remaining value worth testing.
-   - VERIFY, don't assume: after every stop refresh (cancel-if-existing,
-     then place) for a symbol, call get_equity_orders for that symbol and
-     confirm EXACTLY ONE stop_market order exists in a live state
-     (queued/confirmed/new — not cancelled/rejected/failed) at the
-     `stop_price` you just placed. A place_equity_order call returning
-     without an error is NOT sufficient confirmation by itself — this
-     exact gap let 3 real positions (2026-07-16) sit with no broker-side
-     stop for over a day before anyone noticed.
-     - Zero matching orders found: do NOT immediately retry cancel+place.
-       Wait briefly and call get_equity_orders again ONCE, passively (no
-       cancel, no place) — the order may simply not be visible yet
-       (broker-side eventual consistency), and retrying cancel+place
-       before ruling that out risks creating a genuine duplicate: the
-       cancel step would find nothing to cancel (same lag) and the place
-       step would fire again, leaving two live stops on one position.
-       Only if this second, passive check also finds nothing should you
-       retry the actual cancel+place, and only once. Then call
-       get_equity_orders once more to check the retry's result before
-       concluding anything.
-     - More than one matching order found: do NOT treat this as success.
-       This is its own failure mode (a likely duplicate) — name it
-       explicitly in the final report; do not attempt to cancel either
-       one yourself without being certain which is current.
-     - Still zero (or still duplicated) after the one retry: that is a
-       real failure. Name the specific symbol(s) explicitly in the final
-       report — never fold an unverified, failed, or duplicated stop into
-       "stops placed" or "stops updated," and never report step 8 as
-       complete when any symbol failed verification.
-   Do this every cycle, even when nothing else traded: trailing stop types
-   ratchet with the high-water mark, so yesterday's stop_price would be
-   stale even if an order could be placed at it. It currently can't: GFD
-   is confirmed rejected (same as GTC before it, above), so this step
-   places NO broker-side stop at all — there is no window, ever, where a
-   resting stop protects this account. That is total, not a bounded
-   same-day gap. (Historical note only: even if a stop order were
-   accepted, GFD would still leave a gap GTC wouldn't have — it expires
-   at session close and needs re-placing every cycle — but that
-   distinction is moot while every attempt is rejected outright.) If
-   asked about coverage, report plainly that no broker-side stop
-   coverage currently exists — do not describe this as continuous
-   protection, and do not describe it as a bounded daily gap either;
-   right now it is neither.
-   take_profit_price is informational only (Robinhood stop orders don't
-   natively express a take-profit leg);
-   skip placing anything for it unless you've been told otherwise.
-9. Fidelity check (the rehearsal gate): `.venv/bin/bonito live tracking
+8. Fidelity check (the rehearsal gate): `.venv/bin/bonito live tracking
    -u config/universe.live.json`. Status must be OK. WARN = live fills are
    diverging from the replay beyond the fill-bps band — report it; during the
    rehearsal a WARN is a gate failure to investigate before the next cycle.
-10. Persist: `.venv/bin/bonito live status -u config/universe.live.json`,
+9. Persist: `.venv/bin/bonito live status -u config/universe.live.json`,
     then `git add livetrade/ && git commit -m "chore(livetrade): live cycle
     $(date -u +%F)" && git push origin HEAD:main`. Use `HEAD:main` explicitly
     — this container may check out its own dedicated working branch rather
@@ -318,16 +254,11 @@ Setup:
     "fix" that is not — never do it.
 
 Hard rules: never place a market/limit order that isn't in the intents file;
-the only other orders you may place are the stop orders in step 8, and
-only at the `stop_price` that command prints; never trade the margin
-account; never run `bonito live resume`; never edit mode or live_enabled;
-never use `git push --force`/`-f` or `git commit --amend` for any step in
-this prompt — `main` is shared with other automation, and a forced push
-can silently discard someone else's commit with no warning; never report
-a broker-side stop as placed or refreshed in step 8 without confirming
-via get_equity_orders that it actually exists — a successful-looking
-place_equity_order call is not proof by itself. If the kill switch is
-latched, report and stop.
+never trade the margin account; never run `bonito live resume`; never edit
+mode or live_enabled; never use `git push --force`/`-f` or `git commit
+--amend` for any step in this prompt — `main` is shared with other
+automation, and a forced push can silently discard someone else's commit
+with no warning. If the kill switch is latched, report and stop.
 ```
 
 ## Rehearsal protocol — the go-live gate
@@ -346,7 +277,7 @@ radius is then a few dollars per name while the real execution path is proven.
 cycle, places nothing further, reports):
 - Step 2 reconcile → exit 0, no FATAL drift.
 - Step 4 preflight → OK (no kill switch / flag mismatch / data outage).
-- Step 9 `live tracking` → status **OK** (live fills within the fill-bps band
+- Step 8 `live tracking` → status **OK** (live fills within the fill-bps band
   of the replay; no decision divergence beyond tolerance).
 
 **The gate:** run every weekday. **≥2 consecutive weeks where every cycle is
@@ -367,38 +298,26 @@ dogfood chain is clean.
 
 ## Intraday stops under a Routine
 
-**Status: superseded by `docs/RFC_INTRADAY_LIVE_STOPS.md`, pending
-sign-off — read that RFC for the current design; this section is kept for
-history, not as current guidance.** It originally argued that because a
-Routine can't poll every 15 minutes (one-hour minimum interval), intraday
-protection should NOT depend on a sweep Routine at all, and should instead
-rely entirely on step 8's broker-side stop order. That broker-side
-mechanism is now proven dead for this account (both GTC and GFD
-`trigger: stop` orders are rejected for fractional quantities — see
-docs/EXPERIMENT_LOG.md 2026-07-18 and 2026-07-20), so the conclusion this
-section drew no longer holds. The RFC proposes exactly the "second
-Routine" option this section once argued against: an hourly (not
-15-minute, given the one-hour polling floor) sweep that places a real
-market sell the instant Bonito's own stop/take-profit logic decides to
-exit, instead of a broker-side resting order.
+**This is now a separate Routine — `docs/AUTONOMOUS_INTRADAY_LIVE_STOPS.md`
+— not a step in this one.** This daily cycle used to attempt a
+broker-side `trigger: stop` order every cycle (the prior "step 8"), on the
+theory that *some* time-in-force would make it stick for a fractional
+quantity. Both GTC (2026-07-18, "Invalid time in force for fractional
+order") and GFD (2026-07-20, "Invalid trigger for fractional order") were
+tried for real and both rejected, with different errors proving the
+restriction is on the trigger mechanism itself, not time-in-force — so
+that step was removed from this prompt entirely rather than kept as a
+guaranteed-fail daily attempt (see `docs/EXPERIMENT_LOG.md` both dates,
+and `docs/RFC_INTRADAY_LIVE_STOPS.md` for the full design). Intraday
+stop-loss/take-profit protection between this cycle's runs is now the
+second Routine's job: it watches open positions hourly during market
+hours and places a real market sell the instant Bonito's own
+stop/take-profit logic decides to exit, instead of relying on a
+broker-native resting order.
 
-For the record: step 8 uses `bonito live stop-levels` — a deterministic
-CLI command (same stop math as the paper `sweep`, via `compute_stop_levels`
-in `src/bonito/trading/live_runner.py`) that prints each open position's
-current stop price — to place/cancel-and-replace a broker-side stop order
-on Robinhood every cycle. GTC stop orders were rejected outright for this
-account on 2026-07-18 ("Invalid time in force for fractional order");
-switching to GFD was tried as the next real experiment and was ALSO
-rejected, on 2026-07-20, with a different error ("Invalid trigger for
-fractional order") — proving the restriction is on the trigger mechanism
-itself, not time-in-force, and that no remaining time-in-force value was
-worth testing.
-
-Note this only covers fixed/percent/ATR/trailing stops. `take_profit_price`
-is reported for visibility but not auto-placed — Robinhood's basic stop
-order doesn't express a one-cancels-other take-profit leg, and the daily
-cycle's own exit logic already sells on a take-profit signal at the next
-open.
+If Robinhood ever changes its fractional-order rules, a periodic manual
+retest (not a daily automated attempt) is the right way to find out —
+see `docs/EXPERIMENT_LOG.md`'s standing-follow-up note, not this prompt.
 
 ## Your footprint once this is live
 
