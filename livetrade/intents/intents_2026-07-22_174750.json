@@ -1,0 +1,14 @@
+[
+  {
+    "symbol": "META",
+    "side": "sell",
+    "dollar_amount": null,
+    "quantity": 0.12070374357403768,
+    "reason": "stop loss triggered (intraday)",
+    "signal_price": 627.1699829101562,
+    "signal_date": "2026-07-22T17:47:50.969335Z",
+    "strategy_name": "ema_cross_rsi_atr_regime",
+    "generated_at": "2026-07-22T17:47:50.969542Z",
+    "broker_order_id": null
+  }
+]
