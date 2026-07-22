@@ -107,7 +107,7 @@
       "quantity": 0.18692,
       "entry_price": 100.31,
       "entry_date": "2026-07-17T13:30:00.690000Z",
-      "high_water_mark": 100.31,
+      "high_water_mark": 104.4800033569336,
       "strategy_name": "live",
       "strategy_hash": "da16575a5622",
       "strategy_config": {
@@ -207,7 +207,7 @@
       "quantity": 0.010805,
       "entry_price": 1735.31,
       "entry_date": "2026-07-17T13:30:01.515000Z",
-      "high_water_mark": 1747.5799560546875,
+      "high_water_mark": 1801.8599853515625,
       "strategy_name": "live",
       "strategy_hash": "da16575a5622",
       "strategy_config": {
@@ -924,11 +924,22 @@
       "filled_at": "2026-07-21T13:30:01.597000Z",
       "strategy_name": "live",
       "broker_order_id": "6a5e8969-044a-4055-a76f-9db9a18a6232"
+    },
+    {
+      "symbol": "NOW",
+      "side": "sell",
+      "quantity": 0.0,
+      "price": 95.46,
+      "notional": 0.0,
+      "reason": "no_fill: live fill",
+      "filled_at": "2026-07-22T20:48:24.885241Z",
+      "strategy_name": "live",
+      "broker_order_id": null
     }
   ],
   "realized_pnl": 0.0,
   "peak_equity": 150.14103162835693,
   "halted": false,
   "halt_reason": "",
-  "updated_at": "2026-07-21T21:02:42.716174Z"
+  "updated_at": "2026-07-22T20:48:24.885499Z"
 }

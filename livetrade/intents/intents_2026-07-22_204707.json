@@ -1,0 +1,14 @@
+[
+  {
+    "symbol": "NOW",
+    "side": "sell",
+    "dollar_amount": null,
+    "quantity": 0.18517,
+    "reason": "exit rule matched",
+    "signal_price": 95.45999908447266,
+    "signal_date": "2026-07-22T04:00:00",
+    "strategy_name": "ema_cross_rsi_atr_regime",
+    "generated_at": "2026-07-22T20:47:07.265863Z",
+    "broker_order_id": null
+  }
+]
