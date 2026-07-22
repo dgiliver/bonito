@@ -1218,9 +1218,12 @@ def live_lock_acquire(
     else -- that push, not this command, is the actual synchronization
     point. If the push is rejected, pull and run this command again rather
     than assuming acquisition succeeded. Exits 1 if another run holds a
-    lock less than 20 minutes old: STOP, do not proceed, report which
-    holder/run id/timestamp is blocking. A lock older than 20 minutes is
-    treated as abandoned and silently reclaimed.
+    lock still within its staleness window (CYCLE_LOCK_STALE_AFTER in
+    live_runner.py, currently 20 min): STOP, do not proceed, report which
+    holder/run id/timestamp is blocking. A lock older than that window is
+    treated as abandoned and silently reclaimed -- note this can't tell
+    "crashed" from "still running but slow"; see try_acquire_cycle_lock's
+    own docstring for that caveat.
     """
     import uuid as _uuid
 

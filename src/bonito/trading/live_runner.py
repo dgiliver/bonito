@@ -944,20 +944,32 @@ def try_acquire_cycle_lock(
 ) -> CycleLock | None:
     """Attempt to claim the lock.
 
-    Returns the existing lock if it's held and still fresh -- the caller
-    must back off and not proceed. Returns None and WRITES the new lock
-    file if the lock was free or stale -- the caller must still commit and
-    push it; that push, not this write, is the actual synchronization
-    point (see CycleLock's docstring). A push rejection means another run
-    won the race first; the caller must pull and re-check the lock rather
-    than retry the write blindly.
+    Return value is inverted from the usual None-means-nothing idiom:
+    returns None on SUCCESS (lock acquired, file written). Returns the
+    BLOCKING CycleLock on FAILURE (held and still fresh) -- the caller
+    must back off and not proceed. A caller checking `if lock is None:
+    back off` has it backwards; check `if lock is not None`.
 
-    A stale lock (older than `stale_after`) is treated as abandoned (the
-    holder crashed without releasing) and silently overwritten -- this is
-    the self-healing half of the mechanism; without it, one crashed run
-    would wedge the pipeline forever.
+    On success, the caller must still commit and push the written file
+    immediately, before doing anything else; that push, not this write,
+    is the actual synchronization point (see CycleLock's docstring). A
+    push rejection means another run won the race first; the caller must
+    pull and re-check the lock rather than retry the write blindly.
+
+    A stale lock (older than `stale_after`, default 20 min) is treated as
+    abandoned and silently overwritten -- this is the self-healing half of
+    the mechanism; without it, one crashed run would wedge the pipeline
+    forever. Caveat this doesn't resolve: a TTL can't distinguish "crashed"
+    from "still running but slow" (e.g. a hung MCP call past 20 minutes) --
+    a merely-slow holder gets reclaimed out from under it exactly like a
+    dead one, and both runs then proceed concurrently, which is the race
+    this mechanism exists to prevent in the first place. Mitigate by
+    keeping every step a caller performs while holding this lock
+    comfortably under `stale_after`, not by trusting this check alone.
     """
     as_of = as_of or datetime.now(UTC)
+    if as_of.tzinfo is None:
+        as_of = as_of.replace(tzinfo=UTC)
     existing = read_cycle_lock(universe, directory)
     if existing is not None and (as_of - existing.acquired_at) < stale_after:
         return existing
@@ -979,6 +991,16 @@ def release_cycle_lock(
     the NEW holder's lock instead of this (now-former) one's, defeating the
     entire mutex. Returns True if this call actually cleared the lock,
     False if it was a no-op (already clear, or held by someone else).
+
+    Like acquire, this local check is NOT the final synchronization point
+    on its own -- it only reflects whatever this caller last pulled. A
+    caller must `git pull` immediately before calling this, and must
+    commit-and-push the resulting file state afterward with the SAME
+    discipline as acquire: if that push is rejected, pull and re-check
+    (via `read_cycle_lock`) rather than assume the release took effect --
+    the rejection likely means another run already reclaimed the lock in
+    the meantime, in which case this call's own compare-and-delete is
+    already moot and nothing further should be done.
     """
     path = _cycle_lock_path(universe, directory)
     existing = read_cycle_lock(universe, directory)
