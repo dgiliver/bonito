@@ -358,6 +358,23 @@ class TestCycleLock:
         (tmp_path / f"{universe.mode}_cycle_lock.json").write_text("{not valid json")
         assert read_cycle_lock(universe, directory=tmp_path) is None
 
+    def test_naive_as_of_does_not_crash_against_a_tz_aware_stored_lock(self, universe, tmp_path):
+        """Regression test: a naive as_of used to raise TypeError ('can't
+        subtract offset-naive and offset-aware datetimes') when compared
+        against a lock written via the default, tz-aware datetime.now(UTC)
+        path -- the realistic case, since the CLI never passes as_of."""
+        from datetime import UTC as _UTC
+
+        first = try_acquire_cycle_lock(universe, "daily", "run-1", directory=tmp_path)  # aware
+        assert first is None  # acquired
+
+        naive_now = datetime.now(_UTC).replace(tzinfo=None)
+        blocking = try_acquire_cycle_lock(
+            universe, "intraday", "run-2", as_of=naive_now, directory=tmp_path
+        )
+        assert blocking is not None  # correctly still fresh, not a crash
+        assert blocking.run_id == "run-1"
+
     def test_paper_and_live_use_separate_lock_files(self, tmp_path):
         paper = UniverseConfig(
             name="p",

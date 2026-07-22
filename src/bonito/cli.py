@@ -1249,9 +1249,20 @@ def live_lock_release(
     """Release the cycle lock, only if this run id still holds it.
 
     Compare-and-delete: if this run's own lock went stale and a different
-    run already reclaimed it, this is a safe no-op rather than deleting
-    the new holder's lock. Always exits 0 -- releasing is best-effort
-    cleanup, not itself a gate.
+    run already reclaimed it, this correctly no-ops instead of deleting
+    the new holder's lock -- but only if the CALLER follows the same
+    discipline lock-acquire requires: `git pull` immediately before
+    running this command, then commit and push the resulting file state
+    (deleted, or unchanged if this was a no-op) immediately after. If that
+    push is rejected, pull and run `bonito live lock` (read-only check, or
+    just re-run this command) again rather than assuming the release took
+    effect or retrying with force -- a rejection likely means another run
+    already reclaimed the lock in the meantime (re-running lock-acquire
+    will report who, if you need to confirm), in which case this
+    command's own compare-and-delete already correctly did nothing and
+    there is nothing further to do. Always exits 0 -- releasing is
+    best-effort cleanup, not itself a gate; the git push around it is
+    where the real safety lives, exactly as with lock-acquire.
     """
     from bonito.trading.live_runner import release_cycle_lock
 
