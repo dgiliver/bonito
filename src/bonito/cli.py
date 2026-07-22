@@ -1202,6 +1202,64 @@ def live_stop_levels(
     print(_json.dumps(levels, indent=2))
 
 
+@live_app.command("lock-acquire")
+def live_lock_acquire(
+    holder: str = typer.Argument(..., help='Identifies the caller, e.g. "daily" or "intraday"'),
+    universe_path: str = typer.Option("config/universe.json", "--universe", "-u"),
+) -> None:
+    """Claim the cycle lock before touching the ledger. Prints a run id on success.
+
+    Prevents two Routine runs (two overlapping firings of the same
+    scheduled Routine, or the daily cycle and the intraday sweep) from
+    acting on the same ledger concurrently -- Claude Code Routines
+    document no guarantee against overlapping runs. Exits 0 with the run
+    id on stdout if acquired: the CALLER MUST commit and push
+    livetrade/{mode}_cycle_lock.json immediately, before doing anything
+    else -- that push, not this command, is the actual synchronization
+    point. If the push is rejected, pull and run this command again rather
+    than assuming acquisition succeeded. Exits 1 if another run holds a
+    lock less than 20 minutes old: STOP, do not proceed, report which
+    holder/run id/timestamp is blocking. A lock older than 20 minutes is
+    treated as abandoned and silently reclaimed.
+    """
+    import uuid as _uuid
+
+    from bonito.trading.live_runner import try_acquire_cycle_lock
+
+    universe = _load_universe(universe_path)
+    run_id = str(_uuid.uuid4())
+    blocking = try_acquire_cycle_lock(universe, holder=holder, run_id=run_id)
+    if blocking is not None:
+        console.print(
+            f"[bold red]LOCKED[/bold red] by '{blocking.holder}' "
+            f"(run {blocking.run_id}) since {blocking.acquired_at.isoformat()}"
+        )
+        raise typer.Exit(1)
+    console.print(f"[green]ACQUIRED[/green] run_id={run_id}")
+
+
+@live_app.command("lock-release")
+def live_lock_release(
+    run_id: str = typer.Argument(..., help="The run id printed by lock-acquire"),
+    universe_path: str = typer.Option("config/universe.json", "--universe", "-u"),
+) -> None:
+    """Release the cycle lock, only if this run id still holds it.
+
+    Compare-and-delete: if this run's own lock went stale and a different
+    run already reclaimed it, this is a safe no-op rather than deleting
+    the new holder's lock. Always exits 0 -- releasing is best-effort
+    cleanup, not itself a gate.
+    """
+    from bonito.trading.live_runner import release_cycle_lock
+
+    universe = _load_universe(universe_path)
+    cleared = release_cycle_lock(universe, run_id)
+    if cleared:
+        console.print("[green]released[/green]")
+    else:
+        console.print("[dim]no-op (already clear, or held by a different run)[/dim]")
+
+
 @live_app.command("reconcile")
 def live_reconcile(
     positions_json: str = typer.Argument(

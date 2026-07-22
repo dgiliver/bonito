@@ -889,6 +889,105 @@ def save_intents(intents: list[TradeIntent], directory: Path = Path("livetrade/i
     return path
 
 
+CYCLE_LOCK_STALE_AFTER = timedelta(minutes=20)
+
+
+class CycleLock(BaseModel):
+    """Advisory mutex recorded in the repo, real only once committed AND pushed.
+
+    Prevents two Routine runs from acting on the same ledger concurrently --
+    either two overlapping firings of the SAME scheduled Routine (Claude Code
+    Routines document no guarantee against this: each trigger, including
+    "Run now", starts an independent session regardless of whether a prior
+    run finished), or the daily cycle and the intraday sweep genuinely
+    overlapping if either drifts from its nominal schedule (as this
+    account's daily cycle already has once). The local file write here is
+    NOT the synchronization point -- two processes can both write it
+    locally before either pushes. The git push that follows is: only one of
+    two concurrent `git push`es for the same commit range can land, and the
+    loser's caller must re-check the lock after pulling, not retry blindly.
+    """
+
+    holder: str
+    run_id: str
+    acquired_at: datetime
+
+
+def _cycle_lock_path(universe: UniverseConfig, directory: Path = Path("livetrade")) -> Path:
+    """One lock per mode -- paper and live never contend for the same lock."""
+    return directory / f"{universe.mode}_cycle_lock.json"
+
+
+def read_cycle_lock(universe: UniverseConfig, directory: Path = Path("livetrade")) -> CycleLock | None:
+    """Current lock holder, or None if unlocked.
+
+    A missing or corrupt lock file reads as unlocked -- this check is not
+    the fail-closed gate (reconcile/preflight already are); it only decides
+    whether to proceed to the git-push race, so failing open here is safe.
+    """
+    path = _cycle_lock_path(universe, directory)
+    if not path.exists():
+        return None
+    try:
+        return CycleLock.model_validate_json(path.read_text())
+    except (ValueError, OSError):
+        return None
+
+
+def try_acquire_cycle_lock(
+    universe: UniverseConfig,
+    holder: str,
+    run_id: str,
+    as_of: datetime | None = None,
+    stale_after: timedelta = CYCLE_LOCK_STALE_AFTER,
+    directory: Path = Path("livetrade"),
+) -> CycleLock | None:
+    """Attempt to claim the lock.
+
+    Returns the existing lock if it's held and still fresh -- the caller
+    must back off and not proceed. Returns None and WRITES the new lock
+    file if the lock was free or stale -- the caller must still commit and
+    push it; that push, not this write, is the actual synchronization
+    point (see CycleLock's docstring). A push rejection means another run
+    won the race first; the caller must pull and re-check the lock rather
+    than retry the write blindly.
+
+    A stale lock (older than `stale_after`) is treated as abandoned (the
+    holder crashed without releasing) and silently overwritten -- this is
+    the self-healing half of the mechanism; without it, one crashed run
+    would wedge the pipeline forever.
+    """
+    as_of = as_of or datetime.now(UTC)
+    existing = read_cycle_lock(universe, directory)
+    if existing is not None and (as_of - existing.acquired_at) < stale_after:
+        return existing
+    new_lock = CycleLock(holder=holder, run_id=run_id, acquired_at=as_of)
+    path = _cycle_lock_path(universe, directory)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(new_lock.model_dump_json(indent=2))
+    return None
+
+
+def release_cycle_lock(
+    universe: UniverseConfig, run_id: str, directory: Path = Path("livetrade")
+) -> bool:
+    """Clear the lock, but ONLY if it's still held by this exact run_id.
+
+    Compare-and-delete, not unconditional unlink: if this run's own lock
+    went stale and a different run already claimed it (see
+    `try_acquire_cycle_lock`), an unconditional release here would delete
+    the NEW holder's lock instead of this (now-former) one's, defeating the
+    entire mutex. Returns True if this call actually cleared the lock,
+    False if it was a no-op (already clear, or held by someone else).
+    """
+    path = _cycle_lock_path(universe, directory)
+    existing = read_cycle_lock(universe, directory)
+    if existing is None or existing.run_id != run_id:
+        return False
+    path.unlink(missing_ok=True)
+    return True
+
+
 def _is_stale(last_bar: datetime, as_of: datetime) -> bool:
     return (as_of - last_bar) > timedelta(days=MAX_DATA_AGE_DAYS)
 

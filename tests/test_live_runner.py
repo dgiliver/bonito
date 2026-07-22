@@ -12,7 +12,10 @@ from bonito.trading.live_runner import (
     execute_paper,
     generate_intents,
     preflight,
+    read_cycle_lock,
+    release_cycle_lock,
     save_intents,
+    try_acquire_cycle_lock,
 )
 from bonito.trading.paper import PaperLedger
 from bonito.trading.signals import TradeIntent
@@ -281,6 +284,100 @@ class TestSaveIntents:
         loaded = json.loads(path.read_text())
         assert loaded[0]["symbol"] == "AAA"
         assert loaded[0]["side"] == "buy"
+
+
+class TestCycleLock:
+    def test_acquire_when_free_succeeds(self, universe, tmp_path):
+        blocking = try_acquire_cycle_lock(universe, "daily", "run-1", directory=tmp_path)
+        assert blocking is None
+        lock = read_cycle_lock(universe, directory=tmp_path)
+        assert lock is not None
+        assert lock.holder == "daily"
+        assert lock.run_id == "run-1"
+
+    def test_acquire_when_held_and_fresh_is_blocked(self, universe, tmp_path):
+        now = datetime(2026, 7, 21, 12, 0, 0)
+        first = try_acquire_cycle_lock(universe, "daily", "run-1", as_of=now, directory=tmp_path)
+        assert first is None
+
+        blocking = try_acquire_cycle_lock(
+            universe, "intraday", "run-2", as_of=now + timedelta(minutes=5), directory=tmp_path
+        )
+        assert blocking is not None
+        assert blocking.holder == "daily"
+        assert blocking.run_id == "run-1"
+        # Blocked attempt must NOT overwrite the existing lock.
+        still_there = read_cycle_lock(universe, directory=tmp_path)
+        assert still_there.run_id == "run-1"
+
+    def test_acquire_when_held_but_stale_reclaims(self, universe, tmp_path):
+        now = datetime(2026, 7, 21, 12, 0, 0)
+        try_acquire_cycle_lock(universe, "daily", "run-1", as_of=now, directory=tmp_path)
+
+        reclaimer = try_acquire_cycle_lock(
+            universe,
+            "intraday",
+            "run-2",
+            as_of=now + timedelta(minutes=25),  # past the 20-minute stale threshold
+            directory=tmp_path,
+        )
+        assert reclaimer is None  # acquired, not blocked
+        lock = read_cycle_lock(universe, directory=tmp_path)
+        assert lock.holder == "intraday"
+        assert lock.run_id == "run-2"
+
+    def test_release_with_matching_run_id_clears_lock(self, universe, tmp_path):
+        try_acquire_cycle_lock(universe, "daily", "run-1", directory=tmp_path)
+        cleared = release_cycle_lock(universe, "run-1", directory=tmp_path)
+        assert cleared is True
+        assert read_cycle_lock(universe, directory=tmp_path) is None
+
+    def test_release_with_stale_run_id_is_a_safe_noop(self, universe, tmp_path):
+        """The compare-and-delete guard: a preempted run's own release must
+        never delete whoever's lock is actually current."""
+        now = datetime(2026, 7, 21, 12, 0, 0)
+        try_acquire_cycle_lock(universe, "daily", "run-1", as_of=now, directory=tmp_path)
+        try_acquire_cycle_lock(
+            universe, "intraday", "run-2", as_of=now + timedelta(minutes=25), directory=tmp_path
+        )
+
+        cleared = release_cycle_lock(universe, "run-1", directory=tmp_path)  # the preempted run
+        assert cleared is False
+        lock = read_cycle_lock(universe, directory=tmp_path)
+        assert lock is not None
+        assert lock.run_id == "run-2"  # untouched
+
+    def test_release_when_nothing_held_is_a_noop(self, universe, tmp_path):
+        assert release_cycle_lock(universe, "run-1", directory=tmp_path) is False
+
+    def test_read_missing_lock_returns_none(self, universe, tmp_path):
+        assert read_cycle_lock(universe, directory=tmp_path) is None
+
+    def test_read_corrupt_lock_returns_none(self, universe, tmp_path):
+        tmp_path.mkdir(parents=True, exist_ok=True)
+        (tmp_path / f"{universe.mode}_cycle_lock.json").write_text("{not valid json")
+        assert read_cycle_lock(universe, directory=tmp_path) is None
+
+    def test_paper_and_live_use_separate_lock_files(self, tmp_path):
+        paper = UniverseConfig(
+            name="p",
+            mode="paper",
+            symbols=["AAA"],
+            strategy_path="unused.json",
+            data={"timeframe": "1d", "start_date": "2026-01-01"},
+        )
+        live = UniverseConfig(
+            name="l",
+            mode="live",
+            symbols=["AAA"],
+            strategy_path="unused.json",
+            data={"timeframe": "1d", "start_date": "2026-01-01"},
+        )
+        try_acquire_cycle_lock(paper, "daily", "paper-run", directory=tmp_path)
+        blocking = try_acquire_cycle_lock(live, "daily", "live-run", directory=tmp_path)
+        assert blocking is None  # live's lock is independent of paper's
+        assert read_cycle_lock(paper, directory=tmp_path).run_id == "paper-run"
+        assert read_cycle_lock(live, directory=tmp_path).run_id == "live-run"
 
 
 def _intent(symbol, side, dollar_amount=None, quantity=None) -> TradeIntent:
