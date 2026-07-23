@@ -326,17 +326,17 @@ alongside the existing daily Routine.
 ### 6.1 Cadence & schedule
 
 Routines have a one-hour minimum polling interval, so "intraday" here means
-hourly, not 15-minute like paper's sweep. Recommended: on the hour from
-market open through mid-afternoon (e.g. 9:30, 10:30, 11:30, 12:30, 13:30,
-14:30 ET), with the **last run before** the daily cycle's run — which
-must itself be after 16:15 ET (the settled-bar guard's threshold; running
-before it means the daily cycle never trades at all — see the corrected
-"Picking the time" section in `docs/AUTONOMOUS_LIVE_ROUTINE.md`), so
-realistically ~4:45pm ET or later. That puts this Routine's last check
-~135 minutes before the daily cycle in practice — narrower than paper's
-real ~150-minute gap to its own daily cycle once its in-job guard is
-accounted for, and accepted for the same structural reason regardless of
-the exact minute count (§6.5 explains why).
+hourly, not 15-minute like paper's sweep. Recommended: on the half-hour
+from the open through the last slot whose sells still fill before the 4pm
+close (9:30, 10:30, 11:30, 12:30, 13:30, 14:30, 15:30 ET). The daily cycle
+must run after 16:15 ET (the settled-bar guard's threshold; running before
+it means the daily cycle never trades at all — see the corrected "Picking
+the time" section in `docs/AUTONOMOUS_LIVE_ROUTINE.md`), so realistically
+~4:45pm ET. That leaves the last intraday check (15:30) ~75 minutes clear
+of the daily cycle — a 15:30 run would have to execute for 75+ minutes to
+overlap it, and the cycle lock handles even that. 15:30 is the last slot
+that still leaves 30 minutes for a placed market sell to fill before the
+close; a later slot risks a sell that doesn't fill in time.
 A stop breach in the final run-up to close, after the last intraday check,
 is still caught by the daily cycle's own settled-close exit — a coverage
 *granularity* difference in the last ~hour, not a gap (§7).
@@ -402,9 +402,10 @@ to be settled (16:15 ET) before the daily cycle can act on anything, so
 it must run *after* the close — ~4:45pm ET in practice, not the 3:45pm ET
 this RFC originally assumed (see the corrected "Picking the time" section
 in `docs/AUTONOMOUS_LIVE_ROUTINE.md`). That puts the daily cycle *outside*
-this Routine's own market-hours sweep range (9:30am-2:30pm ET), not inside
-it — a ~135-minute gap in practice, closer to paper's own ~150-minute
-effective gap than the razor-thin one this RFC first argued. The collision
+this Routine's own market-hours sweep range (9:30am-3:30pm ET), not inside
+it — a ~75-minute gap from the last intraday check (15:30) to the daily
+cycle (~16:45), comparable to paper's own effective gap rather than the
+razor-thin one this RFC first argued. The collision
 risk is real but lower-probability than originally stated here; it isn't
 zero, since either Routine's actual run time can drift from its nominal
 schedule — this account's *own* daily cycle already drifted once, from a
@@ -530,13 +531,16 @@ rewritten to point at this RFC's mechanism, and a standing "retest if
 Robinhood's fractional-order support ever changes" follow-up is logged in
 `docs/EXPERIMENT_LOG.md` instead.
 
-**D2 — Schedule buffer before the daily cycle: ~135 minutes in
-practice.** The new Routine's last run lands at 2:30pm ET; the daily
-cycle actually runs ~4:45pm ET (not the 3:45pm ET originally assumed here
-— see the Status line and §6.5), so the real gap is ~135 minutes, not the
-75 originally stated. See `docs/AUTONOMOUS_INTRADAY_LIVE_STOPS.md`'s
-Setup section. A stop breach in that last ~135 minutes is caught by the
-daily cycle's own settled-close exit instead — granularity, not a gap.
+**D2 — Last intraday run at 3:30pm ET (revised 2026-07-23).** The last
+run lands at 15:30 ET — the last half-hour slot whose triggered market
+sell still fills before the 4pm close — leaving ~75 minutes clear of the
+post-close daily cycle (~16:45 ET). Earlier drafts stopped at 2:30pm,
+a leftover from the since-corrected assumption that the daily cycle ran
+at 3:45pm and needed a wide buffer before it; with the daily cycle
+actually post-close, that extra hour of coverage (2:30–3:30) is free.
+See `docs/AUTONOMOUS_INTRADAY_LIVE_STOPS.md`'s Setup section. The only
+intraday-blind window is the last 30 minutes (3:30–4:00pm), caught by the
+daily cycle's own settled-close exit — granularity, not a gap.
 
 **D3 — Push-conflict handling divergence: ADOPTED.** The new Routine
 retries via bounded `git pull --rebase` (3 attempts) before stopping on a

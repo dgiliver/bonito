@@ -42,7 +42,7 @@ decisions and only ever places sells.
 
 1. From a local Claude Code terminal:
    ```
-   /schedule weekdays every hour from 9:30am to 2:30pm ET, run the Bonito
+   /schedule weekdays every hour from 9:30am to 3:30pm ET, run the Bonito
    intraday live stop-check
    ```
    Include only the Robinhood connector — same reasoning as the daily
@@ -50,21 +50,26 @@ decisions and only ever places sells.
 2. **Pick a small model** (Sonnet or Haiku) — same reasoning as the daily
    Routine: the decision logic lives entirely in the deterministic CLI,
    this Routine is mechanical orchestration on top of it.
-3. **Schedule buffer**: the last run (2:30pm ET) sits ~135 minutes before
-   the daily cycle's actual ~4:45pm ET run (see
-   `docs/AUTONOMOUS_LIVE_ROUTINE.md`'s "Picking the time" — the daily
-   cycle must run after 16:15 ET or it never trades at all, so it's well
-   outside this Routine's own 9:30am-2:30pm ET market-hours range, not
-   inside it). That's a more comfortable gap than this doc originally
-   assumed (it was drafted against a since-corrected 3:45pm ET premise),
-   but a same-window collision still isn't impossible — either Routine's
-   actual run time can drift from its nominal schedule, exactly as this
-   account's own daily cycle already did — which is why the retry-then-stop
-   push handling below exists regardless of how comfortable the nominal
-   gap looks (see `docs/RFC_INTRADAY_LIVE_STOPS.md` §6.5). A stop breach
-   between this Routine's last check and the 4pm ET close (~90 minutes)
-   is still caught by the daily cycle's own settled-close exit once it
-   runs — a granularity difference, not a coverage gap.
+3. **Last run at 3:30pm ET — the last slot whose sells still fill before
+   the 4pm close.** The daily cycle runs post-close at ~4:45pm ET (it must
+   run after 16:15 ET or it never trades — see
+   `docs/AUTONOMOUS_LIVE_ROUTINE.md`'s "Picking the time"), so it's a full
+   ~75 minutes clear of a 3:30pm intraday run, with no realistic collision
+   (a 3:30 run would have to execute for 75+ minutes to overlap it — and
+   the cycle lock handles even that). A 3:30pm sweep that trips a stop
+   places a plain market sell with 30 minutes to fill before the close;
+   every universe name is liquid, so it fills in seconds. Going later than
+   3:30 (e.g. a :45 cadence) buys a little more coverage but risks a sell
+   placed too near the close not filling in time — 3:30 is the sweet spot
+   on the hourly cadence. The only intraday-blind window is the last 30
+   minutes (3:30–4:00pm), backstopped by the daily cycle's own
+   settled-close exit — a granularity difference, not a coverage gap.
+   (Earlier drafts of this doc stopped at 2:30pm; that was a leftover from
+   a since-corrected assumption that the daily cycle ran at 3:45pm and
+   needed a wide buffer before it. It doesn't — see
+   `docs/RFC_INTRADAY_LIVE_STOPS.md` §6.5, D2. The retry-then-stop push
+   handling below is the real collision protection regardless of the exact
+   cutoff.)
 4. **Dogfood before trusting the schedule**: use "Run now" once while you
    watch, ideally with no open positions or with a symbol you're
    comfortable testing an exit on, to confirm the full chain end to end
