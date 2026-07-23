@@ -1,0 +1,14 @@
+[
+  {
+    "symbol": "AMZN",
+    "side": "sell",
+    "dollar_amount": null,
+    "quantity": 0.075584,
+    "reason": "stop loss triggered (intraday)",
+    "signal_price": 233.21499633789062,
+    "signal_date": "2026-07-23T19:39:13.970546Z",
+    "strategy_name": "ema_cross_rsi_atr_regime",
+    "generated_at": "2026-07-23T19:39:13.970681Z",
+    "broker_order_id": null
+  }
+]
