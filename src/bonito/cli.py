@@ -1202,6 +1202,76 @@ def live_stop_levels(
     print(_json.dumps(levels, indent=2))
 
 
+@live_app.command("pending")
+def live_pending(
+    universe_path: str = typer.Option("config/universe.json", "--universe", "-u"),
+) -> None:
+    """List unresolved queued-order sentinels awaiting a broker outcome, as JSON.
+
+    Prints [] when nothing is pending. Each entry carries the broker order
+    id the routine must look up via get_equity_orders before calling
+    `bonito live resolve-pending`. Sentinels recorded without an order id
+    (true rejections) never appear here -- there is nothing to look up.
+    """
+    import json as _json
+
+    from bonito.trading.live_runner import pending_orders
+
+    universe = _load_universe(universe_path)
+    ledger = _load_ledger(universe)
+    print(_json.dumps(pending_orders(ledger), indent=2))
+
+
+@live_app.command("resolve-pending")
+def live_resolve_pending(
+    orders_json: str = typer.Argument(
+        ...,
+        help='Broker outcomes keyed by order id: {"<order_id>": {"state": ..., '
+        '"filled_quantity": ..., "average_price": ..., "notional": ..., '
+        '"executed_at": ...}, ...} (from get_equity_orders; state is required, '
+        "the rest only for filled orders)",
+    ),
+    universe_path: str = typer.Option("config/universe.json", "--universe", "-u"),
+) -> None:
+    """Apply pending queued-order sentinels' real broker outcomes to the ledger.
+
+    The systemic fix for the queued-order ledger-drift bug class
+    (docs/EXPERIMENT_LOG.md, three real incidents): a post-close cycle's
+    orders fill at the NEXT open, after the cycle ended; this closes that
+    loop at the START of the next cycle, before reconcile judges drift.
+    Filled -> stale sentinel replaced with the real fill via the same
+    apply_buy/apply_sell path as any recorded fill. Still queued -> left
+    alone. Dead (cancelled/rejected/expired) -> sentinel stands, marked
+    resolved. Exits 1 if any entry errored (unknown state, missing data,
+    position conflict) -- STOP and report rather than proceeding to trade
+    on a half-healed ledger; exits 0 otherwise. Saves the ledger only when
+    something actually changed.
+    """
+    import json as _json
+
+    from bonito.trading.live_runner import (
+        PendingOrderOutcome,
+        pending_orders,
+        resolve_pending_fills,
+    )
+
+    universe = _load_universe(universe_path)
+    ledger = _load_ledger(universe)
+    if not pending_orders(ledger):
+        console.print("[dim]No pending orders to resolve.[/dim]")
+        return
+
+    raw = _json.loads(orders_json)
+    outcomes = {oid: PendingOrderOutcome.model_validate(o) for oid, o in raw.items()}
+    report = resolve_pending_fills(universe, ledger, outcomes)
+    console.print(report.describe())
+    if report.resolved or report.expired:
+        ledger.save()
+        console.print("[green]ledger updated[/green]")
+    if report.errors:
+        raise typer.Exit(1)
+
+
 @live_app.command("lock-acquire")
 def live_lock_acquire(
     holder: str = typer.Argument(..., help='Identifies the caller, e.g. "daily" or "intraday"'),

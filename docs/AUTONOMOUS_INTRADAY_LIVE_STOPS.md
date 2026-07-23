@@ -94,9 +94,9 @@ lean):
 Setup:
 - `[ -d .venv ] || python3.12 -m venv .venv && .venv/bin/pip install -e "." --quiet`
 - `git pull origin main` — explicit `main`, same reasoning as the daily
-  Routine's step 9.
+  Routine's step 11.
 - Run every step in the foreground; do not background anything, including
-  step 4's sweep. Do not rely on a plain `export` to carry a variable
+  step 5's sweep. Do not rely on a plain `export` to carry a variable
   between steps — each may run as a separate shell.
 
 1. Resolve the account: Robinhood get_accounts -> the one with
@@ -104,44 +104,81 @@ Setup:
    masked number ends in 8597 AND agentic_allowed == true AND nickname ==
    "Agentic". Any check fails -> STOP immediately, do nothing, report the
    mismatch.
-2. Reconcile: get_equity_positions for that account -> build {"SYMBOL": qty}
+2. Acquire the cycle lock (shared with the daily Routine — prevents two
+   runs acting on the same ledger concurrently):
+   - `.venv/bin/bonito live lock-acquire intraday
+     -u config/universe.live.json`. Exit 1 = another run holds it: STOP,
+     report the holder/run id it printed, do nothing else — for an hourly
+     check, backing off entirely and letting the next hourly run cover it
+     is always acceptable. Exit 0 prints `run_id=<id>` — save it; step 8
+     needs it.
+   - Immediately: `git add livetrade/live_cycle_lock.json && git commit
+     -m "chore(livetrade): cycle lock acquire (intraday)" && git push
+     origin HEAD:main`. The PUSH is the real lock — the local file alone
+     synchronizes nothing. If the push is REJECTED: another run pushed
+     first. Run `git fetch origin main && git reset --hard origin/main`
+     (safe HERE and ONLY here: the sole local commit at this moment is
+     this run's own never-pushed lock commit — do not use reset --hard
+     at any other step), then re-run lock-acquire once. Exit 1 now ->
+     STOP and report. Acquired again -> commit and push once more; a
+     second rejection = STOP and report.
+   - If ANY later step aborts the run, still do step 8's lock-release +
+     commit + push (skipping the trading parts) before ending — a held
+     lock self-heals via staleness in 20 minutes, but releasing promptly
+     is the polite default.
+3. Reconcile: get_equity_positions for that account -> build {"SYMBOL": qty}
    JSON ({} if flat) -> `.venv/bin/bonito live reconcile '<json>' -u
    config/universe.live.json`. Exit 1 = FATAL drift: STOP, report, do not
    act — this catches a prior crash between placing and recording an
-   order, same reasoning as the daily cycle's step 2/7.
-3. Preflight (defense-in-depth, not load-bearing for exit coverage): `.venv
+   order, same reasoning as the daily cycle's steps 4/9. NOTE: a pending
+   sentinel from the daily cycle's own overnight-queued order (its step
+   8 queued branch) resolving at today's open can legitimately surface
+   here as drift before the daily cycle's step 3 has run today — if the
+   FATAL involves a symbol the ledger shows as a zero-qty pending
+   sentinel, report it as "pending order likely filled, daily cycle will
+   resolve it" rather than as unexplained drift, and still STOP (do not
+   resolve it yourself; only the daily cycle runs resolve-pending).
+4. Preflight (defense-in-depth, not load-bearing for exit coverage): `.venv
    /bin/bonito live preflight -u config/universe.live.json`. Non-zero exit
    -> STOP and report (kill switch, data outage, or flag mismatch). A
    latched kill switch already flattened every position at the moment it
    tripped, so this is very unlikely to ever find something left to
    protect — call it anyway, it is cheap and still catches a
    live/live_enabled misconfiguration or a stale data feed.
-4. Detect: `.venv/bin/bonito live sweep --no-refresh -u
+5. Detect: `.venv/bin/bonito live sweep --no-refresh -u
    config/universe.live.json`. NEVER pass `--execute` here — that flag only
    auto-fills the *paper* ledger, which is not applicable to live. This
    command does not place any real order itself; it either prints "No stops
-   triggered" (nothing further to do — skip to step 7) or writes an intents
+   triggered" (nothing further to do — skip to step 8) or writes an intents
    file listing which open position(s) triggered a stop-loss or take-profit.
-5. If (and only if) step 4 wrote an intents file: for each intent in it,
+6. If (and only if) step 5 wrote an intents file: for each intent in it,
    place a real market sell — Robinhood review_equity_order then
    place_equity_order (plain market order, fresh UUID ref_id — NEVER
    trigger:stop; that is confirmed rejected for fractional quantities on
    this account regardless of time-in-force, see docs/EXPERIMENT_LOG.md
-   2026-07-18 and 2026-07-20). After the order resolves, read its ACTUAL
-   filled quantity and price, then record it:
+   2026-07-18 and 2026-07-20). This Routine only runs during regular
+   hours, so the order should fill promptly — read its ACTUAL filled
+   quantity and price, then record it:
    `.venv/bin/bonito live record-fill SYMBOL sell PRICE --shares <ACTUAL
    filled quantity> --broker-order-id ID -u config/universe.live.json`.
    Use `--shares`, never `--dollars` — a partial fill or fractional
-   rounding makes dollars/price wrong. On any order error: STOP, report
-   what filled and what didn't, do not retry.
-6. If step 5 acted: reconcile again (get_equity_positions vs ledger).
+   rounding makes dollars/price wrong. If the order somehow does NOT
+   resolve promptly (state stays queued/confirmed with zero executions):
+   record it as a pending sentinel instead — `.venv/bin/bonito live
+   record-fill SYMBOL sell PRICE --no-fill --broker-order-id ID
+   -u config/universe.live.json` (id REQUIRED — it is what lets the
+   daily cycle's resolve-pending step heal it) — and name it in the
+   report. On any order error: STOP, report what filled and what didn't,
+   do not retry.
+7. If step 6 acted: reconcile again (get_equity_positions vs ledger).
    Report any FATAL mismatch; do not silently fix it.
-7. Persist (only if anything changed — a no-trigger run may still have
-   ratcheted a trailing high-water mark): `.venv/bin/bonito live status -u
-   config/universe.live.json`, then `git add livetrade/ && git commit -m
-   "chore(livetrade): intraday live stop-check $(date -u +%FT%H:%MZ)"`.
-   Skip the commit only if `git diff --cached --quiet` shows nothing
-   staged changed.
+8. Persist and release the lock: `.venv/bin/bonito live status -u
+   config/universe.live.json`, then `.venv/bin/bonito live lock-release
+   <run_id from step 2> -u config/universe.live.json`, then `git add
+   livetrade/ && git commit -m "chore(livetrade): intraday live
+   stop-check $(date -u +%FT%H:%MZ)"` — one commit carrying any ledger
+   changes AND the lock release together (there is always at least the
+   lock release to commit, since step 2 committed the acquisition).
 
    Push (this is the ONE place this Routine's rules deliberately differ
    from the daily cycle's — read this carefully, it is not a mistake):
@@ -156,7 +193,8 @@ Setup:
    undoes your own local, unpushed rebase attempt), then STOP and report
    explicitly that a real order executed but could not be persisted this
    run, so the next reconcile (yours or the daily cycle's) catches and
-   fixes it. Do not attempt to resolve a real conflict yourself.
+   fixes it. Do not attempt to resolve a real conflict yourself. (The
+   unreleased lock is harmless — it goes stale after 20 minutes.)
 
    Why this differs from the daily cycle's "stop immediately on a
    rejected push" rule: giving up immediately here, like the daily cycle
@@ -166,13 +204,17 @@ Setup:
    because it never touches history anyone else has already seen.
 
 Hard rules: never place any order that is not a plain market sell for a
-symbol step 4's sweep actually flagged; never place a `trigger: stop`
+symbol step 5's sweep actually flagged; never place a `trigger: stop`
 order (confirmed rejected for fractional quantities on this account);
 never trade the margin account; never edit mode or live_enabled; never
-use `git push --force`/`-f` or `git commit --amend` for any reason — the
-ONE exception in this entire prompt is step 7's bounded `git pull
---rebase` retry, which is not a force-push and does not rewrite shared
-history. If the kill switch is latched, report and stop.
+run `bonito live resolve-pending` (that is exclusively the daily
+cycle's job); never use `git push --force`/`-f` or `git commit --amend`
+for any reason — the TWO narrowly-scoped exceptions in this entire
+prompt are step 8's bounded `git pull --rebase` retry (not a force-push;
+never rewrites shared history) and step 2's `git reset --hard
+origin/main` on a rejected LOCK push (discards only this run's own
+seconds-old, never-pushed lock commit). If the kill switch is latched,
+report and stop.
 ```
 
 ## Why no rehearsal-sizing protocol here

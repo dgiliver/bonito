@@ -49,7 +49,7 @@ Routine until that sign-off.
    domain allowlisting. Domain access alone is NOT sufficient if the
    environment's outbound HTTPS goes through a TLS-intercepting proxy (as
    Claude Code cloud environments do) — see the `YF_DISABLE_CURL_CFFI=1`
-   prefix on step 3 below; without it, refresh can silently ingest nothing
+   prefix on step 5 below; without it, refresh can silently ingest nothing
    while still exiting 0.
 5. The ••••8597 cash-only account scoping is **NOT enforced by any code in
    `src/bonito/`** — Bonito's own pipeline never contacts Robinhood at all;
@@ -62,9 +62,18 @@ Routine until that sign-off.
 
 ## The safety chain inside each run
 
-The prompt below is fail-closed at three independent points, none of which
+The prompt below is fail-closed at five independent points, none of which
 need a human:
 
+- **`bonito live lock-acquire`** refuses to start while another run (this
+  Routine or the hourly intraday one) holds the cycle lock — two
+  overlapping runs can't both act on the ledger and place duplicate real
+  orders. The lock is real only once its commit is *pushed*; a rejected
+  push means the other run won, and this run stops.
+- **`bonito live resolve-pending`** heals fills that queued past a prior
+  cycle (the post-close cycle's every-order reality) before reconcile
+  judges them, and exits non-zero — halting the run — if any pending
+  order's outcome can't be applied cleanly.
 - **`bonito live preflight`** aborts on a latched kill switch, a
   `live`/`live_enabled` mismatch, or a total data outage (so a Yahoo
   outage stops the run loudly instead of silently trading on nothing).
@@ -72,8 +81,9 @@ need a human:
   ledger and the real Robinhood positions — a prior crash between placing
   an order and recording it halts the new run.
 - The prompt places **only** the intents in the generated file, sells
-  before buys, and records every fill — and stops on the first order error
-  rather than improvising.
+  before buys, and records every order outcome (filled, queued-with-id,
+  or rejected) — and stops on the first order error rather than
+  improvising.
 
 Because a Routine runs with no approval prompts, every safeguard lives in
 the code and this prompt. That is deliberate, and it is why the preflight
@@ -181,24 +191,27 @@ Token discipline (this runs daily, unattended — be lean):
   output or paste raw MCP/JSON blobs — pull only the field you need (fill
   price, filled qty, order id).
 - Minimum tool calls: one get_accounts, one get_equity_positions to reconcile,
-  then per intent review→place→record, one `live tracking`, one commit.
-  Never re-fetch or re-run a step that already succeeded.
-- Final report ≤ 8 lines: what filled / didn't, reconcile + tracking status,
-  any abort reason. Nothing else. Intraday stop-loss/take-profit protection
-  is handled by the separate hourly Routine in
-  `docs/AUTONOMOUS_INTRADAY_LIVE_STOPS.md`, not by this one.
+  one get_equity_orders per pending order id in step 3 (usually zero or one),
+  then per intent review→place→record, one `live tracking`, and the git
+  pushes steps 2 and 11 require. Never re-fetch or re-run a step that
+  already succeeded.
+- Final report ≤ 8 lines: what filled / didn't / queued, pending orders
+  resolved, reconcile + tracking status, any abort reason. Nothing else.
+  Intraday stop-loss/take-profit protection is handled by the separate
+  hourly Routine in `docs/AUTONOMOUS_INTRADAY_LIVE_STOPS.md`, not by this
+  one.
 
 Setup:
 - `[ -d .venv ] || python3.12 -m venv .venv && .venv/bin/pip install -e "." --quiet`
 - `git pull origin main` to get the latest ledger. Explicit `main`, not
   whatever branch this container happens to have checked out — same
-  reasoning as step 9's push below: anchor to `main`, don't rely on
+  reasoning as step 11's push below: anchor to `main`, don't rely on
   incidental branch-forking behavior.
 - Run every step in the foreground and wait for it to finish before moving on
   — do not background any command (including `refresh`). Two overlapping
   `bonito` invocations will contend for DuckDB's single-writer lock. Also:
   do not rely on a plain `export` to carry an env var from one step to the
-  next — each step may run as a separate shell, so step 3 below sets
+  next — each step may run as a separate shell, so step 5 below sets
   `YF_DISABLE_CURL_CFFI=1` inline on the one command that needs it, not as
   a standalone export.
 
@@ -208,14 +221,52 @@ Setup:
    agentic_allowed == true AND nickname == "Agentic". If any check fails,
    STOP immediately, place nothing, and report the mismatch — this is the
    same fail-closed posture as every other step below.
-2. Reconcile: get_equity_positions for that account → build
+2. Acquire the cycle lock (prevents this run overlapping another run of
+   this Routine or the hourly intraday one — Routines have no built-in
+   guarantee against overlapping sessions):
+   - `.venv/bin/bonito live lock-acquire daily -u config/universe.live.json`.
+     Exit 1 = another run holds the lock: STOP, report the holder/run id
+     it printed, do nothing else. Exit 0 prints `run_id=<id>` — save that
+     id; step 11 needs it.
+   - Immediately: `git add livetrade/live_cycle_lock.json && git commit -m
+     "chore(livetrade): cycle lock acquire (daily)" && git push origin
+     HEAD:main`. The PUSH is the real lock — the local file alone
+     synchronizes nothing. If the push is REJECTED: another run pushed
+     first. Run `git fetch origin main && git reset --hard origin/main`
+     (safe HERE and ONLY here: the sole local commit at this moment is
+     this run's own never-pushed lock commit — do not use reset --hard at
+     any other step), then re-run lock-acquire once. If it now exits 1,
+     STOP and report. If it acquires again, commit and push once more; a
+     second rejection = STOP and report.
+   - From this point on, if ANY later step aborts the run, still do step
+     11's lock-release + commit + push (skipping the trading parts)
+     before ending — a held lock self-heals via staleness in 20 minutes,
+     but releasing promptly is the polite default.
+3. Resolve pending orders (heals fills that queued past a prior cycle,
+   BEFORE reconcile judges them as drift — this exact gap caused three
+   real ledger-drift incidents, see docs/EXPERIMENT_LOG.md):
+   - `.venv/bin/bonito live pending -u config/universe.live.json` prints a
+     JSON list. If `[]`, skip to step 4.
+   - Otherwise, for each listed broker_order_id: get_equity_orders
+     (order_id=<id>) → build `{"<order_id>": {"state": <state>,
+     "filled_quantity": <cumulative_quantity>, "average_price":
+     <average_price>, "notional": <dollar_based_amount.amount if the order
+     was dollar-based, else omit>, "executed_at": <last execution
+     timestamp>}}` (state alone suffices for non-filled orders) → run
+     `.venv/bin/bonito live resolve-pending '<json>'
+     -u config/universe.live.json`.
+   - Exit 0: fine — report what resolved / stayed pending. Exit 1: an
+     entry errored (unknown state, missing data, position conflict):
+     STOP, report the printed errors, do not trade — the ledger may be
+     half-healed and reconcile can't be trusted to judge it.
+4. Reconcile: get_equity_positions for that account → build
    {"SYMBOL": qty} JSON ({} if flat) → `.venv/bin/bonito live reconcile
    '<json>' -u config/universe.live.json`. Exit 1 = FATAL drift (>0.5% of a
    position's shares, or a position in one side but not the other): STOP,
    report, do not trade. Exit 0 with a "sub-tolerance drift" warning is fine
    to proceed — the 0.5% gate absorbs fractional-rounding noise. The drift
    gate blocks new entries only; it never blocks an exit.
-3. Refresh data: `YF_DISABLE_CURL_CFFI=1 .venv/bin/bonito live refresh
+5. Refresh data: `YF_DISABLE_CURL_CFFI=1 .venv/bin/bonito live refresh
    -u config/universe.live.json`. The env var forces yfinance's plain-
    `requests`-with-realistic-User-Agent fallback instead of its default
    `curl_cffi` backend — this sandbox's outbound HTTPS goes through a
@@ -225,13 +276,13 @@ Setup:
    while still exiting 0 (yfinance swallows the connection reset as "no
    data" rather than raising), and preflight then aborts the whole cycle
    on a false "data outage."
-4. Preflight: `.venv/bin/bonito live preflight -u config/universe.live.json`.
+6. Preflight: `.venv/bin/bonito live preflight -u config/universe.live.json`.
    Non-zero exit = ABORT: STOP and report (kill switch, data outage, or
    flag mismatch). Do not trade.
-5. Generate intents: `.venv/bin/bonito live run --no-refresh
+7. Generate intents: `.venv/bin/bonito live run --no-refresh
    -u config/universe.live.json`. This writes livetrade/intents/*.json and
    places NOTHING itself.
-6. Execute ONLY the intents in the newest intents file, sells before buys:
+8. Execute ONLY the intents in the newest intents file, sells before buys:
    for each, Robinhood review_equity_order then place_equity_order (fresh
    UUID ref_id). Then read the order's actual state (from
    place_equity_order's response, or get_equity_orders) and record it —
@@ -243,7 +294,7 @@ Setup:
      -u config/universe.live.json`. Use the broker's actual share count via
      `--shares` (NOT `--dollars`): a partial fill or fractional rounding makes
      dollars/price wrong, and `--shares` makes the ledger match the broker
-     exactly, so step 7's reconcile stays clean.
+     exactly, so step 9's reconcile stays clean.
    - QUEUED (state=queued/confirmed, zero executions — the normal case
      for this post-close cycle; the order fills at the NEXT session's
      open): `.venv/bin/bonito live record-fill SYMBOL SIDE PRICE --no-fill
@@ -253,45 +304,58 @@ Setup:
      real outcome later. Say "queued, order id X, expected to fill at
      next open" in the final report — do not call it rejected. Known
      limitation until the automated resolve-pending step ships: nothing
-     yet closes this loop automatically, so the fill must currently be
-     recorded manually after it happens (this exact gap has produced
-     three real ledger-drift incidents — see docs/EXPERIMENT_LOG.md).
+     yet closes this loop automatically at fill time; step 3 of the NEXT
+     cycle resolves it — capturing the id here is what makes that work
+     (this exact gap, before the id was captured, produced three real
+     ledger-drift incidents — see docs/EXPERIMENT_LOG.md).
    - Rejected outright (state=rejected/failed — the broker refused it):
      `.venv/bin/bonito live record-fill SYMBOL SIDE PRICE --no-fill
      -u config/universe.live.json` (no order id needed for a true
      rejection). Logs the divergence as an explicit no-fill instead of
      silently assuming the position exists.
    On any order error: STOP, report what filled and what didn't, do not retry.
-7. Reconcile again (get_equity_positions vs ledger). Report any FATAL
-   mismatch; do not silently fix it.
-8. Fidelity check (the rehearsal gate): `.venv/bin/bonito live tracking
+9. Reconcile again (get_equity_positions vs ledger). Report any FATAL
+   mismatch; do not silently fix it. A position bought this cycle whose
+   order QUEUED (step 8's queued branch) is expected to be absent from
+   the broker until the next open — that is what the pending sentinel
+   records; it is not drift to fix here.
+10. Fidelity check (the rehearsal gate): `.venv/bin/bonito live tracking
    -u config/universe.live.json`. Status must be OK. WARN = live fills are
    diverging from the replay beyond the fill-bps band — report it; during the
    rehearsal a WARN is a gate failure to investigate before the next cycle.
-9. Persist: `.venv/bin/bonito live status -u config/universe.live.json`,
-    then `git add livetrade/ && git commit -m "chore(livetrade): live cycle
-    $(date -u +%F)" && git push origin HEAD:main`. Use `HEAD:main` explicitly
-    — this container may check out its own dedicated working branch rather
-    than `main` directly, and a bare `git push` would silently land the
-    ledger update there instead of on `main`, where tomorrow's cycle
-    actually reads from. If this push is rejected (e.g. branch protection
-    or non-fast-forward), STOP and report it — do not retry with `--force`
-    and do not `git commit --amend` for any reason (including a wrong commit
-    author/identity — leave it, it doesn't matter for this artifact-only
-    commit and is not worth an amend). `main` is shared with other
-    automation (the intraday-stop-sweep and paper-trading GitHub Actions);
-    a forced push here can silently discard a commit one of them made in
-    the same window, with no warning to anyone. A ledger update that isn't
-    on `main` is invisible to the next cycle and will surface as a false
-    reconcile drift — annoying but safe (fails closed); force-pushing to
-    "fix" that is not — never do it.
+11. Persist and release the lock:
+    `.venv/bin/bonito live status -u config/universe.live.json`, then
+    `.venv/bin/bonito live lock-release <run_id from step 2>
+    -u config/universe.live.json`, then `git add livetrade/ && git commit
+    -m "chore(livetrade): live cycle $(date -u +%F)" && git push origin
+    HEAD:main` — one commit carrying the ledger changes AND the lock
+    release together. Use `HEAD:main` explicitly — this container may
+    check out its own dedicated working branch rather than `main`
+    directly, and a bare `git push` would silently land the ledger update
+    there instead of on `main`, where tomorrow's cycle actually reads
+    from. If this push is rejected (e.g. branch protection or
+    non-fast-forward), STOP and report it — do not retry with `--force`
+    and do not `git commit --amend` for any reason (including a wrong
+    commit author/identity — leave it, it doesn't matter for this
+    artifact-only commit and is not worth an amend). `main` is shared
+    with other automation (the intraday-stop-sweep and paper-trading
+    GitHub Actions and the hourly intraday live Routine); a forced push
+    here can silently discard a commit one of them made in the same
+    window, with no warning to anyone. A ledger update that isn't on
+    `main` is invisible to the next cycle and will surface as a false
+    reconcile drift — annoying but safe (fails closed); the lock not
+    releasing is equally safe (it goes stale after 20 minutes);
+    force-pushing to "fix" either is not — never do it.
 
 Hard rules: never place a market/limit order that isn't in the intents file;
 never trade the margin account; never run `bonito live resume`; never edit
 mode or live_enabled; never use `git push --force`/`-f` or `git commit
 --amend` for any step in this prompt — `main` is shared with other
 automation, and a forced push can silently discard someone else's commit
-with no warning. If the kill switch is latched, report and stop.
+with no warning; the one narrowly-scoped exception to "never discard
+anything" is step 2's `git reset --hard origin/main` on a rejected LOCK
+push, which discards only this run's own seconds-old, never-pushed lock
+commit. If the kill switch is latched, report and stop.
 ```
 
 ## Rehearsal protocol — the go-live gate
@@ -308,10 +372,12 @@ radius is then a few dollars per name while the real execution path is proven.
 
 **Per-cycle pass criteria** (the Routine asserts these; any failure stops the
 cycle, places nothing further, reports):
-- Step 2 reconcile → exit 0, no FATAL drift.
-- Step 4 preflight → OK (no kill switch / flag mismatch / data outage).
-- Step 8 `live tracking` → status **OK** (live fills within the fill-bps band
-  of the replay; no decision divergence beyond tolerance).
+- Step 3 resolve-pending → exit 0 (pending orders healed or still cleanly
+  pending, no errors).
+- Step 4 reconcile → exit 0, no FATAL drift.
+- Step 6 preflight → OK (no kill switch / flag mismatch / data outage).
+- Step 10 `live tracking` → status **OK** (live fills within the fill-bps
+  band of the replay; no decision divergence beyond tolerance).
 
 **The gate:** run every weekday. **≥2 consecutive weeks where every cycle is
 green** (reconcile clean + tracking OK) is the quantitative basis to trust the

@@ -7,17 +7,20 @@ import pytest
 
 from bonito.data.models import BarData
 from bonito.trading.live_runner import (
+    PendingOrderOutcome,
     UniverseConfig,
     check_stops,
     execute_paper,
     generate_intents,
+    pending_orders,
     preflight,
     read_cycle_lock,
     release_cycle_lock,
+    resolve_pending_fills,
     save_intents,
     try_acquire_cycle_lock,
 )
-from bonito.trading.paper import PaperLedger
+from bonito.trading.paper import PaperFill, PaperLedger
 from bonito.trading.signals import TradeIntent
 
 LAST_BAR = datetime(2026, 6, 5)
@@ -284,6 +287,177 @@ class TestSaveIntents:
         loaded = json.loads(path.read_text())
         assert loaded[0]["symbol"] == "AAA"
         assert loaded[0]["side"] == "buy"
+
+
+def _pending_sentinel(symbol, side, order_id, price=100.0) -> PaperFill:
+    return PaperFill(
+        symbol=symbol,
+        side=side,
+        quantity=0.0,
+        price=price,
+        notional=0.0,
+        reason="no_fill: order queued, market closed",
+        filled_at=datetime(2026, 7, 22, 20, 47, tzinfo=None),
+        broker_order_id=order_id,
+    )
+
+
+class TestResolvePendingFills:
+    def _ledger(self) -> PaperLedger:
+        return PaperLedger(cash=100.0, starting_cash=100.0)
+
+    def test_pending_orders_lists_only_id_bearing_unresolved_sentinels(self):
+        ledger = self._ledger()
+        ledger.fills.append(_pending_sentinel("AAA", "buy", "order-1"))
+        # True rejection (no order id) — must be invisible to pending listing.
+        idless = _pending_sentinel("BBB", "sell", None)
+        ledger.fills.append(idless)
+        # Already-resolved sentinel — must also be invisible.
+        done = _pending_sentinel("CCC", "buy", "order-3")
+        done.reason += "; resolved=cancelled"
+        ledger.fills.append(done)
+        # Real (non-zero-qty) fill — never pending.
+        ledger.fills.append(
+            PaperFill(
+                symbol="DDD", side="buy", quantity=1.0, price=10.0, notional=10.0,
+                reason="live fill", filled_at=datetime(2026, 7, 22), broker_order_id="order-4",
+            )
+        )
+        listed = pending_orders(ledger)
+        assert [e["broker_order_id"] for e in listed] == ["order-1"]
+
+    def test_filled_buy_replaces_sentinel_with_real_position(self, universe):
+        ledger = self._ledger()
+        ledger.fills.append(_pending_sentinel("AAA", "buy", "order-1"))
+        executed = datetime(2026, 7, 23, 13, 30, tzinfo=None)
+        report = resolve_pending_fills(
+            universe,
+            ledger,
+            {
+                "order-1": PendingOrderOutcome(
+                    state="filled",
+                    filled_quantity=0.05,
+                    average_price=400.0,
+                    notional=20.0,
+                    executed_at=executed,
+                )
+            },
+        )
+        assert report.errors == []
+        assert len(report.resolved) == 1
+        assert "AAA" in ledger.positions
+        pos = ledger.positions["AAA"]
+        assert pos.quantity == 0.05
+        assert pos.entry_price == 400.0
+        assert pos.entry_date == executed
+        assert ledger.cash == 80.0  # notional debited exactly
+        # The stale sentinel is gone; the real fill remains.
+        assert not [f for f in ledger.fills if f.quantity == 0]
+        real = [f for f in ledger.fills if f.symbol == "AAA"][0]
+        assert real.quantity == 0.05
+        assert real.broker_order_id == "order-1"
+        assert real.filled_at == executed
+        # Strategy pinned, same as a live-recorded buy.
+        assert pos.strategy_hash
+
+    def test_filled_sell_closes_existing_position(self, universe):
+        ledger = self._ledger()
+        _open_position(ledger, "NOW", 0.18517, 101.15)
+        ledger.fills.append(_pending_sentinel("NOW", "sell", "order-2", price=104.53))
+        report = resolve_pending_fills(
+            universe,
+            ledger,
+            {
+                "order-2": PendingOrderOutcome(
+                    state="filled", filled_quantity=0.18517, average_price=103.10
+                )
+            },
+        )
+        assert report.errors == []
+        assert "NOW" not in ledger.positions  # fully closed
+        assert ledger.cash == pytest.approx(100.0 + 0.18517 * 103.10)
+        assert not [f for f in ledger.fills if f.quantity == 0]
+        sell = [f for f in ledger.fills if f.side == "sell"][0]
+        assert sell.broker_order_id == "order-2"
+
+    def test_still_queued_left_untouched(self, universe):
+        ledger = self._ledger()
+        ledger.fills.append(_pending_sentinel("AAA", "buy", "order-1"))
+        report = resolve_pending_fills(
+            universe, ledger, {"order-1": PendingOrderOutcome(state="queued")}
+        )
+        assert report.still_pending and not report.resolved and not report.errors
+        assert len(pending_orders(ledger)) == 1  # still pending next time
+
+    def test_dead_order_marks_sentinel_resolved(self, universe):
+        ledger = self._ledger()
+        ledger.fills.append(_pending_sentinel("AAA", "buy", "order-1"))
+        report = resolve_pending_fills(
+            universe, ledger, {"order-1": PendingOrderOutcome(state="cancelled")}
+        )
+        assert report.expired and not report.errors
+        assert pending_orders(ledger) == []  # no longer pending
+        assert len(ledger.fills) == 1  # sentinel kept as the no-fill record
+        assert "resolved=cancelled" in ledger.fills[0].reason
+
+    def test_missing_outcome_is_an_error_not_silent(self, universe):
+        ledger = self._ledger()
+        ledger.fills.append(_pending_sentinel("AAA", "buy", "order-1"))
+        report = resolve_pending_fills(universe, ledger, {})
+        assert report.errors and not report.resolved
+        assert len(pending_orders(ledger)) == 1  # untouched
+
+    def test_unknown_state_is_an_error_not_a_guess(self, universe):
+        ledger = self._ledger()
+        ledger.fills.append(_pending_sentinel("AAA", "buy", "order-1"))
+        report = resolve_pending_fills(
+            universe, ledger, {"order-1": PendingOrderOutcome(state="mystery")}
+        )
+        assert report.errors
+        assert len(pending_orders(ledger)) == 1
+
+    def test_filled_buy_with_existing_position_errors(self, universe):
+        ledger = self._ledger()
+        _open_position(ledger, "AAA", 1.0, 100.0)
+        ledger.fills.append(_pending_sentinel("AAA", "buy", "order-1"))
+        report = resolve_pending_fills(
+            universe,
+            ledger,
+            {"order-1": PendingOrderOutcome(state="filled", filled_quantity=0.1, average_price=100.0)},
+        )
+        assert report.errors
+        assert ledger.positions["AAA"].quantity == 1.0  # untouched
+
+    def test_filled_sell_without_position_errors(self, universe):
+        ledger = self._ledger()
+        ledger.fills.append(_pending_sentinel("NOW", "sell", "order-2"))
+        report = resolve_pending_fills(
+            universe,
+            ledger,
+            {"order-2": PendingOrderOutcome(state="filled", filled_quantity=0.1, average_price=100.0)},
+        )
+        assert report.errors
+        assert len(pending_orders(ledger)) == 1  # untouched, still needs a human
+
+    def test_notional_falls_back_to_qty_times_price(self, universe):
+        ledger = self._ledger()
+        ledger.fills.append(_pending_sentinel("AAA", "buy", "order-1"))
+        report = resolve_pending_fills(
+            universe,
+            ledger,
+            {"order-1": PendingOrderOutcome(state="filled", filled_quantity=0.0344, average_price=399.01)},
+        )
+        assert report.errors == []
+        assert ledger.cash == pytest.approx(100.0 - round(0.0344 * 399.01, 2))
+
+    def test_filled_without_quantity_or_price_errors(self, universe):
+        ledger = self._ledger()
+        ledger.fills.append(_pending_sentinel("AAA", "buy", "order-1"))
+        report = resolve_pending_fills(
+            universe, ledger, {"order-1": PendingOrderOutcome(state="filled")}
+        )
+        assert report.errors
+        assert len(pending_orders(ledger)) == 1
 
 
 class TestCycleLock:

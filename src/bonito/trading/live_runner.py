@@ -889,6 +889,190 @@ def save_intents(intents: list[TradeIntent], directory: Path = Path("livetrade/i
     return path
 
 
+# --- Pending-order resolution (the queued-order-drift systemic fix) -------
+#
+# The daily cycle runs after the 16:15 ET settle threshold (it has to -- see
+# docs/AUTONOMOUS_LIVE_ROUTINE.md "Picking the time"), so every dollar-based
+# order it places queues as GFD and fills at the NEXT session's open, after
+# the cycle has already ended. The cycle records those as no-fill sentinels
+# (with the broker order id), and this module closes the loop the next time
+# any cycle runs: look up each pending sentinel's real outcome at the broker
+# and apply it to the ledger BEFORE reconcile judges drift. Replaces the
+# manual correction scripts that fixed this same bug class three times
+# (docs/EXPERIMENT_LOG.md 2026-07-18/2026-07-21).
+#
+# src/bonito never contacts Robinhood: exactly like reconcile, the Routine
+# fetches order states via MCP and passes them in as JSON.
+
+# States meaning "the order can still fill" vs "it is dead, unfilled".
+PENDING_ORDER_LIVE_STATES = {"queued", "confirmed", "new", "unconfirmed", "partially_filled"}
+PENDING_ORDER_DEAD_STATES = {"cancelled", "rejected", "failed", "voided", "expired"}
+_RESOLVED_MARKER = "resolved="
+
+
+class PendingOrderOutcome(BaseModel):
+    """Broker-reported current state of one previously-queued order."""
+
+    state: str
+    filled_quantity: float | None = None
+    average_price: float | None = None
+    notional: float | None = Field(
+        default=None,
+        description="Actual cash moved (dollar_based_amount for dollar buys). "
+        "Falls back to filled_quantity * average_price rounded to cents.",
+    )
+    executed_at: datetime | None = None
+
+
+class PendingResolutionReport(BaseModel):
+    resolved: list[str] = Field(default_factory=list)
+    still_pending: list[str] = Field(default_factory=list)
+    expired: list[str] = Field(default_factory=list)
+    errors: list[str] = Field(default_factory=list)
+
+    def describe(self) -> str:
+        lines = []
+        for label, entries in (
+            ("resolved", self.resolved),
+            ("still pending", self.still_pending),
+            ("expired unfilled", self.expired),
+            ("ERRORS", self.errors),
+        ):
+            for e in entries:
+                lines.append(f"{label}: {e}")
+        return "\n".join(lines) if lines else "no pending orders"
+
+
+def _is_pending_sentinel(fill: PaperFill) -> bool:
+    return (
+        fill.quantity == 0
+        and fill.broker_order_id is not None
+        and fill.reason.startswith("no_fill")
+        and _RESOLVED_MARKER not in fill.reason
+    )
+
+
+def pending_orders(ledger: PaperLedger) -> list[dict]:
+    """Unresolved queued-order sentinels awaiting a broker outcome.
+
+    A sentinel is pending iff it is zero-qty, carries a broker order id,
+    and hasn't been marked resolved. Sentinels recorded WITHOUT an order id
+    (true rejections, or records from before the id was captured) are
+    invisible here by design -- there is nothing to look up.
+    """
+    return [
+        {
+            "symbol": f.symbol,
+            "side": f.side,
+            "broker_order_id": f.broker_order_id,
+            "signal_price": f.price,
+            "recorded_at": f.filled_at.isoformat(),
+        }
+        for f in ledger.fills
+        if _is_pending_sentinel(f)
+    ]
+
+
+def resolve_pending_fills(
+    universe: UniverseConfig,
+    ledger: PaperLedger,
+    orders: dict[str, PendingOrderOutcome],
+) -> PendingResolutionReport:
+    """Apply each pending sentinel's real broker outcome to the ledger.
+
+    For a FILLED order: the stale sentinel is removed (it recorded "hadn't
+    filled yet at cycle time", now known false) and the real fill is applied
+    through the same apply_buy/apply_sell path a live-recorded fill uses,
+    with the position/fill timestamps corrected to the actual execution time
+    -- exactly what the three manual correction scripts did, now once, in
+    tested code. For an order still in a live state: left alone. For a dead
+    (cancelled/rejected/expired) order: the sentinel stands as the truth and
+    is marked resolved so it stops appearing as pending. Unknown states are
+    reported as errors and left untouched (fail closed -- an unrecognized
+    state is not a license to guess).
+
+    Does NOT save the ledger; the caller decides when to persist.
+    """
+    report = PendingResolutionReport()
+    for fill in list(ledger.fills):
+        if not _is_pending_sentinel(fill):
+            continue
+        order_id = fill.broker_order_id
+        assert order_id is not None  # _is_pending_sentinel guarantees this
+        outcome = orders.get(order_id)
+        label = f"{fill.symbol} {fill.side} ({order_id})"
+        if outcome is None:
+            report.errors.append(f"{label}: no outcome supplied for this pending order id")
+            continue
+        state = outcome.state.lower()
+
+        if state in PENDING_ORDER_LIVE_STATES:
+            report.still_pending.append(f"{label}: state={state}")
+            continue
+
+        if state in PENDING_ORDER_DEAD_STATES:
+            fill.reason = f"{fill.reason}; {_RESOLVED_MARKER}{state}"
+            report.expired.append(f"{label}: state={state}, sentinel stands")
+            continue
+
+        if state != "filled":
+            report.errors.append(f"{label}: unrecognized state '{outcome.state}', left untouched")
+            continue
+
+        # --- filled: replace the sentinel with the real fill ---
+        qty = outcome.filled_quantity
+        price = outcome.average_price
+        if not qty or qty <= 0 or not price or price <= 0:
+            report.errors.append(
+                f"{label}: state=filled but filled_quantity/average_price missing or invalid"
+            )
+            continue
+        notional = outcome.notional if outcome.notional is not None else round(qty * price, 2)
+        try:
+            if fill.side == "buy":
+                if fill.symbol in ledger.positions:
+                    raise ValueError(
+                        "position already open -- cannot auto-apply; resolve manually"
+                    )
+                intent = TradeIntent(
+                    symbol=fill.symbol,
+                    side="buy",
+                    dollar_amount=notional,
+                    reason="live fill (resolved from queued order)",
+                    signal_price=price,
+                    signal_date=outcome.executed_at or datetime.now(UTC),
+                    strategy_name="live",
+                    broker_order_id=order_id,
+                )
+                strategy = universe.load_strategy_for(fill.symbol)
+                new_fill = ledger.apply_buy(intent, price, strategy=strategy, fill_quantity=qty)
+                if outcome.executed_at is not None:
+                    ledger.positions[fill.symbol].entry_date = outcome.executed_at
+                    new_fill.filled_at = outcome.executed_at
+            else:
+                if fill.symbol not in ledger.positions:
+                    raise ValueError("no open position to sell -- cannot auto-apply")
+                intent = TradeIntent(
+                    symbol=fill.symbol,
+                    side="sell",
+                    quantity=qty,
+                    reason="live fill (resolved from queued order)",
+                    signal_price=price,
+                    signal_date=outcome.executed_at or datetime.now(UTC),
+                    strategy_name="live",
+                    broker_order_id=order_id,
+                )
+                new_fill = ledger.apply_sell(intent, price, fill_quantity=qty)
+                if outcome.executed_at is not None:
+                    new_fill.filled_at = outcome.executed_at
+        except ValueError as e:
+            report.errors.append(f"{label}: {e}")
+            continue
+        ledger.fills.remove(fill)
+        report.resolved.append(f"{label}: {qty:.6f} @ {price:.2f} applied")
+    return report
+
+
 CYCLE_LOCK_STALE_AFTER = timedelta(minutes=20)
 
 
