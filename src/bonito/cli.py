@@ -1272,6 +1272,28 @@ def live_resolve_pending(
         raise typer.Exit(1)
 
 
+@live_app.command("market-hours")
+def live_market_hours() -> None:
+    """Exit 0 during the intraday sweep window (weekday 9:30-15:45 ET), else 1.
+
+    A DST-proof guard for the intraday Routine, whose claude.ai custom cron
+    is interpreted in UTC and therefore fires an hour off across the EDT/EST
+    boundary. Run it FIRST in that Routine; on exit 1 the run is a stray
+    off-hours firing (the UTC cron is a superset of both seasons) and should
+    stop immediately and do nothing. Uses zoneinfo, so it is DST-correct
+    without any twice-a-year cron edit. Note: weekday/time only — market
+    holidays aren't special-cased (a holiday run just finds no triggered
+    stops and no-ops, same as paper's sweep).
+    """
+    from bonito.trading.live_runner import in_intraday_sweep_window
+
+    if in_intraday_sweep_window():
+        console.print("[green]within intraday sweep window[/green]")
+    else:
+        console.print("[dim]outside intraday sweep window — stray firing, skip[/dim]")
+        raise typer.Exit(1)
+
+
 @live_app.command("lock-acquire")
 def live_lock_acquire(
     holder: str = typer.Argument(..., help='Identifies the caller, e.g. "daily" or "intraday"'),

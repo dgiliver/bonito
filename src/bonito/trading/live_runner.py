@@ -1128,6 +1128,40 @@ def resolve_pending_fills(
     return report
 
 
+# --- Intraday sweep market-hours guard (DST-proof) ------------------------
+#
+# The intraday Routine's claude.ai cron is interpreted in UTC (confirmed:
+# `30 13 * * 1-5` resolves to 9:30am EDT in the UI), so a cron tuned for one
+# DST season fires an hour off in the other. Rather than babysit the cron
+# twice a year, the cron is a UTC SUPERSET (`30 13-20 * * 1-5`, covering both
+# seasons' 9:30-15:30 ET slots) and this guard trims stray firings to the
+# real ET window -- the same superset-cron + in-job-ET-guard pattern paper's
+# intraday-stops.yml uses. Upper bound is 15:45, not 15:30, to absorb the
+# few-minute run stagger while still leaving time for a market sell to fill
+# before the 16:00 close.
+INTRADAY_SWEEP_OPEN_ET = (9, 30)
+INTRADAY_SWEEP_CLOSE_ET = (15, 45)
+
+
+def in_intraday_sweep_window(as_of: datetime | None = None) -> bool:
+    """True if `as_of` (default now) is a weekday within the ET sweep window.
+
+    Fail-closed on a clock/tz resolution failure: return False (skip the
+    sweep) rather than risk trading off-hours. `as_of` may be naive (treated
+    as UTC) or aware; the ET conversion is DST-correct via zoneinfo.
+    """
+    try:
+        as_of = as_of or datetime.now(UTC)
+        if as_of.tzinfo is None:
+            as_of = as_of.replace(tzinfo=UTC)
+        et = as_of.astimezone(_ET)
+    except (ValueError, OverflowError, OSError):
+        return False
+    if et.weekday() >= 5:  # Sat/Sun
+        return False
+    return INTRADAY_SWEEP_OPEN_ET <= (et.hour, et.minute) <= INTRADAY_SWEEP_CLOSE_ET
+
+
 CYCLE_LOCK_STALE_AFTER = timedelta(minutes=20)
 
 

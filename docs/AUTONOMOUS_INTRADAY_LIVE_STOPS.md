@@ -40,13 +40,23 @@ decisions and only ever places sells.
 
 `/schedule` is unavailable inside a cloud session.
 
-1. From a local Claude Code terminal:
+1. Create the Routine on claude.ai (or via `/schedule`), then set a
+   **custom cron** on it. claude.ai custom crons are interpreted in **UTC**
+   (verified: entering `30 13 * * 1-5` displays as "9:30 AM EDT"), and a
+   fixed-UTC cron does NOT track daylight saving. So do NOT hand-tune a
+   cron for the current season — set the **DST-superset** and let the
+   in-prompt market-hours guard trim the strays:
    ```
-   /schedule weekdays every hour from 9:30am to 3:30pm ET, run the Bonito
-   intraday live stop-check
+   30 13-20 * * 1-5
    ```
-   Include only the Robinhood connector — same reasoning as the daily
-   Routine. Paste the prompt below.
+   That is 13:30-20:30 UTC, weekdays. In EDT (UTC-4) it fires 9:30am-4:30pm
+   ET; in EST (UTC-5) it fires 8:30am-3:30pm ET. Either way the guard (Setup
+   below) keeps only the real 9:30am-3:30pm ET runs and skips the one stray
+   (the 4:30pm EDT run, or the 8:30am EST run) — so the effective schedule
+   is exactly 9:30, 10:30, 11:30, 12:30, 1:30, 2:30, 3:30 ET every weekday,
+   in both seasons, with no cron edit ever needed. Include only the
+   Robinhood connector — same reasoning as the daily Routine. Paste the
+   prompt below.
 2. **Pick a small model** (Sonnet or Haiku) — same reasoning as the daily
    Routine: the decision logic lives entirely in the deterministic CLI,
    this Routine is mechanical orchestration on top of it.
@@ -98,6 +108,14 @@ lean):
 
 Setup:
 - `[ -d .venv ] || python3.12 -m venv .venv && .venv/bin/pip install -e "." --quiet`
+- Market-hours guard, FIRST after the venv exists:
+  `.venv/bin/bonito live market-hours`. Exit 1 = this is a stray
+  off-hours firing (the schedule's cron is a UTC superset of both DST
+  seasons, so it fires an hour early or late across the EDT/EST boundary
+  — see the Setup notes above) — STOP immediately, do nothing else (no
+  pull, no lock, no report). Exit 0 = within the weekday 9:30-15:45 ET
+  window, proceed. This is what makes the UTC cron DST-proof without a
+  twice-a-year manual edit.
 - `git pull origin main` — explicit `main`, same reasoning as the daily
   Routine's step 11.
 - Run every step in the foreground; do not background anything, including

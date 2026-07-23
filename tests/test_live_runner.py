@@ -13,6 +13,7 @@ from bonito.trading.live_runner import (
     check_stops,
     execute_paper,
     generate_intents,
+    in_intraday_sweep_window,
     pending_orders,
     preflight,
     read_cycle_lock,
@@ -526,6 +527,47 @@ class TestResolvePendingFills:
         # The invariant that actually matters: fills remain mutually sortable.
         ordered = sorted(ledger.fills, key=lambda f: f.filled_at)
         assert len(ordered) == 2  # would have raised TypeError before the fix
+
+
+class TestIntradaySweepWindow:
+    """The DST-proof guard for the intraday Routine's UTC cron.
+
+    Times are passed as UTC (naive or aware); the guard converts to ET. The
+    critical cases are the two DST seasons: the SAME UTC instant maps to a
+    different ET wall-clock, and the guard must key off ET, not UTC.
+    """
+
+    def _utc(self, y, mo, d, h, mi):
+        return datetime(y, mo, d, h, mi, tzinfo=UTC_TZ)
+
+    def test_edt_open_and_close_slots_are_in_window(self):
+        # July = EDT (UTC-4). 13:30 UTC = 9:30 ET open; 19:30 UTC = 15:30 ET last slot.
+        assert in_intraday_sweep_window(self._utc(2026, 7, 15, 13, 30)) is True
+        assert in_intraday_sweep_window(self._utc(2026, 7, 15, 19, 30)) is True
+
+    def test_edt_after_cutoff_slot_is_skipped(self):
+        # 20:30 UTC = 16:30 ET in EDT — the extra superset slot, must be skipped.
+        assert in_intraday_sweep_window(self._utc(2026, 7, 15, 20, 30)) is False
+
+    def test_est_shifts_by_an_hour_but_window_holds(self):
+        # January = EST (UTC-5). The SAME 13:30 UTC is now 8:30 ET — PRE-market, skip.
+        assert in_intraday_sweep_window(self._utc(2026, 1, 15, 13, 30)) is False
+        # 14:30 UTC = 9:30 ET open; 20:30 UTC = 15:30 ET last slot — both in.
+        assert in_intraday_sweep_window(self._utc(2026, 1, 15, 14, 30)) is True
+        assert in_intraday_sweep_window(self._utc(2026, 1, 15, 20, 30)) is True
+
+    def test_stagger_slack_above_1530(self):
+        # A 15:30 ET slot staggered to 15:40 ET still passes (<= 15:45 upper bound).
+        assert in_intraday_sweep_window(self._utc(2026, 7, 15, 19, 40)) is True
+        # ...but 15:50 ET does not (past the slack).
+        assert in_intraday_sweep_window(self._utc(2026, 7, 15, 19, 50)) is False
+
+    def test_weekend_is_out(self):
+        # 2026-07-18 is a Saturday; a valid-looking ET time must still skip.
+        assert in_intraday_sweep_window(self._utc(2026, 7, 18, 15, 30)) is False
+
+    def test_naive_utc_input_accepted(self):
+        assert in_intraday_sweep_window(datetime(2026, 7, 15, 13, 30)) is True
 
 
 class TestCycleLock:

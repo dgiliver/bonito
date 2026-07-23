@@ -341,6 +341,22 @@ A stop breach in the final run-up to close, after the last intraday check,
 is still caught by the daily cycle's own settled-close exit — a coverage
 *granularity* difference in the last ~hour, not a gap (§7).
 
+**DST-proofing the schedule (added 2026-07-23).** claude.ai custom crons
+are interpreted in UTC, not the user's local zone (verified: `30 13 * * 1-5`
+displays as "9:30 AM EDT"). A fixed-UTC cron therefore fires an hour off
+across the EDT/EST boundary — tuned for summer, it would run 8:30am–2:30pm
+ET all winter, first run pre-market. Rather than a twice-a-year manual cron
+edit (exactly the kind of silent-drift maintenance that already produced
+this account's 3:45→4:45pm schedule divergence), the cron is a **UTC
+superset** of both seasons (`30 13-20 * * 1-5`) and an in-prompt guard
+(`bonito live market-hours` → `in_intraday_sweep_window`, `live_runner.py`)
+trims stray firings to the real weekday 9:30am–15:45 ET window (15:45, not
+15:30, absorbs the few-minute run stagger while still leaving fill time
+before the close). This is the same superset-cron + ET-guard pattern paper's
+`intraday-stops.yml` uses, ported from a GitHub Actions in-job Python check
+to a tested CLI exit-code gate. DST-correct via `zoneinfo`, no cron edit
+ever needed.
+
 ### 6.2 Detection: reuse `bonito live sweep`, unmodified
 
 `bonito live sweep --no-refresh -u config/universe.live.json`. Two
