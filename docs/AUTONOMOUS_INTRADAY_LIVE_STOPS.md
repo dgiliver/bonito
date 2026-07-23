@@ -176,19 +176,39 @@ Setup:
    - Either way, STOP: never run `bonito live resolve-pending` yourself
      (that is exclusively the daily cycle's job — one writer owns sentinel
      healing so two runs never race to heal the same record).
-4. Preflight (defense-in-depth, not load-bearing for exit coverage): `.venv
-   /bin/bonito live preflight -u config/universe.live.json`. Non-zero exit
-   -> STOP and report (kill switch, data outage, or flag mismatch). A
-   latched kill switch already flattened every position at the moment it
-   tripped, so this is very unlikely to ever find something left to
-   protect — call it anyway, it is cheap and still catches a
-   live/live_enabled misconfiguration or a stale data feed.
-5. Detect: `.venv/bin/bonito live sweep --no-refresh -u
-   config/universe.live.json`. NEVER pass `--execute` here — that flag only
-   auto-fills the *paper* ledger, which is not applicable to live. This
-   command does not place any real order itself; it either prints "No stops
-   triggered" (nothing further to do — skip to step 8) or writes an intents
-   file listing which open position(s) triggered a stop-loss or take-profit.
+4. Preflight, EXITS-ONLY mode: `.venv/bin/bonito live preflight
+   --exits-only -u config/universe.live.json`. The `--exits-only` flag is
+   REQUIRED here and is not optional: this Routine's container starts with
+   an EMPTY market-data store (the DuckDB is gitignored, so a fresh
+   container has no bars until step 5's sweep refreshes the open
+   positions), and a plain preflight would false-abort every single run on
+   "data outage — 0 fresh bars." `--exits-only` skips the stored-daily-bar
+   checks (irrelevant here — this Routine acts on live quotes, not stored
+   bars) and gates only on the kill switch and the live/live_enabled flag,
+   which still matter. Non-zero exit -> STOP and report (kill switch
+   latched, or live/live_enabled misconfigured). Do not run plain
+   preflight without the flag.
+5. Detect: `YF_DISABLE_CURL_CFFI=1 .venv/bin/bonito live sweep -u
+   config/universe.live.json`. Two required details:
+   - The `YF_DISABLE_CURL_CFFI=1` prefix is mandatory, same as the daily
+     cycle's refresh (this sandbox's TLS-intercepting proxy breaks
+     yfinance's default curl_cffi backend — without it, both the refresh
+     and the live-quote fetch silently return nothing).
+   - Do NOT pass `--no-refresh`: this container's store is empty, so the
+     sweep MUST refresh to have any data. The sweep refreshes ONLY the
+     open positions (a handful of symbols, for ATR), not the full
+     universe, then fetches their live quotes — lean, and correct. (An
+     earlier version of this prompt used `--no-refresh` on the mistaken
+     belief it would avoid DuckDB lock contention with the daily cycle;
+     the two Routines run in SEPARATE isolated containers with separate,
+     non-shared DuckDB files, so there is no lock to contend for, and
+     `--no-refresh` just left the store empty — see docs/EXPERIMENT_LOG.md.)
+   - NEVER pass `--execute` — that flag only auto-fills the *paper* ledger,
+     not applicable to live. The sweep places no real order itself; it
+     either prints "No stops triggered" (nothing further — skip to step 8)
+     or writes an intents file listing which open position(s) triggered a
+     stop-loss or take-profit. If ALL quote lookups fail, the sweep exits
+     non-zero — treat that as a real data problem: STOP and report.
 6. If (and only if) step 5 wrote an intents file: for each intent in it,
    place a real market sell — Robinhood review_equity_order then
    place_equity_order (plain market order, fresh UUID ref_id — NEVER

@@ -358,23 +358,35 @@ leaving fill time before the close). This is the same superset-cron + ET-guard p
 to a tested CLI exit-code gate. DST-correct via `zoneinfo`, no cron edit
 ever needed.
 
-### 6.2 Detection: reuse `bonito live sweep`, unmodified
+### 6.2 Detection: reuse `bonito live sweep` (with refresh)
 
-`bonito live sweep --no-refresh -u config/universe.live.json`. Two
-deliberate choices:
+`YF_DISABLE_CURL_CFFI=1 bonito live sweep -u config/universe.live.json`.
 
-- **`--no-refresh`**, not a fresh `bonito live refresh` every hour: avoids
-  contending with the daily cycle for DuckDB's single-writer lock, and
-  avoids feeding a same-day forming bar into the ATR window (harmless in
-  small doses, but pointless risk for a value that only needs multi-day
-  freshness). ATR/trailing stops read whatever the most recent daily
-  refresh already ingested — sufficient, since ATR moves slowly.
+- **Refresh, NOT `--no-refresh` (corrected 2026-07-23).** The original
+  design used `--no-refresh` on the theory it would avoid contending with
+  the daily cycle for DuckDB's single-writer lock. That theory was wrong,
+  and the first real runs proved it: `data/market_data.duckdb` is
+  gitignored, and Routine containers are ephemeral, so each intraday run
+  starts with a completely EMPTY store — there is no shared DuckDB to
+  contend for (the two Routines are isolated containers with separate
+  files), and `--no-refresh` simply left the store empty, so preflight
+  false-aborted every run on "data outage" and ATR could never compute. A
+  plain `sweep` (no `--no-refresh`) refreshes ONLY the open positions
+  (`refresh_data(store, symbols=sorted(ledger.positions))`, `cli.py`) —
+  a handful of symbols for ATR, lean — then fetches their live quotes. The
+  `YF_DISABLE_CURL_CFFI=1` prefix is required for the same TLS-proxy reason
+  the daily cycle's refresh needs it (both `refresh_data` and
+  `fetch_latest_quotes` go through yfinance).
 - **No `--execute`**: that flag's job is auto-filling the *paper* ledger,
   which is exactly the fiction live can't assume (`RFC_LIVE_FIDELITY.md`'s
   entire thesis). Live already has the right shape without it: `sweep`
   writes an intents file when something triggers, and the Routine —
   exactly like the daily cycle's step 6 — is what actually places the real
   order.
+- **Preflight runs `--exits-only`** (§6.4): the stored-daily-bar data
+  checks are wrong for a live-quote-based exits path and would false-abort
+  on the empty container; only the kill-switch and live/live_enabled
+  checks are kept.
 
 ### 6.3 Placement: real market sell, same shape as daily step 6
 
@@ -511,11 +523,13 @@ fractional-order policy ever changes.
    parameterized on a live-mode `UniverseConfig` fixture specifically, not
    only paper — the "no code change needed" claim in §4 should be backed
    by a test, not just a read of the source.
-2. **`--no-refresh` + `--execute` interaction.** Assert `bonito live sweep
-   --no-refresh -u <live-config>` (no `--execute`) writes an intents file
-   on a synthetic triggered stop and does **not** touch `ledger.positions`
-   itself (confirming detection and execution stay decoupled for live, the
-   same way step 5/6 are decoupled in the daily cycle).
+2. **`--execute` non-interaction for live.** Assert `bonito live sweep
+   -u <live-config>` (no `--execute`) writes an intents file on a synthetic
+   triggered stop and does **not** touch `ledger.positions` itself
+   (confirming detection and execution stay decoupled for live, the same
+   way step 5/6 are decoupled in the daily cycle). Plus: a preflight
+   `--exits-only` unit test (empty store passes; kill switch / live-flag
+   still abort) — DONE this pass (`TestPreflight`).
 3. **Rebase-retry unit coverage** for the push-conflict handling in §6.5:
    a clean fast-forward-able divergence retries and succeeds; a genuine
    content conflict aborts cleanly and reports rather than guessing.
@@ -523,7 +537,7 @@ fractional-order policy ever changes.
    `ledger.positions`, a second `check_stops()` pass over the same (now
    closed) symbol produces no intent — confirms §6.4's "no separate de-dup
    needed" claim rather than assuming it.
-5. **Dry run against the live ledger**, `--no-refresh`, no order placement
+5. **Dry run against the live ledger**, no order placement
    — confirms `bonito live sweep -u config/universe.live.json` behaves as
    described in §4 against the real current 6-position book before any
    Routine is wired up.
@@ -624,9 +638,11 @@ src/bonito/trading/live_runner.py
 src/bonito/trading/paper.py
   :202        apply_sell — supports partial fills; fully removes a closed position (idempotency basis)
 src/bonito/cli.py
-  :1114       live_sweep — --no-refresh avoids DuckDB lock + forming-bar ATR noise
-  :1153       _sweep_stops — --execute is paper-gated (:1174) by design; live never needed it
-  :1184       live_stop_levels — compute_stop_levels' CLI surface, informational only here
+  live_sweep    intraday MUST refresh (open positions only) — the container's DuckDB
+                is empty (gitignored, ephemeral); --no-refresh was a design bug, fixed 2026-07-23
+  live_preflight  --exits-only skips the stored-bar data checks for the intraday path
+  _sweep_stops  --execute is paper-gated by design; live never needed it
+  live_stop_levels  compute_stop_levels' CLI surface, informational only here
 docs/AUTONOMOUS_LIVE_ROUTINE.md
   step 8      REMOVED per D1 (steps renumbered 9->8, 10->9); "Intraday
               stops under a Routine" section rewritten to point at

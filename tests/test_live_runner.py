@@ -1267,3 +1267,34 @@ class TestPreflight:
         assert report.ok  # exits must still process despite a risk-off regime
         assert report.stale_regime == ["SPY"]
         assert any("risk-off" in w for w in report.warnings)
+
+    def test_exits_only_skips_data_outage_but_keeps_kill_switch(self, universe):
+        """The intraday-Routine mode: an empty store must NOT abort (it acts on
+        live quotes, not stored bars), but the kill switch and flag checks
+        still gate."""
+        universe.mode = "live"
+        universe.live_enabled = True
+        empty_store = FakeStore({})  # fresh ephemeral container: no data at all
+        ledger = PaperLedger(cash=150.0, starting_cash=150.0)
+
+        # Without exits_only this would abort on total data outage...
+        assert not preflight(universe, ledger, empty_store, as_of=AS_OF).ok
+        # ...with exits_only it passes (data checks skipped entirely).
+        report = preflight(universe, ledger, empty_store, as_of=AS_OF, exits_only=True)
+        assert report.ok
+        assert report.reasons == []
+        assert report.missing_symbols == []  # data checks not even run
+
+        # But a latched kill switch STILL aborts under exits_only.
+        ledger.halt("drawdown 25% >= 25% cap")
+        halted = preflight(universe, ledger, empty_store, as_of=AS_OF, exits_only=True)
+        assert not halted.ok
+        assert any("kill switch" in r for r in halted.reasons)
+
+    def test_exits_only_keeps_live_flag_check(self, universe):
+        universe.mode = "live"
+        universe.live_enabled = False  # misconfigured
+        report = preflight(universe, PaperLedger(cash=150.0, starting_cash=150.0),
+                           FakeStore({}), as_of=AS_OF, exits_only=True)
+        assert not report.ok
+        assert any("live_enabled is false" in r for r in report.reasons)

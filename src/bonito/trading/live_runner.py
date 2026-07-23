@@ -724,6 +724,7 @@ def preflight(
     ledger: PaperLedger,
     store: MarketDataStore,
     as_of: datetime | None = None,
+    exits_only: bool = False,
 ) -> PreflightReport:
     """Fail-closed gate that must pass before any UNATTENDED cycle.
 
@@ -740,6 +741,16 @@ def preflight(
     switch, or zero fresh symbols (a total data outage). Individually stale
     symbols and stale regime data are warnings — the run should still
     proceed so exits and stops process — surfaced for the run summary.
+
+    exits_only: for the intraday stop Routine, which acts on LIVE QUOTES
+    (fetched during its sweep), not the stored daily bars this gate
+    inspects, and which runs in a fresh ephemeral container whose DuckDB
+    starts EMPTY (it refreshes only its open positions, in the sweep). The
+    daily-bar data checks below (outage/stale/missing/forming/regime) are
+    therefore both irrelevant and actively wrong there — an empty store
+    would false-abort every run on "data outage". When True, skip all
+    market-data checks and gate ONLY on the config/kill-switch invariants
+    that still matter for an exits-only path.
     """
     as_of = as_of or datetime.now(UTC).replace(tzinfo=None)
     reasons: list[str] = []
@@ -750,6 +761,24 @@ def preflight(
 
     if ledger.halted:
         reasons.append(f"kill switch latched: {ledger.halt_reason or 'drawdown halt'}")
+
+    if exits_only:
+        # Skip every market-data check: this path acts on live quotes, not
+        # stored bars, and its container's store is legitimately empty.
+        return PreflightReport(
+            ok=not reasons,
+            reasons=reasons,
+            warnings=warnings,
+            mode=universe.mode,
+            live_enabled=universe.live_enabled,
+            halted=ledger.halted,
+            halt_reason=ledger.halt_reason,
+            fresh_symbols=[],
+            stale_symbols=[],
+            missing_symbols=[],
+            stale_regime=[],
+            forming_symbols=[],
+        )
 
     start = datetime.strptime(universe.data.start_date, "%Y-%m-%d")
     fresh: list[str] = []

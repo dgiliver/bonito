@@ -1416,6 +1416,13 @@ def live_reconcile(
 @live_app.command("preflight")
 def live_preflight(
     universe_path: str = typer.Option("config/universe.json", "--universe", "-u"),
+    exits_only: bool = typer.Option(
+        False,
+        "--exits-only",
+        help="Skip all market-data checks; gate only on kill switch + live/live_enabled. "
+        "For the intraday stop Routine, which acts on live quotes (not stored bars) "
+        "in a fresh container whose store is legitimately empty.",
+    ),
 ) -> None:
     """Fail-closed safety gate for unattended cycles.
 
@@ -1424,12 +1431,15 @@ def live_preflight(
     stops and notifies instead of trading on bad state. Stale individual
     symbols and stale regime data are warnings, not aborts. Run this
     immediately after `bonito live refresh` and before reconcile/run.
+
+    With --exits-only, the market-data checks are skipped entirely (see the
+    flag help): use it for the intraday stop Routine, NOT the daily cycle.
     """
     from bonito.trading.live_runner import preflight
 
     universe = _load_universe(universe_path)
     ledger = _load_ledger(universe)
-    report = preflight(universe, ledger, _get_store())
+    report = preflight(universe, ledger, _get_store(), exits_only=exits_only)
 
     border = "green" if report.ok else "red"
     console.print(Panel.fit(report.describe(), border_style=border))
