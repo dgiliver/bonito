@@ -1,0 +1,26 @@
+[
+  {
+    "symbol": "AAPL",
+    "side": "buy",
+    "dollar_amount": 604.16,
+    "quantity": null,
+    "reason": "entry rule matched: ema_fast gt ema_slow, close gt ema_slow, rsi_14 lt 60.0",
+    "signal_price": 321.6600036621094,
+    "signal_date": "2026-07-23T04:00:00",
+    "strategy_name": "c_ema8-21_rsi60_atr1.5_tp10",
+    "generated_at": "2026-07-23T23:30:30.159542Z",
+    "broker_order_id": null
+  },
+  {
+    "symbol": "UNH",
+    "side": "buy",
+    "dollar_amount": 604.16,
+    "quantity": null,
+    "reason": "entry rule matched: ema_fast gt ema_slow, close gt ema_slow, rsi_14 lt 68.0",
+    "signal_price": 423.55999755859375,
+    "signal_date": "2026-07-23T04:00:00",
+    "strategy_name": "ema_cross_rsi_atr_regime",
+    "generated_at": "2026-07-23T23:30:30.196598Z",
+    "broker_order_id": null
+  }
+]
