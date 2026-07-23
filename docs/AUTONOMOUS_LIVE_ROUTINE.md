@@ -239,7 +239,7 @@ Setup:
      STOP and report. If it acquires again, commit and push once more; a
      second rejection = STOP and report. (Edge case, degrades safely: if
      the first push actually landed but you didn't observe the
-     confirmation, the reset is a content no-op and the re-run may see
+     confirmation, the reset is a no-op and the re-run may see
      your OWN just-pushed lock and exit 1 — a false self-abort. That is
      fine: no order was placed, and the lock self-heals in 20 minutes.
      Report it as a likely false-abort, not real contention, and stop.)

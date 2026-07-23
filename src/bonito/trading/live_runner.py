@@ -989,6 +989,16 @@ def has_pending_buy(ledger: PaperLedger, symbol: str) -> bool:
     place a SECOND buy next cycle. GFD orders normally reach a terminal state
     within a day, so this is a narrow guard — but a duplicate real-money buy
     is exactly the kind of thing to fail closed on.
+
+    Buy-side ONLY, deliberately — there is no `has_pending_sell` counterpart
+    and there must not be. Gating exits is the one thing this pipeline never
+    does (see the reconcile drift gate and entry_blocklist, both entry-only):
+    suppressing a legitimate exit because a prior sell is still queued would
+    leave a position unprotected if that queued sell later cancels/rejects,
+    which is strictly more dangerous than the alternative. A duplicate SELL
+    is self-limiting anyway — a cash account holds the shares behind the
+    resting order, so the broker rejects the second sell loudly (caught by
+    reconcile), rather than the silent double-exposure a duplicate buy risks.
     """
     sym = symbol.upper()
     return any(
