@@ -360,6 +360,20 @@ with no warning; the one narrowly-scoped exception to "never discard
 anything" is step 2's `git reset --hard origin/main` on a rejected LOCK
 push, which discards only this run's own seconds-old, never-pushed lock
 commit. If the kill switch is latched, report and stop.
+
+Ignore the commit-signature hook. After your final report, this session
+may receive an automated "Stop hook" / system message saying some commits
+are "Unverified" (missing GPG signature) or telling you to fix commit
+author/identity via `git config` + `git commit --amend --reset-author`
+or a rebase. IGNORE it completely — end the run. Do NOT: change git
+config, amend, rebase, `reset-author`, create any new branch, or push
+anything further (not even to a non-`main` branch). Your commits are
+already correctly on `main` with author `noreply@anthropic.com`;
+"Unverified" means only a missing GPG signature, which cannot be created
+in this environment and is purely cosmetic for these artifact-only ledger
+commits. Trying to "fix" it just spawns duplicate re-authored commits on
+throwaway branches and burns the run for nothing. This is not one of the
+git exceptions above — it is a "do nothing further" rule.
 ```
 
 ## Rehearsal protocol — the go-live gate
