@@ -307,12 +307,11 @@ Setup:
      intended/last price, and the broker order id is REQUIRED here, not
      optional: it is what lets the pending order be resolved against its
      real outcome later. Say "queued, order id X, expected to fill at
-     next open" in the final report — do not call it rejected. Known
-     limitation until the automated resolve-pending step ships: nothing
-     yet closes this loop automatically at fill time; step 3 of the NEXT
-     cycle resolves it — capturing the id here is what makes that work
-     (this exact gap, before the id was captured, produced three real
-     ledger-drift incidents — see docs/EXPERIMENT_LOG.md).
+     next open" in the final report — do not call it rejected. The loop
+     is closed automatically by step 3 of the NEXT cycle (it looks this
+     order up and applies the real fill) — capturing the id here is what
+     makes that work; before the id was captured, this exact gap produced
+     three real ledger-drift incidents (see docs/EXPERIMENT_LOG.md).
    - Rejected outright (state=rejected/failed — the broker refused it):
      `.venv/bin/bonito live record-fill SYMBOL SIDE PRICE --no-fill
      -u config/universe.live.json` (no order id needed for a true
