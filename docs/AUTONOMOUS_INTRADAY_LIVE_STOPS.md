@@ -159,14 +159,23 @@ Setup:
    JSON ({} if flat) -> `.venv/bin/bonito live reconcile '<json>' -u
    config/universe.live.json`. Exit 1 = FATAL drift: STOP, report, do not
    act — this catches a prior crash between placing and recording an
-   order, same reasoning as the daily cycle's steps 4/9. NOTE: a pending
-   sentinel from the daily cycle's own overnight-queued order (its step
-   8 queued branch) resolving at today's open can legitimately surface
-   here as drift before the daily cycle's step 3 has run today — if the
-   FATAL involves a symbol the ledger shows as a zero-qty pending
-   sentinel, report it as "pending order likely filled, daily cycle will
-   resolve it" rather than as unexplained drift, and still STOP (do not
-   resolve it yourself; only the daily cycle runs resolve-pending).
+   order, same reasoning as the daily cycle's steps 4/9.
+   - On a FATAL, first run `.venv/bin/bonito live pending -u
+     config/universe.live.json` and check whether the drifting symbol(s)
+     appear in that list. If they do, this is EXPECTED, not a crash: the
+     daily cycle's own overnight-queued order (its step 8 queued branch)
+     filled at today's open and the daily cycle's step 3 hasn't reconciled
+     it yet. Do NOT inspect the ledger by hand for a "zero-qty sentinel" —
+     that only shows the pending-BUY shape; a pending SELL leaves the
+     position at full quantity with a separate zero-qty sentinel, so
+     `bonito live pending` (which reads the fills, not the positions) is
+     the only reliable check. Report it as "pending order likely filled,
+     daily cycle will resolve it" and STOP.
+   - If the drifting symbol is NOT in the pending list, it's genuine,
+     unexplained drift — report that and STOP.
+   - Either way, STOP: never run `bonito live resolve-pending` yourself
+     (that is exclusively the daily cycle's job — one writer owns sentinel
+     healing so two runs never race to heal the same record).
 4. Preflight (defense-in-depth, not load-bearing for exit coverage): `.venv
    /bin/bonito live preflight -u config/universe.live.json`. Non-zero exit
    -> STOP and report (kill switch, data outage, or flag mismatch). A
