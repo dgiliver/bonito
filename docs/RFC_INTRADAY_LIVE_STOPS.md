@@ -383,7 +383,7 @@ ever needed.
   writes an intents file when something triggers, and the Routine —
   exactly like the daily cycle's step 6 — is what actually places the real
   order.
-- **Preflight runs `--exits-only`** (§6.4): the stored-daily-bar data
+- **Preflight runs `--exits-only`** (§9 D4): the stored-daily-bar data
   checks are wrong for a live-quote-based exits path and would false-abort
   on the empty container; only the kill-switch and live/live_enabled
   checks are kept.
@@ -504,9 +504,11 @@ fractional-order policy ever changes.
   -316`), before the halted-check that blocks further *entries*
   (`:318-320`) is even reached — so by the time any later run (daily or
   intraday) sees `ledger.halted`, there is nothing left to protect. The new
-  Routine calling `bonito live preflight` (recommended, §9 D4) is
-  defense-in-depth for a live/live_enabled misconfiguration or a stale data
-  feed, not a load-bearing exit-coverage check.
+  Routine calling `bonito live preflight --exits-only` (recommended, §9 D4)
+  is defense-in-depth for a live/live_enabled misconfiguration or a latched
+  kill switch, not a load-bearing exit-coverage check. (`--exits-only`
+  deliberately does NOT check the data feed — that's the stored-daily-bar
+  path, irrelevant to a live-quote exits sweep; see §6.2.)
 - **The still-open queued-order-reconciliation gap (§3)** is not fixed by
   this RFC. It's a daily-cycle, entry-side problem (orders placed outside
   a live session queuing past cycle-time); the new Routine's strictly
@@ -580,11 +582,14 @@ stop-immediately rule, because giving up here can orphan an
 already-executed real order. Does not touch the daily Routine's own rule
 or the no-force-push branch protection.
 
-**D4 — Preflight as defense-in-depth: ADOPTED.** The new Routine calls
-`bonito live preflight` every run (step 3) even though §7 shows the
-kill-switch check is usually moot for an exits-only path by the time it
-would fire — cheap, and still catches a live/live_enabled
-misconfiguration or a stale data feed independent of the kill switch.
+**D4 — Preflight as defense-in-depth: ADOPTED (as `--exits-only`).** The
+new Routine calls `bonito live preflight --exits-only` every run (step 4)
+even though §7 shows the kill-switch check is usually moot for an
+exits-only path by the time it would fire — cheap, and still catches a
+live/live_enabled misconfiguration or a latched kill switch. The
+`--exits-only` variant (added 2026-07-23, §6.2) skips the stored-daily-bar
+data checks, which are wrong for a live-quote exits sweep and false-abort
+on the intraday container's empty store.
 
 **D5 — DST-proofing via superset cron + ET guard: ADOPTED (2026-07-23).**
 claude.ai custom crons are UTC (empirically confirmed — see §6.1), so a
@@ -611,10 +616,12 @@ pattern as paper's `intraday-stops.yml`.
    `src/bonito` code needed for detection" claim (§4) is backed by
    reading the source, not yet by a test asserting it against a
    live-mode fixture — do this before fully trusting the mechanism.
-4. **Still open — §8 test 5**: a dry run of `bonito live sweep
-   --no-refresh -u config/universe.live.json` against the real live
-   ledger, no order placement, to confirm current behavior matches §4's
-   description before the Routine is created.
+4. **Overtaken by events (2026-07-23)**: the Routine has since run live,
+   which surfaced the empty-container bug — a far stronger test than the
+   planned dry run of `bonito live sweep -u config/universe.live.json`.
+   That bug is fixed (refresh + `--exits-only`, §6.2 / §9 D4); the
+   remaining validation is re-pasting the corrected prompt and confirming
+   a clean run.
 5. **User, manual**: create the Routine per
    `docs/AUTONOMOUS_INTRADAY_LIVE_STOPS.md`'s Setup section; §8 test 6
    (dogfood) happens here via "Run now."
