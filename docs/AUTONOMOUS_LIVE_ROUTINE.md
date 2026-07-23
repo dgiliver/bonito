@@ -233,19 +233,34 @@ Setup:
    places NOTHING itself.
 6. Execute ONLY the intents in the newest intents file, sells before buys:
    for each, Robinhood review_equity_order then place_equity_order (fresh
-   UUID ref_id). After the order resolves, read its ACTUAL filled quantity
-   and price (from place_equity_order's response, or get_equity_orders), then
-   record it:
+   UUID ref_id). Then read the order's actual state (from
+   place_equity_order's response, or get_equity_orders) and record it —
+   THREE possible outcomes, not two, and because this cycle runs after
+   the 4pm ET close, the QUEUED outcome is the expected default for
+   every order, not an edge case:
    - Filled (including a PARTIAL fill): `.venv/bin/bonito live record-fill
      SYMBOL SIDE PRICE --shares <ACTUAL filled quantity> --broker-order-id ID
      -u config/universe.live.json`. Use the broker's actual share count via
      `--shares` (NOT `--dollars`): a partial fill or fractional rounding makes
      dollars/price wrong, and `--shares` makes the ledger match the broker
      exactly, so step 7's reconcile stays clean.
-   - Rejected / did NOT fill: `.venv/bin/bonito live record-fill SYMBOL SIDE
-     PRICE --no-fill -u config/universe.live.json` (PRICE = the intended/last
-     price; no order id needed). Logs the divergence as an explicit no-fill
-     instead of silently assuming the position exists.
+   - QUEUED (state=queued/confirmed, zero executions — the normal case
+     for this post-close cycle; the order fills at the NEXT session's
+     open): `.venv/bin/bonito live record-fill SYMBOL SIDE PRICE --no-fill
+     --broker-order-id ID -u config/universe.live.json` — PRICE = the
+     intended/last price, and the broker order id is REQUIRED here, not
+     optional: it is what lets the pending order be resolved against its
+     real outcome later. Say "queued, order id X, expected to fill at
+     next open" in the final report — do not call it rejected. Known
+     limitation until the automated resolve-pending step ships: nothing
+     yet closes this loop automatically, so the fill must currently be
+     recorded manually after it happens (this exact gap has produced
+     three real ledger-drift incidents — see docs/EXPERIMENT_LOG.md).
+   - Rejected outright (state=rejected/failed — the broker refused it):
+     `.venv/bin/bonito live record-fill SYMBOL SIDE PRICE --no-fill
+     -u config/universe.live.json` (no order id needed for a true
+     rejection). Logs the divergence as an explicit no-fill instead of
+     silently assuming the position exists.
    On any order error: STOP, report what filled and what didn't, do not retry.
 7. Reconcile again (get_equity_positions vs ledger). Report any FATAL
    mismatch; do not silently fix it.

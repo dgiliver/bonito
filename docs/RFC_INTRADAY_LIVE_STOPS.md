@@ -391,8 +391,10 @@ paper's *schedule* also does most of the real work: its daily cycle runs at
 22:30 UTC. The cron's raw last tick is 21:45 UTC (45 min before), but the
 in-job guard trims actual execution to 9:30-16:00 ET — 20:00 UTC in EDT —
 so the real gap between paper's last EFFECTIVE sweep and its daily cycle is
-~150 minutes, not 45. Genuinely disjoint in practice either way, which is
-why a real collision has essentially never happened.
+~150 minutes in EDT (~90 in EST, since paper's daily cron is fixed-UTC
+while the guard is ET wall-clock; either figure dwarfs the raw 45).
+Genuinely disjoint in practice either way, which is why a real collision
+has essentially never happened.
 
 **Live's daily cycle actually runs post-close, not in RTH — correcting
 this RFC's own earlier premise.** The settled-bar guard requires the bar
@@ -533,7 +535,7 @@ practice.** The new Routine's last run lands at 2:30pm ET; the daily
 cycle actually runs ~4:45pm ET (not the 3:45pm ET originally assumed here
 — see the Status line and §6.5), so the real gap is ~135 minutes, not the
 75 originally stated. See `docs/AUTONOMOUS_INTRADAY_LIVE_STOPS.md`'s
-Setup section. A stop breach in that last 75 minutes is caught by the
+Setup section. A stop breach in that last ~135 minutes is caught by the
 daily cycle's own settled-close exit instead — granularity, not a gap.
 
 **D3 — Push-conflict handling divergence: ADOPTED.** The new Routine

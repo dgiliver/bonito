@@ -23,13 +23,18 @@ decisions and only ever places sells.
    daily Routine works — this Routine reuses the same connector).
 2. `config/universe.live.json` has `mode: "live"` and `live_enabled: true`
    (unchanged by this Routine; human-only).
-3. The daily Routine's own schedule must run comfortably before the 4pm ET
-   close — **if it does not, fix that first.** A late-running daily cycle
-   (this account's actual root cause for 2 of its 3 ledger-drift incidents
-   so far — see `docs/EXPERIMENT_LOG.md`) queues its own orders past the
-   close regardless of anything this second Routine does; this Routine
-   only adds *intraday* coverage between cycles, it does not fix a
-   mistimed daily cycle.
+3. The daily Routine's own schedule must run **after 16:15 ET**
+   (realistically ~4:45pm ET) — running before that threshold means the
+   settled-bar guard reads every bar as forming and the daily cycle never
+   trades at all, on any regular day (see "Picking the time" in
+   `docs/AUTONOMOUS_LIVE_ROUTINE.md`; this doc originally said the
+   opposite here, which was the pre-correction premise). A post-close
+   daily cycle is expected and correct, not a mistimed bug — its real
+   consequence is that every order it places queues overnight and fills
+   at the next open (the queued-order ledger-drift class in
+   `docs/EXPERIMENT_LOG.md`), which is a distinct, still-open recording
+   problem this second Routine neither causes nor fixes; this Routine
+   only adds *intraday* exit coverage between the daily cycles.
 
 ## Setup (from a LOCAL terminal, same as the daily Routine)
 
