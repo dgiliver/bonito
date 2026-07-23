@@ -15,7 +15,7 @@ from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from zoneinfo import ZoneInfo
 
-from pydantic import BaseModel, Field, PrivateAttr
+from pydantic import BaseModel, Field, PrivateAttr, field_validator
 
 from bonito.backtest.strategy import StrategyConfig
 from bonito.data.models import BarData
@@ -344,6 +344,11 @@ def generate_intents(
         if open_after_exits + buys >= universe.risk.max_positions:
             break
         if symbol in ledger.positions:
+            continue
+        if has_pending_buy(ledger, symbol):
+            # A prior cycle's buy for this symbol queued and hasn't resolved
+            # yet — don't stack a second real order on top of it.
+            logger.info(f"{symbol}: unresolved pending buy, skipping new entry")
             continue
         if allowset is not None and symbol.upper() not in allowset:
             continue
@@ -905,6 +910,13 @@ def save_intents(intents: list[TradeIntent], directory: Path = Path("livetrade/i
 # fetches order states via MCP and passes them in as JSON.
 
 # States meaning "the order can still fill" vs "it is dead, unfilled".
+# NOTE: "partially_filled" is treated as still-live (more may fill). If
+# Robinhood ever reports a TERMINAL partial (some filled, remainder
+# expired) under this same string rather than a distinct one, such an
+# order would sit as still-pending indefinitely -- visible as a daily nag
+# in the pending report (fails loud, not silent), never auto-resolved.
+# Unverified against real behavior; retest the same way GTC/GFD were
+# (docs/EXPERIMENT_LOG.md standing follow-up).
 PENDING_ORDER_LIVE_STATES = {"queued", "confirmed", "new", "unconfirmed", "partially_filled"}
 PENDING_ORDER_DEAD_STATES = {"cancelled", "rejected", "failed", "voided", "expired"}
 _RESOLVED_MARKER = "resolved="
@@ -922,6 +934,23 @@ class PendingOrderOutcome(BaseModel):
         "Falls back to filled_quantity * average_price rounded to cents.",
     )
     executed_at: datetime | None = None
+
+    @field_validator("executed_at")
+    @classmethod
+    def _coerce_executed_at_to_aware_utc(cls, v: datetime | None) -> datetime | None:
+        """Force a naive timestamp to UTC-aware (the ledger's convention).
+
+        get_equity_orders timestamps flow straight into a fill's filled_at /
+        a position's entry_date. Every ledger fill is UTC-aware (paper.py uses
+        datetime.now(UTC)); a single naive one mixed in makes any later
+        `sorted(fills, key=filled_at)` raise TypeError -- which is exactly
+        what breaks `bonito live tracking`, performance, and the dashboard.
+        Same normalization CycleLock.acquired_at/as_of already applies for
+        the identical reason (a prior regression in this same file).
+        """
+        if v is not None and v.tzinfo is None:
+            return v.replace(tzinfo=UTC)
+        return v
 
 
 class PendingResolutionReport(BaseModel):
@@ -949,6 +978,22 @@ def _is_pending_sentinel(fill: PaperFill) -> bool:
         and fill.broker_order_id is not None
         and fill.reason.startswith("no_fill")
         and _RESOLVED_MARKER not in fill.reason
+    )
+
+
+def has_pending_buy(ledger: PaperLedger, symbol: str) -> bool:
+    """True if `symbol` has an unresolved queued BUY awaiting a broker outcome.
+
+    Such a symbol has no `ledger.positions` entry yet (the buy hasn't filled),
+    so the entry loop's `symbol in ledger.positions` guard alone would let it
+    place a SECOND buy next cycle. GFD orders normally reach a terminal state
+    within a day, so this is a narrow guard — but a duplicate real-money buy
+    is exactly the kind of thing to fail closed on.
+    """
+    sym = symbol.upper()
+    return any(
+        _is_pending_sentinel(f) and f.side == "buy" and f.symbol.upper() == sym
+        for f in ledger.fills
     )
 
 

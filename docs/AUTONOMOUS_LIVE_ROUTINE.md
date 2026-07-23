@@ -237,7 +237,12 @@ Setup:
      this run's own never-pushed lock commit — do not use reset --hard at
      any other step), then re-run lock-acquire once. If it now exits 1,
      STOP and report. If it acquires again, commit and push once more; a
-     second rejection = STOP and report.
+     second rejection = STOP and report. (Edge case, degrades safely: if
+     the first push actually landed but you didn't observe the
+     confirmation, the reset is a content no-op and the re-run may see
+     your OWN just-pushed lock and exit 1 — a false self-abort. That is
+     fine: no order was placed, and the lock self-heals in 20 minutes.
+     Report it as a likely false-abort, not real contention, and stop.)
    - From this point on, if ANY later step aborts the run, still do step
      11's lock-release + commit + push (skipping the trading parts)
      before ending — a held lock self-heals via staleness in 20 minutes,

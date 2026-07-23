@@ -100,3 +100,10 @@ ideas, structural changes) still follow the steps below by hand:
   4:45pm ET (see 2026-07-21 Bugs row) with no code-side way to detect
   the mismatch, since the schedule lives in claude.ai's Routines UI, not
   this repo.
+- **Standing follow-up**: `resolve_pending_fills()` treats Robinhood's
+  `partially_filled` order state as still-live (more may fill). If a
+  terminal partial (some filled, remainder expired) ever reports under
+  that same string, the order sits as still-pending indefinitely (loud
+  daily nag, never silent). Unverified against real behavior — confirm
+  the terminal-partial state string the same empirical way GTC/GFD were
+  tested, and add it to `PENDING_ORDER_DEAD_STATES` if distinct.

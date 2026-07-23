@@ -1,6 +1,7 @@
 """Tests for the daily live runner (bonito.trading.live_runner)."""
 
 import json
+from datetime import UTC as UTC_TZ
 from datetime import datetime, timedelta
 
 import pytest
@@ -147,6 +148,27 @@ class TestGenerateIntents:
         intents, _ = generate_intents(universe, store, ledger, as_of=AS_OF)
         assert len([i for i in intents if i.side == "sell"]) == 1
         assert len([i for i in intents if i.side == "buy"]) == 2
+
+    def test_unresolved_pending_buy_blocks_a_second_entry(self, universe):
+        """A prior cycle's buy that queued and hasn't resolved has no
+        ledger.positions entry yet — the entry loop must still not place a
+        second real buy for it."""
+        store = uptrend_store(universe.symbols)
+        ledger = PaperLedger(cash=150.0, starting_cash=150.0)
+        ledger.fills.append(
+            PaperFill(
+                symbol="AAA", side="buy", quantity=0.0, price=100.0, notional=0.0,
+                reason="no_fill: order queued, market closed",
+                filled_at=datetime(2026, 6, 5, tzinfo=UTC_TZ), broker_order_id="order-1",
+            )
+        )
+        intents, _ = generate_intents(universe, store, ledger, as_of=AS_OF)
+        buys = [i for i in intents if i.side == "buy"]
+        assert "AAA" not in {i.symbol for i in buys}  # not re-bought
+        # A resolved sentinel (dead order) does NOT block — that symbol is free.
+        ledger.fills[0].reason += "; resolved=cancelled"
+        intents2, _ = generate_intents(universe, store, ledger, as_of=AS_OF)
+        assert "AAA" in {i.symbol for i in intents2 if i.side == "buy"}
 
     def test_cash_buffer_blocks_buys(self, universe):
         store = uptrend_store(universe.symbols)
@@ -329,7 +351,7 @@ class TestResolvePendingFills:
     def test_filled_buy_replaces_sentinel_with_real_position(self, universe):
         ledger = self._ledger()
         ledger.fills.append(_pending_sentinel("AAA", "buy", "order-1"))
-        executed = datetime(2026, 7, 23, 13, 30, tzinfo=None)
+        executed = datetime(2026, 7, 23, 13, 30, tzinfo=UTC_TZ)
         report = resolve_pending_fills(
             universe,
             ledger,
@@ -458,6 +480,52 @@ class TestResolvePendingFills:
         )
         assert report.errors
         assert len(pending_orders(ledger)) == 1
+
+    def test_notional_prefers_broker_amount_over_recompute(self, universe):
+        """The broker's actual charged amount (fees/rounding) must win over
+        qty*price when supplied — otherwise every resolved buy drifts cash by
+        a few cents. Uses a notional deliberately != round(qty*price)."""
+        ledger = self._ledger()
+        ledger.fills.append(_pending_sentinel("AAA", "buy", "order-1"))
+        # qty*price = 0.05 * 400 = 20.00, but the broker charged 20.07 (fee/rounding).
+        resolve_pending_fills(
+            universe,
+            ledger,
+            {
+                "order-1": PendingOrderOutcome(
+                    state="filled", filled_quantity=0.05, average_price=400.0, notional=20.07
+                )
+            },
+        )
+        assert ledger.cash == pytest.approx(100.0 - 20.07)  # supplied notional, NOT 20.00
+
+    def test_naive_executed_at_normalized_so_tracking_can_sort_fills(self, universe):
+        """Regression (same class as CycleLock's naive-as_of fix): a naive
+        executed_at from get_equity_orders must be coerced to UTC-aware before
+        it lands on a fill, or a later sorted(fills, key=filled_at) — which
+        `bonito live tracking` does — raises TypeError on mixed tz-awareness."""
+        ledger = self._ledger()
+        # A pre-existing aware fill, as every paper.py-produced fill is.
+        ledger.fills.append(
+            PaperFill(
+                symbol="ZZZ", side="buy", quantity=1.0, price=10.0, notional=10.0,
+                reason="live fill", filled_at=datetime(2026, 7, 22, tzinfo=UTC_TZ),
+            )
+        )
+        ledger.fills.append(_pending_sentinel("AAA", "buy", "order-1"))
+        # executed_at supplied WITHOUT a tz offset (the realistic hazard).
+        outcome = PendingOrderOutcome.model_validate(
+            {"state": "filled", "filled_quantity": 0.05, "average_price": 400.0,
+             "executed_at": "2026-07-23T09:30:00"}
+        )
+        assert outcome.executed_at.tzinfo is not None  # coerced at validation
+        resolve_pending_fills(universe, ledger, {"order-1": outcome})
+        new_fill = [f for f in ledger.fills if f.symbol == "AAA"][0]
+        assert new_fill.filled_at.tzinfo is not None
+        assert ledger.positions["AAA"].entry_date.tzinfo is not None
+        # The invariant that actually matters: fills remain mutually sortable.
+        ordered = sorted(ledger.fills, key=lambda f: f.filled_at)
+        assert len(ordered) == 2  # would have raised TypeError before the fix
 
 
 class TestCycleLock:
