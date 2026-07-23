@@ -1,0 +1,50 @@
+[
+  {
+    "symbol": "AMZN",
+    "side": "sell",
+    "dollar_amount": null,
+    "quantity": 2.5835767800908007,
+    "reason": "stop loss triggered (intraday)",
+    "signal_price": 232.39999389648438,
+    "signal_date": "2026-07-23T15:03:43.213329Z",
+    "strategy_name": "ema_cross_rsi_atr_regime",
+    "generated_at": "2026-07-23T15:03:43.213482Z",
+    "broker_order_id": null
+  },
+  {
+    "symbol": "DASH",
+    "side": "sell",
+    "dollar_amount": null,
+    "quantity": 3.438579353202684,
+    "reason": "stop loss triggered (intraday)",
+    "signal_price": 167.83999633789062,
+    "signal_date": "2026-07-23T15:03:43.213329Z",
+    "strategy_name": "ema_cross_rsi_atr_regime",
+    "generated_at": "2026-07-23T15:03:43.213561Z",
+    "broker_order_id": null
+  },
+  {
+    "symbol": "MSFT",
+    "side": "sell",
+    "dollar_amount": null,
+    "quantity": 1.0512316761970406,
+    "reason": "stop loss triggered (intraday)",
+    "signal_price": 378.3219909667969,
+    "signal_date": "2026-07-23T15:03:43.213329Z",
+    "strategy_name": "ema_cross_rsi_atr_regime",
+    "generated_at": "2026-07-23T15:03:43.213698Z",
+    "broker_order_id": null
+  },
+  {
+    "symbol": "PLTR",
+    "side": "sell",
+    "dollar_amount": null,
+    "quantity": 4.98811324312593,
+    "reason": "stop loss triggered (intraday)",
+    "signal_price": 121.18499755859375,
+    "signal_date": "2026-07-23T15:03:43.213329Z",
+    "strategy_name": "ema_cross_rsi_atr_regime",
+    "generated_at": "2026-07-23T15:03:43.213733Z",
+    "broker_order_id": null
+  }
+]
