@@ -934,12 +934,12 @@
       "reason": "no_fill: live fill",
       "filled_at": "2026-07-22T20:48:24.885241Z",
       "strategy_name": "live",
-      "broker_order_id": null
+      "broker_order_id": "6a612c6e-f2dc-49a9-a9fc-9f5a3e9baa9e"
     }
   ],
   "realized_pnl": 0.0,
   "peak_equity": 150.14103162835693,
   "halted": false,
   "halt_reason": "",
-  "updated_at": "2026-07-22T20:48:24.885499Z"
+  "updated_at": "2026-07-23T02:14:14.116873Z"
 }
