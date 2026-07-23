@@ -112,10 +112,11 @@ Setup:
   `.venv/bin/bonito live market-hours`. Exit 1 = this is a stray
   off-hours firing (the schedule's cron is a UTC superset of both DST
   seasons, so it fires an hour early or late across the EDT/EST boundary
-  — see the Setup notes above) — STOP immediately, do nothing else (no
-  pull, no lock, no report). Exit 0 = within the weekday 9:30-15:45 ET
-  window, proceed. This is what makes the UTC cron DST-proof without a
-  twice-a-year manual edit.
+  — see the Setup notes above) — STOP immediately, do nothing else: no
+  pull, no lock, no order, no ledger commit. End with a single line
+  ("outside window, skipped"); a stray firing needs no fuller report.
+  Exit 0 = within the weekday 9:30-15:45 ET window, proceed. This is
+  what makes the UTC cron DST-proof without a twice-a-year manual edit.
 - `git pull origin main` — explicit `main`, same reasoning as the daily
   Routine's step 11.
 - Run every step in the foreground; do not background anything, including

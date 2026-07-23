@@ -1137,8 +1137,9 @@ def resolve_pending_fills(
 # seasons' 9:30-15:30 ET slots) and this guard trims stray firings to the
 # real ET window -- the same superset-cron + in-job-ET-guard pattern paper's
 # intraday-stops.yml uses. Upper bound is 15:45, not 15:30, to absorb the
-# few-minute run stagger while still leaving time for a market sell to fill
-# before the 16:00 close.
+# run stagger claude.ai adds ("Runs are staggered by a few minutes to spread
+# server load", per its Routines UI) while still leaving a market sell time
+# to fill before the 16:00 close.
 INTRADAY_SWEEP_OPEN_ET = (9, 30)
 INTRADAY_SWEEP_CLOSE_ET = (15, 45)
 

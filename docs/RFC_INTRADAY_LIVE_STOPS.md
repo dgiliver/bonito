@@ -351,8 +351,9 @@ this account's 3:45→4:45pm schedule divergence), the cron is a **UTC
 superset** of both seasons (`30 13-20 * * 1-5`) and an in-prompt guard
 (`bonito live market-hours` → `in_intraday_sweep_window`, `live_runner.py`)
 trims stray firings to the real weekday 9:30am–15:45 ET window (15:45, not
-15:30, absorbs the few-minute run stagger while still leaving fill time
-before the close). This is the same superset-cron + ET-guard pattern paper's
+15:30, absorbs the run stagger claude.ai's Routines UI states it applies —
+"Runs are staggered by a few minutes to spread server load" — while still
+leaving fill time before the close). This is the same superset-cron + ET-guard pattern paper's
 `intraday-stops.yml` uses, ported from a GitHub Actions in-job Python check
 to a tested CLI exit-code gate. DST-correct via `zoneinfo`, no cron edit
 ever needed.
@@ -570,6 +571,16 @@ or the no-force-push branch protection.
 kill-switch check is usually moot for an exits-only path by the time it
 would fire — cheap, and still catches a live/live_enabled
 misconfiguration or a stale data feed independent of the kill switch.
+
+**D5 — DST-proofing via superset cron + ET guard: ADOPTED (2026-07-23).**
+claude.ai custom crons are UTC (empirically confirmed — see §6.1), so a
+fixed cron drifts an hour across the EDT/EST boundary. Rather than a
+twice-a-year manual cron edit, the cron is a UTC superset
+(`30 13-20 * * 1-5`) and an in-prompt guard (`bonito live market-hours` →
+`in_intraday_sweep_window`) trims stray firings to the real weekday
+9:30am–15:45 ET window. Full rationale, the 15:45-vs-15:30 stagger slack,
+and the both-seasons arithmetic are in §6.1. Same superset-cron + ET-guard
+pattern as paper's `intraday-stops.yml`.
 
 ---
 
