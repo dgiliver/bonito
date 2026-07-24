@@ -1,0 +1,26 @@
+[
+  {
+    "symbol": "DELL",
+    "side": "buy",
+    "dollar_amount": 18.05,
+    "quantity": null,
+    "reason": "entry rule matched: ema_fast gt ema_slow, close gt ema_slow, rsi_14 lt 68.0",
+    "signal_price": 437.5,
+    "signal_date": "2026-07-24T04:00:00",
+    "strategy_name": "ema_cross_rsi_atr_regime",
+    "generated_at": "2026-07-24T20:47:40.128564Z",
+    "broker_order_id": null
+  },
+  {
+    "symbol": "UNH",
+    "side": "buy",
+    "dollar_amount": 17.72,
+    "quantity": null,
+    "reason": "entry rule matched: ema_fast gt ema_slow, close gt ema_slow, rsi_14 lt 68.0",
+    "signal_price": 420.739990234375,
+    "signal_date": "2026-07-24T04:00:00",
+    "strategy_name": "ema_cross_rsi_atr_regime",
+    "generated_at": "2026-07-24T20:47:40.312271Z",
+    "broker_order_id": null
+  }
+]
