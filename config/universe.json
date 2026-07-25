@@ -47,12 +47,19 @@
   ],
   "strategy_path": "strategies/deployed_strategy.json",
   "symbol_strategies": {
-    "AAPL": "strategies/cluster_AAPL_54746177d5a1.json",
-    "GOOGL": "strategies/cluster_GOOGL_7fa6fdd674c8.json",
-    "IREN": "strategies/iren_ema8-21_rsi68_atr1.5_tpnone.json"
+    "ASML": "strategies/auto_ASML_9dfc85e38e1c.json",
+    "MSFT": "strategies/auto_MSFT_ef10b624536e.json"
   },
   "entry_blocklist": [
-    "NVDA"
+    "CORZ",
+    "DASH",
+    "INTC",
+    "KLAC",
+    "MSTR",
+    "NOW",
+    "ORCL",
+    "PLTR",
+    "TSLA"
   ],
   "data": {
     "timeframe": "1d",

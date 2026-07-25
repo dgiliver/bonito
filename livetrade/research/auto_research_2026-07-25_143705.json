@@ -1,0 +1,72 @@
+{
+  "generated_at": "2026-07-25T14:37:05.542277",
+  "universe_path": "config/universe.json",
+  "start": "2022-01-01T00:00:00",
+  "holdout": "2025-01-31T14:24:37.270861",
+  "end": "2026-07-25T14:24:37.270861",
+  "outcome": "adopted",
+  "adopted_bundle": "assignments+bench",
+  "reasons": [],
+  "previous_assignments": {
+    "AAPL": "strategies/cluster_AAPL_54746177d5a1.json",
+    "GOOGL": "strategies/cluster_GOOGL_7fa6fdd674c8.json",
+    "IREN": "strategies/iren_ema8-21_rsi68_atr1.5_tpnone.json"
+  },
+  "candidate_assignments": {
+    "ASML": "strategies/auto_ASML_9dfc85e38e1c.json",
+    "MSFT": "strategies/auto_MSFT_ef10b624536e.json"
+  },
+  "added": [
+    "ASML",
+    "MSFT"
+  ],
+  "removed": [
+    "AAPL",
+    "GOOGL",
+    "IREN"
+  ],
+  "updated": [],
+  "default_swap": null,
+  "default_swapped": false,
+  "benched": [
+    "CORZ",
+    "DASH",
+    "INTC",
+    "KLAC",
+    "MSTR",
+    "NOW",
+    "ORCL",
+    "PLTR",
+    "TSLA"
+  ],
+  "unbenched": [
+    "NVDA"
+  ],
+  "grid_edge_flags": [
+    "ASML: winner at grid edge (atr=1)",
+    "MSFT: winner at grid edge (atr=1)"
+  ],
+  "comparisons": [
+    {
+      "window": "train",
+      "baseline_sharpe": 0.9319,
+      "candidate_sharpe": 1.3649,
+      "baseline_return": 0.7587,
+      "candidate_return": 1.3899,
+      "baseline_failures": [],
+      "candidate_failures": []
+    },
+    {
+      "window": "holdout",
+      "baseline_sharpe": 2.0387,
+      "candidate_sharpe": 2.5555,
+      "baseline_return": 1.5672,
+      "candidate_return": 1.827,
+      "baseline_failures": [],
+      "candidate_failures": []
+    }
+  ],
+  "baseline_final_equity": 22540.45,
+  "candidate_final_equity": 33668.13,
+  "report_path": "livetrade/research/cluster_report_2026-07-25_143040.json"
+}
