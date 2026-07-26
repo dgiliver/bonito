@@ -43,7 +43,14 @@
     "MSTR",
     "UNH",
     "RBLX",
-    "NVDA"
+    "NVDA",
+    "AAOI",
+    "SMCI",
+    "SKHY",
+    "ALAB",
+    "ADI",
+    "DRAM",
+    "NBIS"
   ],
   "strategy_path": "strategies/deployed_strategy.json",
   "symbol_strategies": {

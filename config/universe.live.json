@@ -43,7 +43,14 @@
     "MSTR",
     "UNH",
     "RBLX",
-    "NVDA"
+    "NVDA",
+    "AAOI",
+    "SMCI",
+    "SKHY",
+    "ALAB",
+    "ADI",
+    "DRAM",
+    "NBIS"
   ],
   "entry_allowlist": null,
   "entry_blocklist": [
