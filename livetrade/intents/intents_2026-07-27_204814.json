@@ -1,0 +1,26 @@
+[
+  {
+    "symbol": "ASML",
+    "side": "sell",
+    "dollar_amount": null,
+    "quantity": 0.010805,
+    "reason": "exit rule matched",
+    "signal_price": 1655.260009765625,
+    "signal_date": "2026-07-27T04:00:00",
+    "strategy_name": "ema_cross_rsi_atr_regime",
+    "generated_at": "2026-07-27T20:48:14.777001Z",
+    "broker_order_id": null
+  },
+  {
+    "symbol": "HOOD",
+    "side": "sell",
+    "dollar_amount": null,
+    "quantity": 0.18692,
+    "reason": "exit rule matched",
+    "signal_price": 95.6500015258789,
+    "signal_date": "2026-07-27T04:00:00",
+    "strategy_name": "ema_cross_rsi_atr_regime",
+    "generated_at": "2026-07-27T20:48:14.792644Z",
+    "broker_order_id": null
+  }
+]
