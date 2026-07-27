@@ -1,0 +1,26 @@
+[
+  {
+    "symbol": "AMD",
+    "side": "sell",
+    "dollar_amount": null,
+    "quantity": 0.1072004022377236,
+    "reason": "stop loss triggered (intraday)",
+    "signal_price": 478.614990234375,
+    "signal_date": "2026-07-27T15:38:35.272909Z",
+    "strategy_name": "ema_cross_rsi_atr_regime",
+    "generated_at": "2026-07-27T15:38:35.273168Z",
+    "broker_order_id": null
+  },
+  {
+    "symbol": "ASML",
+    "side": "sell",
+    "dollar_amount": null,
+    "quantity": 0.3617126187151865,
+    "reason": "stop loss triggered (intraday)",
+    "signal_price": 1618.8199462890625,
+    "signal_date": "2026-07-27T15:38:35.272909Z",
+    "strategy_name": "ema_cross_rsi_atr_regime",
+    "generated_at": "2026-07-27T15:38:35.273211Z",
+    "broker_order_id": null
+  }
+]
