@@ -1,0 +1,14 @@
+[
+  {
+    "symbol": "AXON",
+    "side": "buy",
+    "dollar_amount": 596.18,
+    "quantity": null,
+    "reason": "entry rule matched: ema_fast gt ema_slow, close gt ema_slow, rsi_14 lt 68.0",
+    "signal_price": 525.47998046875,
+    "signal_date": "2026-07-27T04:00:00",
+    "strategy_name": "ema_cross_rsi_atr_regime",
+    "generated_at": "2026-07-27T23:36:34.627763Z",
+    "broker_order_id": null
+  }
+]
