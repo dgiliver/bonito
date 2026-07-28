@@ -107,7 +107,7 @@
       "quantity": 1.8782565227930708,
       "entry_price": 321.6600036621094,
       "entry_date": "2026-07-23T23:30:30.206861Z",
-      "high_water_mark": 339.9599914550781,
+      "high_water_mark": 340.0799865722656,
       "strategy_name": "c_ema8-21_rsi60_atr1.5_tp10",
       "strategy_hash": "54746177d5a1",
       "strategy_config": {
@@ -1443,5 +1443,5 @@
   "peak_equity": 6004.595534551629,
   "halted": false,
   "halt_reason": "",
-  "updated_at": "2026-07-28T19:51:00.677880Z"
+  "updated_at": "2026-07-28T23:32:18.065293Z"
 }
