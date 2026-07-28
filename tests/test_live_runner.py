@@ -868,6 +868,109 @@ class TestReconcile:
         assert report.fatal_drift is True
         assert report.pending_explained == []
 
+    def test_oversized_broker_extra_is_fatal_despite_matching_pending_buy(self):
+        """The magnitude bound: a pending BUY is capped at max_position_usd, so
+        a broker position worth far more than that (valued at the sentinel's own
+        signal price) cannot be that queued order's fill — it stays FATAL even
+        with a same-symbol pending-buy sentinel present. Without the bound a
+        tiny stale sentinel would wave an arbitrarily large holding through."""
+        from bonito.trading.live_runner import reconcile_positions
+
+        ledger = PaperLedger(cash=150.0, starting_cash=150.0)
+        # signal price 100 → a $30-capped buy is ~0.3 shares, never 10,000
+        ledger.fills.append(_pending_sentinel("DELL", "buy", "order-dell", price=100.0))
+        report = reconcile_positions(ledger, {"DELL": 10_000.0}, max_position_usd=30.0)
+        assert report.fatal_drift is True
+        assert report.pending_explained == []
+        assert any("DELL" in r for r in report.fatal_reasons)
+
+    def test_plausible_broker_extra_within_cap_is_still_pending_explained(self):
+        """With the bound active, a broker-extra whose value at the sentinel's
+        signal price is within PENDING_VALUE_TOLERANCE × max_position_usd is a
+        plausible overnight fill — still waved through (regression guard that
+        the bound didn't become over-strict)."""
+        from bonito.trading.live_runner import reconcile_positions
+
+        ledger = PaperLedger(cash=150.0, starting_cash=150.0)
+        # 0.3 shares × $100 = $30 == the cap → comfortably inside 4× headroom
+        ledger.fills.append(_pending_sentinel("DELL", "buy", "order-dell", price=100.0))
+        report = reconcile_positions(ledger, {"DELL": 0.3}, max_position_usd=30.0)
+        assert report.fatal_drift is False
+        assert report.pending_explained == ["DELL"]
+
+    def test_pending_buy_value_bound_boundary(self):
+        """At exactly PENDING_VALUE_TOLERANCE × cap the extra is tolerated (<=);
+        a clearly larger value is fatal. Values chosen to be float-exact so the
+        boundary guards the operator, not float noise."""
+        from bonito.trading.live_runner import PENDING_VALUE_TOLERANCE, reconcile_positions
+
+        cap, price = 25.0, 100.0
+        at_qty = PENDING_VALUE_TOLERANCE * cap / price  # 4*25/100 = 1.0 share exactly
+        over_qty = at_qty * 1.5  # 1.5 shares → 6× cap, clearly over
+
+        at_ledger = PaperLedger(cash=150.0, starting_cash=150.0)
+        at_ledger.fills.append(_pending_sentinel("DELL", "buy", "o1", price=price))
+        assert reconcile_positions(
+            at_ledger, {"DELL": at_qty}, max_position_usd=cap
+        ).pending_explained == ["DELL"]
+
+        over_ledger = PaperLedger(cash=150.0, starting_cash=150.0)
+        over_ledger.fills.append(_pending_sentinel("DELL", "buy", "o1", price=price))
+        assert (
+            reconcile_positions(over_ledger, {"DELL": over_qty}, max_position_usd=cap).fatal_drift
+            is True
+        )
+
+    def test_malformed_zero_price_sentinel_does_not_wave_through(self):
+        """A pending-buy sentinel with a non-positive signal price can't be
+        valued, so with the bound active it must NOT explain any broker-extra
+        (fail closed) rather than let 0 × qty ≤ threshold wave everything in."""
+        from bonito.trading.live_runner import reconcile_positions
+
+        ledger = PaperLedger(cash=150.0, starting_cash=150.0)
+        ledger.fills.append(_pending_sentinel("DELL", "buy", "order-dell", price=0.0))
+        report = reconcile_positions(ledger, {"DELL": 0.0416}, max_position_usd=30.0)
+        assert report.fatal_drift is True
+        assert report.pending_explained == []
+
+    def test_pending_sell_explained_regardless_of_cap(self):
+        """The SELL direction is self-bounded — the unexplained leg is our OWN
+        (already entry-capped) ledger position — so passing max_position_usd
+        adds no value bound there: a matching pending sell still explains a
+        ledger position even when its notional exceeds the cap (e.g. a winner)."""
+        from bonito.trading.live_runner import reconcile_positions
+
+        ledger = self._ledger_with("ASML", qty=5.0)  # 5 × $100 = $500, well over 4×cap
+        ledger.fills.append(_pending_sentinel("ASML", "sell", "order-asml", price=100.0))
+        report = reconcile_positions(ledger, {}, max_position_usd=30.0)
+        assert report.fatal_drift is False
+        assert report.pending_explained == ["ASML"]
+
+    def test_reconcile_gate_requires_and_applies_max_position_usd(self):
+        """The gate REQUIRES the cap (keyword-only, no default) and forwards it,
+        so the oversized-broker-extra bound is always active on the production D1
+        path — a caller cannot silently fall back to the unbounded existence-only
+        match. The low-level reconcile_positions still permits an explicit
+        cap-less call (the primitive); the gate is the safe wrapper over it."""
+        from bonito.trading.live_runner import reconcile_gate, reconcile_positions
+
+        def _fresh():
+            lg = PaperLedger(cash=150.0, starting_cash=150.0)
+            lg.fills.append(_pending_sentinel("DELL", "buy", "order-dell", price=100.0))
+            return lg
+
+        # Gate forwards the cap → an implausible 10k-share holding stays fatal.
+        assert (
+            reconcile_gate(_fresh(), {"DELL": 10_000.0}, max_position_usd=30.0).fatal_drift is True
+        )
+        # Omitting the cap is a TypeError at the gate — the whole point: the safe
+        # entry point cannot be invoked without the size bound.
+        with pytest.raises(TypeError):
+            reconcile_gate(_fresh(), {"DELL": 10_000.0})
+        # The primitive still allows an explicit cap-less existence-only match
+        # (documents the behaviour the required-arg gate protects callers from).
+        assert reconcile_positions(_fresh(), {"DELL": 10_000.0}).fatal_drift is False
+
 
 NEVER_ENTER_STRATEGY = {
     **ALWAYS_ENTER_STRATEGY,

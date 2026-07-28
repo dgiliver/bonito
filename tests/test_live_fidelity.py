@@ -274,13 +274,13 @@ class TestReconcileD1:
     def test_reconcile_gate_passes_in_sync(self):
         """reconcile_gate with perfectly matching positions must not set fatal_drift."""
         ledger = self._ledger_with("AAA", qty=1.0)
-        report = reconcile_gate(ledger, {"AAA": 1.0})
+        report = reconcile_gate(ledger, {"AAA": 1.0}, max_position_usd=30.0)
         assert report.fatal_drift is False
 
     def test_reconcile_gate_fails_on_fatal(self):
         """reconcile_gate with >0.5% drift must set fatal_drift."""
         ledger = self._ledger_with("AAA", qty=1.0)
-        report = reconcile_gate(ledger, {"AAA": 1.5})  # 33% drift
+        report = reconcile_gate(ledger, {"AAA": 1.5}, max_position_usd=30.0)  # 33% drift
         assert report.fatal_drift is True
 
     def test_reconcile_gate_honors_custom_tolerance(self):
@@ -289,8 +289,13 @@ class TestReconcileD1:
         is below the 0.5% default but above a tightened 0.3% band.
         """
         ledger = self._ledger_with("AAA", qty=1.0)
-        assert reconcile_gate(ledger, {"AAA": 1.004}).fatal_drift is False
-        assert reconcile_gate(ledger, {"AAA": 1.004}, tolerance_pct=0.003).fatal_drift is True
+        assert reconcile_gate(ledger, {"AAA": 1.004}, max_position_usd=30.0).fatal_drift is False
+        assert (
+            reconcile_gate(
+                ledger, {"AAA": 1.004}, max_position_usd=30.0, tolerance_pct=0.003
+            ).fatal_drift
+            is True
+        )
 
     def test_exits_not_gated_by_reconcile(self, universe):
         """check_stops returns a sell intent for a stop-breached open position without

@@ -1388,7 +1388,9 @@ def live_reconcile(
     ledger = _load_ledger(universe)
     broker_positions = {k.upper(): float(v) for k, v in _json.loads(positions_json).items()}
 
-    report = reconcile_gate(ledger, broker_positions)
+    report = reconcile_gate(
+        ledger, broker_positions, max_position_usd=universe.risk.max_position_usd
+    )
 
     if report.fatal_drift:
         # D1: drift exceeds 0.5% tolerance — hard-halt new entries (exits still allowed).
@@ -1403,10 +1405,13 @@ def live_reconcile(
         raise typer.Exit(1)
 
     if report.pending_explained:
-        # Broker holds these but the ledger has them as unresolved pending buys
-        # (overnight fills the daily cycle's resolve-pending will heal). Expected,
-        # not drift — proceed (exit 0). This is what lets the intraday sweep run
-        # instead of aborting all day after a daily-cycle buy.
+        # A leg the ledger and broker disagree on, but fully explained by an
+        # unresolved queued order the daily cycle's resolve-pending will heal —
+        # in EITHER direction: a broker-extra matched by a pending BUY (fills
+        # overnight), or a ledger-extra matched by a pending SELL (exit not yet
+        # settled at the broker). Expected, not drift — proceed (exit 0). This is
+        # what lets the intraday sweep run instead of aborting all day after a
+        # daily-cycle buy or sell.
         console.print(
             f"[yellow]pending fills (expected, daily cycle resolves): "
             f"{report.pending_explained} — proceeding[/yellow]"

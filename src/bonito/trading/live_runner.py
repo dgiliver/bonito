@@ -45,6 +45,14 @@ MIN_ORDER_USD = 1.0
 # Drift beyond this fraction of the larger leg is a fatal entry-blocking divergence;
 # exits are NEVER gated — only new entries are blocked.
 DRIFT_TOLERANCE_PCT = 0.005
+# A broker position is only "explained" by a pending BUY sentinel if its value
+# (observed shares × the sentinel's own signal price) is within this multiple of
+# max_position_usd — the queued order's hard dollar cap. Bigger than that and the
+# position cannot be that order's fill, so it stays FATAL drift. The multiple is
+# generous (absorbs an overnight gap between signal and fill price) but finite, so
+# an implausibly large broker holding can never be waved through by a same-symbol
+# sentinel's mere existence.
+PENDING_VALUE_TOLERANCE = 4.0
 # Extra history ingested for regime symbols so the SMA is defined from the
 # universe start (200 trading days ≈ 10 months; 550 calendar days is safe).
 REGIME_WARMUP_DAYS = 550
@@ -854,6 +862,7 @@ def reconcile_positions(
     broker_positions: dict[str, float],
     tolerance: float = 1e-4,
     drift_tolerance_pct: float = DRIFT_TOLERANCE_PCT,
+    max_position_usd: float | None = None,
 ) -> ReconcileReport:
     """Compare ledger positions against the broker's actual holdings.
 
@@ -872,6 +881,11 @@ def reconcile_positions(
     Args:
         broker_positions: Symbol → share quantity from the broker
             (e.g. Robinhood MCP get_equity_positions).
+        max_position_usd: the per-order dollar cap. When given, a broker-extra is
+            only "pending-explained" (waved through) if its value at the matching
+            sentinel's signal price is within PENDING_VALUE_TOLERANCE × this cap —
+            an implausibly large holding stays fatal. When None, the pending match
+            is existence-only (legacy behaviour, used by callers with no risk cfg).
     """
     dust = 1e-4  # below this treat a position as zero for exact-match and drift checks
     broker = {s.upper(): q for s, q in broker_positions.items() if q > dust}
@@ -902,12 +916,43 @@ def reconcile_positions(
     # FATAL when there is NO matching sentinel (the real-unrecorded-order crash
     # case this gate exists for). Lets the intraday sweep proceed on the in-sync
     # positions instead of aborting all day after a daily-cycle buy or sell.
-    def _pending_explains(sym: str, side: str) -> bool:
+    #
+    # A same-symbol sentinel's mere existence is necessary but NOT sufficient for
+    # the BUY direction: the observed broker quantity is the unexplained leg and,
+    # unbounded, a tiny stale sentinel would wave through ANY holding (e.g. a
+    # 10,000-share position "explained" by a $30 queued buy). So when a cap is
+    # known we require the observed shares, valued at the sentinel's own signal
+    # price, to fit within PENDING_VALUE_TOLERANCE × max_position_usd. The SELL
+    # direction needs no such bound: there the unexplained leg is our OWN ledger
+    # position, already capped at entry by max_position_usd — the ledger row is
+    # the reference, so a foreign quantity can't be injected.
+    def _pending_explains(sym: str, side: str, observed_qty: float) -> bool:
         s = sym.upper()
-        return any(
-            _is_pending_sentinel(f) and f.side == side and f.symbol.upper() == s
-            for f in ledger.fills
-        )
+        for f in ledger.fills:
+            if not (_is_pending_sentinel(f) and f.side == side and f.symbol.upper() == s):
+                continue
+            if side != "buy":
+                return True  # sell leg is self-bounded (unexplained leg is our capped ledger row)
+            if max_position_usd is None:
+                # No cap supplied → unbounded existence-only match. The production
+                # gate (reconcile_gate) REQUIRES the cap so this can't happen there;
+                # a direct cap-less reconcile_positions call lands here. Never silent
+                # for a real-money buy — warn so any such path is visible in logs.
+                logger.warning(
+                    "reconcile: pending-BUY %s waved through on existence alone (%.4f sh) "
+                    "— no max_position_usd bound supplied; call via reconcile_gate so the "
+                    "size guard applies",
+                    s,
+                    observed_qty,
+                )
+                return True
+            if f.price <= 0:
+                continue  # malformed sentinel price — can't value it, don't wave qty through
+            if observed_qty * f.price <= PENDING_VALUE_TOLERANCE * max_position_usd:
+                return True
+            # sentinel too small to account for observed_qty; keep scanning in case
+            # a different same-symbol sentinel can (falls through to FATAL otherwise)
+        return False
 
     # --- D1 fatal-drift gate (entry-only, DRIFT_TOLERANCE_PCT) ---
     # Compute over the union of all ledger+broker symbols with meaningful qty.
@@ -920,10 +965,10 @@ def reconcile_positions(
             continue  # both sides are dust — not fatal
         diff = abs(ledger_qty - broker_qty)
         if diff > drift_tolerance_pct * larger:
-            if ledger_qty <= dust and _pending_explains(symbol, "buy"):
+            if ledger_qty <= dust and _pending_explains(symbol, "buy", broker_qty):
                 report.pending_explained.append(symbol)
                 continue
-            if broker_qty <= dust and _pending_explains(symbol, "sell"):
+            if broker_qty <= dust and _pending_explains(symbol, "sell", ledger_qty):
                 report.pending_explained.append(symbol)
                 continue
             report.fatal_reasons.append(
@@ -938,6 +983,7 @@ def reconcile_gate(
     ledger: PaperLedger,
     broker_positions: dict[str, float],
     *,
+    max_position_usd: float,
     tolerance_pct: float = DRIFT_TOLERANCE_PCT,
 ) -> ReconcileReport:
     """Thin wrapper: call reconcile_positions and return the report.
@@ -947,10 +993,23 @@ def reconcile_gate(
     permitted regardless of the report result.
 
     Args:
+        max_position_usd: per-order dollar cap, forwarded to bound which
+            broker-extras a pending-BUY sentinel may explain (see
+            ``reconcile_positions``). REQUIRED — pass
+            ``universe.risk.max_position_usd``. It is deliberately not optional:
+            this is a real-money safety gate, and defaulting it would let a
+            caller silently fall back to the unbounded existence-only match the
+            size guard exists to prevent. Every caller has a loaded
+            ``UniverseConfig`` (it built the ledger), so the cap is always in hand.
         tolerance_pct: fraction of the larger leg used as the fatal-drift
             threshold.  Defaults to DRIFT_TOLERANCE_PCT (0.5%).
     """
-    return reconcile_positions(ledger, broker_positions, drift_tolerance_pct=tolerance_pct)
+    return reconcile_positions(
+        ledger,
+        broker_positions,
+        drift_tolerance_pct=tolerance_pct,
+        max_position_usd=max_position_usd,
+    )
 
 
 def save_intents(intents: list[TradeIntent], directory: Path = Path("livetrade/intents")) -> Path:

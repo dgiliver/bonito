@@ -160,17 +160,23 @@ Setup:
    config/universe.live.json`. Exit 1 = FATAL drift: STOP, report, do not
    act — this catches a prior crash between placing and recording an
    order, same reasoning as the daily cycle's steps 4/9.
-   - reconcile now AUTO-TOLERATES expected pending fills: a broker position
-     the ledger doesn't hold but which has a matching unresolved pending-BUY
-     sentinel (the daily cycle's overnight-queued order filling at today's
-     open) exits 0 with a "pending fills (expected, daily cycle resolves)"
-     note — you PROCEED normally to the sweep on the in-sync positions.
-     Those pending symbols aren't ledger positions, so the sweep doesn't
-     touch them anyway; the daily cycle's step 3 resolve-pending records
-     them tonight. This is what keeps the intraday sweep running instead of
-     aborting all day after a daily-cycle buy.
+   - reconcile now AUTO-TOLERATES expected pending fills in EITHER direction
+     (the daily cycle's overnight-queued orders settling at today's open):
+     a broker position the ledger doesn't hold, matched by a pending-BUY
+     sentinel; OR a ledger position the broker no longer holds, matched by a
+     pending-SELL sentinel. Either exits 0 with a "pending fills (expected,
+     daily cycle resolves)" note — you PROCEED normally to the sweep. The
+     buy side is size-guarded: a broker holding worth far more than the
+     per-order cap (max_position_usd) can't be that queued order's fill, so
+     it stays FATAL even with a same-symbol sentinel. Those tolerated pending
+     symbols are either not ledger positions (pending buy) or already gone at
+     the broker (pending sell), so the sweep doesn't touch them anyway; the
+     daily cycle's step 3 resolve-pending records them tonight. This is what
+     keeps the intraday sweep running instead of aborting all day after a
+     daily-cycle buy OR sell.
    - So an exit-1 FATAL now means GENUINE, unexplained drift — a real
-     unrecorded order, the crash case — STOP and report.
+     unrecorded order, or a holding too large to be an expected fill, the
+     crash case — STOP and report.
    - Never run `bonito live resolve-pending` yourself (exclusively the daily
      cycle's job — one writer owns sentinel healing so two runs never race
      to heal the same record).
