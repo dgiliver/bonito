@@ -1,0 +1,50 @@
+[
+  {
+    "symbol": "ASML",
+    "side": "sell",
+    "dollar_amount": null,
+    "quantity": 0.010805,
+    "reason": "stop loss triggered (intraday)",
+    "signal_price": 1568.6700439453125,
+    "signal_date": "2026-07-28T14:39:04.475687Z",
+    "strategy_name": "ema_cross_rsi_atr_regime",
+    "generated_at": "2026-07-28T14:39:04.475800Z",
+    "broker_order_id": null
+  },
+  {
+    "symbol": "HOOD",
+    "side": "sell",
+    "dollar_amount": null,
+    "quantity": 0.18692,
+    "reason": "stop loss triggered (intraday)",
+    "signal_price": 90.07499694824219,
+    "signal_date": "2026-07-28T14:39:04.475687Z",
+    "strategy_name": "ema_cross_rsi_atr_regime",
+    "generated_at": "2026-07-28T14:39:04.475866Z",
+    "broker_order_id": null
+  },
+  {
+    "symbol": "META",
+    "side": "sell",
+    "dollar_amount": null,
+    "quantity": 0.029062,
+    "reason": "stop loss triggered (intraday)",
+    "signal_price": 590.4149780273438,
+    "signal_date": "2026-07-28T14:39:04.475687Z",
+    "strategy_name": "ema_cross_rsi_atr_regime",
+    "generated_at": "2026-07-28T14:39:04.475959Z",
+    "broker_order_id": null
+  },
+  {
+    "symbol": "PLTR",
+    "side": "sell",
+    "dollar_amount": null,
+    "quantity": 0.142196,
+    "reason": "stop loss triggered (intraday)",
+    "signal_price": 119.05500030517578,
+    "signal_date": "2026-07-28T14:39:04.475687Z",
+    "strategy_name": "ema_cross_rsi_atr_regime",
+    "generated_at": "2026-07-28T14:39:04.476011Z",
+    "broker_order_id": null
+  }
+]
