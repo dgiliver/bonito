@@ -307,7 +307,7 @@
       "quantity": 0.015897,
       "entry_price": 1180.73,
       "entry_date": "2026-07-20T13:30:43.410000Z",
-      "high_water_mark": 1202.5,
+      "high_water_mark": 1222.3699951171875,
       "strategy_name": "live",
       "strategy_hash": "da16575a5622",
       "strategy_config": {
@@ -996,5 +996,5 @@
   "peak_equity": 150.14103162835693,
   "halted": false,
   "halt_reason": "",
-  "updated_at": "2026-07-27T20:48:50.954342Z"
+  "updated_at": "2026-07-28T13:39:24.532056Z"
 }
