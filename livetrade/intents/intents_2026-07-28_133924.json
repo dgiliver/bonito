@@ -1,0 +1,26 @@
+[
+  {
+    "symbol": "ASML",
+    "side": "sell",
+    "dollar_amount": null,
+    "quantity": 0.010805,
+    "reason": "stop loss triggered (intraday)",
+    "signal_price": 1566.550048828125,
+    "signal_date": "2026-07-28T13:39:24.524013Z",
+    "strategy_name": "ema_cross_rsi_atr_regime",
+    "generated_at": "2026-07-28T13:39:24.524175Z",
+    "broker_order_id": null
+  },
+  {
+    "symbol": "HOOD",
+    "side": "sell",
+    "dollar_amount": null,
+    "quantity": 0.18692,
+    "reason": "stop loss triggered (intraday)",
+    "signal_price": 89.87999725341797,
+    "signal_date": "2026-07-28T13:39:24.524013Z",
+    "strategy_name": "ema_cross_rsi_atr_regime",
+    "generated_at": "2026-07-28T13:39:24.524271Z",
+    "broker_order_id": null
+  }
+]
