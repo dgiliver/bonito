@@ -1402,6 +1402,18 @@ def live_reconcile(
         )
         raise typer.Exit(1)
 
+    if report.pending_explained:
+        # Broker holds these but the ledger has them as unresolved pending buys
+        # (overnight fills the daily cycle's resolve-pending will heal). Expected,
+        # not drift — proceed (exit 0). This is what lets the intraday sweep run
+        # instead of aborting all day after a daily-cycle buy.
+        console.print(
+            f"[yellow]pending fills (expected, daily cycle resolves): "
+            f"{report.pending_explained} — proceeding[/yellow]"
+        )
+        console.print(report.describe())
+        return
+
     if not report.in_sync:
         # Sub-tolerance drift — surface it but proceed (D1 relaxation).
         console.print(

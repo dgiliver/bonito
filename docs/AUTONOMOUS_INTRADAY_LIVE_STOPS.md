@@ -160,22 +160,20 @@ Setup:
    config/universe.live.json`. Exit 1 = FATAL drift: STOP, report, do not
    act — this catches a prior crash between placing and recording an
    order, same reasoning as the daily cycle's steps 4/9.
-   - On a FATAL, first run `.venv/bin/bonito live pending -u
-     config/universe.live.json` and check whether the drifting symbol(s)
-     appear in that list. If they do, this is EXPECTED, not a crash: the
-     daily cycle's own overnight-queued order (its step 8 queued branch)
-     filled at today's open and the daily cycle's step 3 hasn't reconciled
-     it yet. Do NOT inspect the ledger by hand for a "zero-qty sentinel" —
-     that only shows the pending-BUY shape; a pending SELL leaves the
-     position at full quantity with a separate zero-qty sentinel, so
-     `bonito live pending` (which reads the fills, not the positions) is
-     the only reliable check. Report it as "pending order likely filled,
-     daily cycle will resolve it" and STOP.
-   - If the drifting symbol is NOT in the pending list, it's genuine,
-     unexplained drift — report that and STOP.
-   - Either way, STOP: never run `bonito live resolve-pending` yourself
-     (that is exclusively the daily cycle's job — one writer owns sentinel
-     healing so two runs never race to heal the same record).
+   - reconcile now AUTO-TOLERATES expected pending fills: a broker position
+     the ledger doesn't hold but which has a matching unresolved pending-BUY
+     sentinel (the daily cycle's overnight-queued order filling at today's
+     open) exits 0 with a "pending fills (expected, daily cycle resolves)"
+     note — you PROCEED normally to the sweep on the in-sync positions.
+     Those pending symbols aren't ledger positions, so the sweep doesn't
+     touch them anyway; the daily cycle's step 3 resolve-pending records
+     them tonight. This is what keeps the intraday sweep running instead of
+     aborting all day after a daily-cycle buy.
+   - So an exit-1 FATAL now means GENUINE, unexplained drift — a real
+     unrecorded order, the crash case — STOP and report.
+   - Never run `bonito live resolve-pending` yourself (exclusively the daily
+     cycle's job — one writer owns sentinel healing so two runs never race
+     to heal the same record).
 4. Preflight, EXITS-ONLY mode: `.venv/bin/bonito live preflight
    --exits-only -u config/universe.live.json`. The `--exits-only` flag is
    REQUIRED here and is not optional: this Routine's container starts with

@@ -672,19 +672,31 @@ class ReconcileReport(BaseModel):
         default_factory=list,
         description="Per-symbol descriptions of fatal drift (>0.5% of the larger leg)",
     )
+    pending_explained: list[str] = Field(
+        default_factory=list,
+        description="Broker holds these, the ledger doesn't — but each has an "
+        "unresolved pending-BUY sentinel, so the discrepancy is an expected "
+        "overnight fill (the daily cycle's resolve-pending will heal it), NOT "
+        "drift. Excluded from fatal_drift; still listed in missing_in_ledger.",
+    )
 
     def describe(self) -> str:
         if self.in_sync:
             return "ledger and broker are in sync"
         lines = []
         for sym, qty in self.missing_in_ledger.items():
-            lines.append(f"CRITICAL: broker holds {qty} {sym} unknown to the ledger")
+            tag = " (pending fill — expected)" if sym in self.pending_explained else ""
+            lines.append(f"CRITICAL: broker holds {qty} {sym} unknown to the ledger{tag}")
         for sym in self.missing_at_broker:
             lines.append(f"{sym}: open in ledger but not held at broker")
         for sym, d in self.quantity_mismatch.items():
             lines.append(f"{sym}: ledger={d['ledger']} broker={d['broker']}")
         for reason in self.fatal_reasons:
             lines.append(f"FATAL DRIFT: {reason}")
+        if self.pending_explained and not self.fatal_reasons:
+            lines.append(
+                f"pending fills (expected, daily cycle resolves): {self.pending_explained}"
+            )
         return "\n".join(lines)
 
 
@@ -888,6 +900,18 @@ def reconcile_positions(
             continue  # both sides are dust — not fatal
         diff = abs(ledger_qty - broker_qty)
         if diff > drift_tolerance_pct * larger:
+            # A broker position the ledger doesn't hold, but with a matching
+            # unresolved pending-BUY sentinel, is an EXPECTED overnight fill
+            # (the daily cycle's step 8 queued it; resolve-pending will heal
+            # it), not drift. Excluding it lets the intraday sweep proceed on
+            # the in-sync positions instead of aborting all day. It stays a
+            # genuine FATAL when there is NO sentinel (a real unrecorded
+            # order — the crash case this gate exists for). A symbol is never
+            # both a live position and a pending buy (the entry guard forbids
+            # it), so this only ever fires on the ledger-has-nothing side.
+            if ledger_qty <= dust and has_pending_buy(ledger, symbol):
+                report.pending_explained.append(symbol)
+                continue
             report.fatal_reasons.append(
                 f"{symbol}: ledger={ledger_qty:.4f} broker={broker_qty:.4f} "
                 f"diff={diff:.4f} ({diff/larger:.2%} of {larger:.4f})"

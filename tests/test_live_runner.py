@@ -767,6 +767,71 @@ class TestReconcile:
         report = reconcile_positions(ledger, {"AAA": 0.00000001})
         assert report.in_sync is True
 
+    def test_broker_extra_with_pending_buy_sentinel_is_not_fatal(self):
+        """The intraday-coverage fix: a broker position the ledger doesn't hold,
+        but with a matching unresolved pending-BUY sentinel, is an expected
+        overnight fill — NOT fatal drift. So the intraday sweep can proceed
+        instead of aborting all day after a daily-cycle buy."""
+        from bonito.trading.live_runner import reconcile_positions
+
+        ledger = PaperLedger(cash=150.0, starting_cash=150.0)
+        ledger.fills.append(_pending_sentinel("DELL", "buy", "order-dell"))
+        report = reconcile_positions(ledger, {"DELL": 0.0416})
+        assert report.fatal_drift is False  # would-be fatal, but pending-explained
+        assert report.pending_explained == ["DELL"]
+        assert report.missing_in_ledger == {"DELL": 0.0416}  # still surfaced
+        assert report.in_sync is False  # there IS a (benign) discrepancy
+        assert "pending fill" in report.describe()
+
+    def test_broker_extra_without_a_sentinel_is_still_fatal(self):
+        """The crash case this gate exists for: broker holds a position the
+        ledger has NO record of (no pending sentinel) — genuinely unrecorded,
+        must still hard-fail."""
+        from bonito.trading.live_runner import reconcile_positions
+
+        ledger = PaperLedger(cash=150.0, starting_cash=150.0)
+        report = reconcile_positions(ledger, {"DELL": 0.0416})  # no sentinel
+        assert report.fatal_drift is True
+        assert report.pending_explained == []
+
+    def test_a_pending_sell_sentinel_does_not_explain_a_broker_extra(self):
+        """Only a pending BUY explains a broker position the ledger lacks. A
+        pending SELL sentinel for a symbol the broker still holds is unrelated
+        and must NOT suppress the fatal check."""
+        from bonito.trading.live_runner import reconcile_positions
+
+        ledger = PaperLedger(cash=150.0, starting_cash=150.0)
+        ledger.fills.append(_pending_sentinel("DELL", "sell", "order-dell"))
+        report = reconcile_positions(ledger, {"DELL": 0.0416})
+        assert report.fatal_drift is True
+        assert report.pending_explained == []
+
+    def test_mixed_pending_and_genuine_drift_still_fatal(self):
+        """One pending-explained broker-extra + one genuine unexplained one:
+        the genuine one keeps it fatal; the pending one is still classified."""
+        from bonito.trading.live_runner import reconcile_positions
+
+        ledger = PaperLedger(cash=150.0, starting_cash=150.0)
+        ledger.fills.append(_pending_sentinel("DELL", "buy", "order-dell"))
+        report = reconcile_positions(ledger, {"DELL": 0.0416, "GHOST": 0.5})
+        assert report.fatal_drift is True  # GHOST has no sentinel
+        assert report.pending_explained == ["DELL"]
+        assert any("GHOST" in r for r in report.fatal_reasons)
+        assert not any("DELL" in r for r in report.fatal_reasons)
+
+    def test_resolved_pending_sentinel_no_longer_explains(self):
+        """Once a sentinel is marked resolved, it no longer suppresses drift
+        (it's been dealt with) — the broker-extra becomes genuine drift again."""
+        from bonito.trading.live_runner import reconcile_positions
+
+        ledger = PaperLedger(cash=150.0, starting_cash=150.0)
+        s = _pending_sentinel("DELL", "buy", "order-dell")
+        s.reason += "; resolved=cancelled"
+        ledger.fills.append(s)
+        report = reconcile_positions(ledger, {"DELL": 0.0416})
+        assert report.fatal_drift is True
+        assert report.pending_explained == []
+
 
 NEVER_ENTER_STRATEGY = {
     **ALWAYS_ENTER_STRATEGY,
