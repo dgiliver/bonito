@@ -806,6 +806,42 @@ class TestReconcile:
         assert report.fatal_drift is True
         assert report.pending_explained == []
 
+    def test_ledger_position_missing_at_broker_with_pending_sell_is_not_fatal(self):
+        """Symmetric to the buy case: a ledger position the broker no longer
+        holds, but with a matching unresolved pending-SELL sentinel, is an
+        expected overnight sell fill (daily cycle queued it, it filled at open)
+        — NOT drift. So the intraday sweep proceeds instead of aborting after a
+        daily-cycle sell."""
+        from bonito.trading.live_runner import reconcile_positions
+
+        ledger = self._ledger_with("ASML", qty=0.0108)  # open position
+        ledger.fills.append(_pending_sentinel("ASML", "sell", "order-asml"))
+        report = reconcile_positions(ledger, {})  # broker no longer holds it
+        assert report.fatal_drift is False
+        assert report.pending_explained == ["ASML"]
+        assert report.missing_at_broker == ["ASML"]  # still surfaced
+        assert "pending sell fill" in report.describe()
+
+    def test_ledger_position_missing_at_broker_without_a_sentinel_is_still_fatal(self):
+        """A ledger position the broker doesn't hold, with NO pending sell
+        sentinel, is genuine drift (a vanished/unrecorded position) — fatal."""
+        from bonito.trading.live_runner import reconcile_positions
+
+        report = reconcile_positions(self._ledger_with("ASML", qty=0.0108), {})
+        assert report.fatal_drift is True
+        assert report.pending_explained == []
+
+    def test_a_pending_buy_sentinel_does_not_explain_a_missing_at_broker(self):
+        """Direction matters: a ledger position gone from the broker is only
+        explained by a pending SELL, never a pending BUY."""
+        from bonito.trading.live_runner import reconcile_positions
+
+        ledger = self._ledger_with("ASML", qty=0.0108)
+        ledger.fills.append(_pending_sentinel("ASML", "buy", "order-asml"))
+        report = reconcile_positions(ledger, {})
+        assert report.fatal_drift is True
+        assert report.pending_explained == []
+
     def test_mixed_pending_and_genuine_drift_still_fatal(self):
         """One pending-explained broker-extra + one genuine unexplained one:
         the genuine one keeps it fatal; the pending one is still classified."""

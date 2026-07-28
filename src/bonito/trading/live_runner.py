@@ -674,10 +674,12 @@ class ReconcileReport(BaseModel):
     )
     pending_explained: list[str] = Field(
         default_factory=list,
-        description="Broker holds these, the ledger doesn't — but each has an "
-        "unresolved pending-BUY sentinel, so the discrepancy is an expected "
-        "overnight fill (the daily cycle's resolve-pending will heal it), NOT "
-        "drift. Excluded from fatal_drift; still listed in missing_in_ledger.",
+        description="Symbols whose ledger-vs-broker discrepancy is fully "
+        "explained by an unresolved pending sentinel (a broker-extra by a "
+        "pending BUY that filled, or a ledger-extra by a pending SELL that "
+        "filled) — an expected overnight fill the daily cycle's resolve-pending "
+        "will heal, NOT drift. Excluded from fatal_drift; still surfaced in "
+        "missing_in_ledger / missing_at_broker.",
     )
 
     def describe(self) -> str:
@@ -685,10 +687,11 @@ class ReconcileReport(BaseModel):
             return "ledger and broker are in sync"
         lines = []
         for sym, qty in self.missing_in_ledger.items():
-            tag = " (pending fill — expected)" if sym in self.pending_explained else ""
+            tag = " (pending buy fill — expected)" if sym in self.pending_explained else ""
             lines.append(f"CRITICAL: broker holds {qty} {sym} unknown to the ledger{tag}")
         for sym in self.missing_at_broker:
-            lines.append(f"{sym}: open in ledger but not held at broker")
+            tag = " (pending sell fill — expected)" if sym in self.pending_explained else ""
+            lines.append(f"{sym}: open in ledger but not held at broker{tag}")
         for sym, d in self.quantity_mismatch.items():
             lines.append(f"{sym}: ledger={d['ledger']} broker={d['broker']}")
         for reason in self.fatal_reasons:
@@ -889,6 +892,23 @@ def reconcile_positions(
         report.missing_in_ledger or report.missing_at_broker or report.quantity_mismatch
     )
 
+    # A discrepancy fully explained by an unresolved pending order the daily
+    # cycle queued (it fills overnight; resolve-pending records it next daily
+    # cycle) is EXPECTED, not drift — in EITHER direction:
+    #   broker-extra (ledger 0, broker >0)  <- a matching pending BUY  (fill)
+    #   ledger-extra (ledger >0, broker 0)  <- a matching pending SELL (exit)
+    # This is drift CLASSIFICATION for the reconcile gate; it does NOT gate any
+    # exit (exits are still never gated in generate_intents). It stays a genuine
+    # FATAL when there is NO matching sentinel (the real-unrecorded-order crash
+    # case this gate exists for). Lets the intraday sweep proceed on the in-sync
+    # positions instead of aborting all day after a daily-cycle buy or sell.
+    def _pending_explains(sym: str, side: str) -> bool:
+        s = sym.upper()
+        return any(
+            _is_pending_sentinel(f) and f.side == side and f.symbol.upper() == s
+            for f in ledger.fills
+        )
+
     # --- D1 fatal-drift gate (entry-only, DRIFT_TOLERANCE_PCT) ---
     # Compute over the union of all ledger+broker symbols with meaningful qty.
     all_symbols = set(broker.keys()) | {s for s, p in ledger.positions.items() if p.quantity > dust}
@@ -900,16 +920,10 @@ def reconcile_positions(
             continue  # both sides are dust — not fatal
         diff = abs(ledger_qty - broker_qty)
         if diff > drift_tolerance_pct * larger:
-            # A broker position the ledger doesn't hold, but with a matching
-            # unresolved pending-BUY sentinel, is an EXPECTED overnight fill
-            # (the daily cycle's step 8 queued it; resolve-pending will heal
-            # it), not drift. Excluding it lets the intraday sweep proceed on
-            # the in-sync positions instead of aborting all day. It stays a
-            # genuine FATAL when there is NO sentinel (a real unrecorded
-            # order — the crash case this gate exists for). A symbol is never
-            # both a live position and a pending buy (the entry guard forbids
-            # it), so this only ever fires on the ledger-has-nothing side.
-            if ledger_qty <= dust and has_pending_buy(ledger, symbol):
+            if ledger_qty <= dust and _pending_explains(symbol, "buy"):
+                report.pending_explained.append(symbol)
+                continue
+            if broker_qty <= dust and _pending_explains(symbol, "sell"):
                 report.pending_explained.append(symbol)
                 continue
             report.fatal_reasons.append(
