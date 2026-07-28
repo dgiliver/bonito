@@ -1,0 +1,14 @@
+[
+  {
+    "symbol": "ASML",
+    "side": "sell",
+    "dollar_amount": null,
+    "quantity": 0.010805,
+    "reason": "stop loss triggered (intraday)",
+    "signal_price": 1587.7850341796875,
+    "signal_date": "2026-07-28T15:39:10.141093Z",
+    "strategy_name": "ema_cross_rsi_atr_regime",
+    "generated_at": "2026-07-28T15:39:10.141248Z",
+    "broker_order_id": null
+  }
+]
