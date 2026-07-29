@@ -1,0 +1,14 @@
+[
+  {
+    "symbol": "COST",
+    "side": "buy",
+    "dollar_amount": 589.65,
+    "quantity": null,
+    "reason": "entry rule matched: ema_fast gt ema_slow, close gt ema_slow, rsi_14 lt 68.0",
+    "signal_price": 974.030029296875,
+    "signal_date": "2026-07-29T04:00:00",
+    "strategy_name": "ema_cross_rsi_atr_regime",
+    "generated_at": "2026-07-29T23:33:52.512502Z",
+    "broker_order_id": null
+  }
+]
