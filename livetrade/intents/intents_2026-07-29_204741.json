@@ -1,0 +1,38 @@
+[
+  {
+    "symbol": "COST",
+    "side": "buy",
+    "dollar_amount": 17.39,
+    "quantity": null,
+    "reason": "entry rule matched: ema_fast gt ema_slow, close gt ema_slow, rsi_14 lt 68.0",
+    "signal_price": 974.030029296875,
+    "signal_date": "2026-07-29T04:00:00",
+    "strategy_name": "ema_cross_rsi_atr_regime",
+    "generated_at": "2026-07-29T20:47:40.911887Z",
+    "broker_order_id": null
+  },
+  {
+    "symbol": "AAPL",
+    "side": "buy",
+    "dollar_amount": 17.39,
+    "quantity": null,
+    "reason": "entry rule matched: ema_fast gt ema_slow, close gt ema_slow, rsi_14 lt 68.0",
+    "signal_price": 338.19000244140625,
+    "signal_date": "2026-07-29T04:00:00",
+    "strategy_name": "ema_cross_rsi_atr_regime",
+    "generated_at": "2026-07-29T20:47:41.015569Z",
+    "broker_order_id": null
+  },
+  {
+    "symbol": "AXON",
+    "side": "buy",
+    "dollar_amount": 17.39,
+    "quantity": null,
+    "reason": "entry rule matched: ema_fast gt ema_slow, close gt ema_slow, rsi_14 lt 68.0",
+    "signal_price": 531.2000122070312,
+    "signal_date": "2026-07-29T04:00:00",
+    "strategy_name": "ema_cross_rsi_atr_regime",
+    "generated_at": "2026-07-29T20:47:41.036639Z",
+    "broker_order_id": null
+  }
+]

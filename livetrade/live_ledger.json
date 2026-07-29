@@ -623,11 +623,44 @@
       "filled_at": "2026-07-28T20:48:27.129310Z",
       "strategy_name": "live",
       "broker_order_id": null
+    },
+    {
+      "symbol": "COST",
+      "side": "buy",
+      "quantity": 0.0,
+      "price": 972.31,
+      "notional": 0.0,
+      "reason": "no_fill: live fill",
+      "filled_at": "2026-07-29T20:48:59.458201Z",
+      "strategy_name": "live",
+      "broker_order_id": "6a6a6723-c54c-43ee-9b57-911fdd2ca588"
+    },
+    {
+      "symbol": "AAPL",
+      "side": "buy",
+      "quantity": 0.0,
+      "price": 338.2,
+      "notional": 0.0,
+      "reason": "no_fill: live fill",
+      "filled_at": "2026-07-29T20:49:05.074419Z",
+      "strategy_name": "live",
+      "broker_order_id": "6a6a672b-dcea-46f0-883d-3dba420a430b"
+    },
+    {
+      "symbol": "AXON",
+      "side": "buy",
+      "quantity": 0.0,
+      "price": 529.95,
+      "notional": 0.0,
+      "reason": "no_fill: live fill",
+      "filled_at": "2026-07-29T20:49:10.375926Z",
+      "strategy_name": "live",
+      "broker_order_id": "6a6a6730-b556-4f30-adbe-0714d6fed9bc"
     }
   ],
   "realized_pnl": -8.309245653000003,
   "peak_equity": 150.14103162835693,
   "halted": false,
   "halt_reason": "",
-  "updated_at": "2026-07-29T19:38:38.804946Z"
+  "updated_at": "2026-07-29T20:49:10.376166Z"
 }
