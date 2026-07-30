@@ -1,0 +1,14 @@
+[
+  {
+    "symbol": "MSFT",
+    "side": "sell",
+    "dollar_amount": null,
+    "quantity": 0.03436,
+    "reason": "take profit triggered (intraday)",
+    "signal_price": 446.9399108886719,
+    "signal_date": "2026-07-30T13:39:17.147329Z",
+    "strategy_name": "ema_cross_rsi_atr_regime",
+    "generated_at": "2026-07-30T13:39:17.147650Z",
+    "broker_order_id": null
+  }
+]
