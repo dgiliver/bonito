@@ -1,0 +1,14 @@
+[
+  {
+    "symbol": "LLY",
+    "side": "sell",
+    "dollar_amount": null,
+    "quantity": 0.015897,
+    "reason": "stop loss triggered (intraday)",
+    "signal_price": 1156.800048828125,
+    "signal_date": "2026-07-30T15:39:13.988327Z",
+    "strategy_name": "ema_cross_rsi_atr_regime",
+    "generated_at": "2026-07-30T15:39:13.988526Z",
+    "broker_order_id": null
+  }
+]
