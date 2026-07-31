@@ -1,0 +1,26 @@
+[
+  {
+    "symbol": "AAPL",
+    "side": "sell",
+    "dollar_amount": null,
+    "quantity": 1.8782565227930708,
+    "reason": "stop loss triggered (intraday)",
+    "signal_price": 302.7500915527344,
+    "signal_date": "2026-07-31T15:13:47.233914Z",
+    "strategy_name": "c_ema8-21_rsi60_atr1.5_tp10",
+    "generated_at": "2026-07-31T15:13:47.234004Z",
+    "broker_order_id": null
+  },
+  {
+    "symbol": "LLY",
+    "side": "sell",
+    "dollar_amount": null,
+    "quantity": 0.5521951262293872,
+    "reason": "stop loss triggered (intraday)",
+    "signal_price": 1141.2950439453125,
+    "signal_date": "2026-07-31T15:13:47.233914Z",
+    "strategy_name": "ema_cross_rsi_atr_regime",
+    "generated_at": "2026-07-31T15:13:47.234101Z",
+    "broker_order_id": null
+  }
+]
