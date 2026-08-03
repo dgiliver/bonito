@@ -600,11 +600,22 @@
       "filled_at": "2026-08-03T18:40:00.602691Z",
       "strategy_name": "live",
       "broker_order_id": "6a70e064-7f87-4728-b4cf-ae12b3451d99"
+    },
+    {
+      "symbol": "AXON",
+      "side": "buy",
+      "quantity": 0.0,
+      "price": 577.0,
+      "notional": 0.0,
+      "reason": "no_fill: live fill",
+      "filled_at": "2026-08-03T20:48:44.160378Z",
+      "strategy_name": "live",
+      "broker_order_id": "6a70fea4-e90c-4b08-a908-340729c40760"
     }
   ],
   "realized_pnl": -6.877334492200001,
   "peak_equity": 150.14103162835693,
   "halted": false,
   "halt_reason": "",
-  "updated_at": "2026-08-03T19:39:20.814454Z"
+  "updated_at": "2026-08-03T20:48:44.160634Z"
 }

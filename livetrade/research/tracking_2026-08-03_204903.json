@@ -1,0 +1,230 @@
+{
+  "generated_at": "2026-08-03T20:49:03.522193",
+  "window_start": "2026-07-17T00:00:00",
+  "window_end": "2026-08-03T20:49:02.285311",
+  "status": "INSUFFICIENT",
+  "reasons": [
+    "5 no_fill event(s) recorded in the ledger",
+    "only 4 matched fills (<10)"
+  ],
+  "paper_fills": 23,
+  "matched_fills": 4,
+  "no_fill_count": 5,
+  "decision_divergence": 0.8261,
+  "mean_abs_fill_bps": 117.4,
+  "median_abs_fill_bps": 122.1,
+  "worst_fill_bps": 153.1,
+  "paper_final_equity": 142.63,
+  "replay_final_equity": 143.29,
+  "equity_gap_pct": -0.46,
+  "mean_daily_tracking_error_bps": 159.5,
+  "fills": [
+    {
+      "symbol": "PLTR",
+      "side": "buy",
+      "paper_date": "2026-07-17T13:30:00.688000",
+      "paper_price": 131.86,
+      "replay_price": null,
+      "delta_bps": null,
+      "matched": false
+    },
+    {
+      "symbol": "HOOD",
+      "side": "buy",
+      "paper_date": "2026-07-17T13:30:00.690000",
+      "paper_price": 100.31,
+      "replay_price": null,
+      "delta_bps": null,
+      "matched": false
+    },
+    {
+      "symbol": "ASML",
+      "side": "buy",
+      "paper_date": "2026-07-17T13:30:01.515000",
+      "paper_price": 1735.31,
+      "replay_price": null,
+      "delta_bps": null,
+      "matched": false
+    },
+    {
+      "symbol": "AMZN",
+      "side": "buy",
+      "paper_date": "2026-07-20T13:30:01.050000",
+      "paper_price": 248.33,
+      "replay_price": null,
+      "delta_bps": null,
+      "matched": false
+    },
+    {
+      "symbol": "META",
+      "side": "buy",
+      "paper_date": "2026-07-20T13:30:02.012000",
+      "paper_price": 645.86,
+      "replay_price": null,
+      "delta_bps": null,
+      "matched": false
+    },
+    {
+      "symbol": "LLY",
+      "side": "buy",
+      "paper_date": "2026-07-20T13:30:43.410000",
+      "paper_price": 1180.73,
+      "replay_price": null,
+      "delta_bps": null,
+      "matched": false
+    },
+    {
+      "symbol": "MSFT",
+      "side": "buy",
+      "paper_date": "2026-07-21T13:30:00.345000",
+      "paper_price": 399.01,
+      "replay_price": null,
+      "delta_bps": null,
+      "matched": false
+    },
+    {
+      "symbol": "NOW",
+      "side": "buy",
+      "paper_date": "2026-07-21T13:30:01.597000",
+      "paper_price": 101.15,
+      "replay_price": null,
+      "delta_bps": null,
+      "matched": false
+    },
+    {
+      "symbol": "NOW",
+      "side": "sell",
+      "paper_date": "2026-07-23T13:30:01.179000",
+      "paper_price": 98.0,
+      "replay_price": null,
+      "delta_bps": null,
+      "matched": false
+    },
+    {
+      "symbol": "AMZN",
+      "side": "sell",
+      "paper_date": "2026-07-23T19:39:48.030085",
+      "paper_price": 233.2201,
+      "replay_price": 236.25999450683594,
+      "delta_bps": -128.67,
+      "matched": true
+    },
+    {
+      "symbol": "UNH",
+      "side": "buy",
+      "paper_date": "2026-07-27T13:30:01.493000",
+      "paper_price": 422.14,
+      "replay_price": null,
+      "delta_bps": null,
+      "matched": false
+    },
+    {
+      "symbol": "DELL",
+      "side": "buy",
+      "paper_date": "2026-07-27T13:31:03.462000",
+      "paper_price": 433.58,
+      "replay_price": null,
+      "delta_bps": null,
+      "matched": false
+    },
+    {
+      "symbol": "ASML",
+      "side": "sell",
+      "paper_date": "2026-07-28T13:30:01.284000",
+      "paper_price": 1580.72,
+      "replay_price": null,
+      "delta_bps": null,
+      "matched": false
+    },
+    {
+      "symbol": "HOOD",
+      "side": "sell",
+      "paper_date": "2026-07-28T13:30:01.611000",
+      "paper_price": 92.59,
+      "replay_price": null,
+      "delta_bps": null,
+      "matched": false
+    },
+    {
+      "symbol": "META",
+      "side": "sell",
+      "paper_date": "2026-07-28T14:40:25.142774",
+      "paper_price": 590.4801,
+      "replay_price": null,
+      "delta_bps": null,
+      "matched": false
+    },
+    {
+      "symbol": "PLTR",
+      "side": "sell",
+      "paper_date": "2026-07-28T14:40:30.976893",
+      "paper_price": 118.7719,
+      "replay_price": null,
+      "delta_bps": null,
+      "matched": false
+    },
+    {
+      "symbol": "COST",
+      "side": "buy",
+      "paper_date": "2026-07-30T13:30:00.111000",
+      "paper_price": 955.04,
+      "replay_price": null,
+      "delta_bps": null,
+      "matched": false
+    },
+    {
+      "symbol": "AXON",
+      "side": "buy",
+      "paper_date": "2026-07-30T13:30:01.986000",
+      "paper_price": 517.26,
+      "replay_price": 525.2999877929688,
+      "delta_bps": -153.06,
+      "matched": true
+    },
+    {
+      "symbol": "AAPL",
+      "side": "buy",
+      "paper_date": "2026-07-30T13:30:02.023000",
+      "paper_price": 332.62,
+      "replay_price": null,
+      "delta_bps": null,
+      "matched": false
+    },
+    {
+      "symbol": "MSFT",
+      "side": "sell",
+      "paper_date": "2026-07-30T13:40:01.893791",
+      "paper_price": 447.585,
+      "replay_price": null,
+      "delta_bps": null,
+      "matched": false
+    },
+    {
+      "symbol": "LLY",
+      "side": "sell",
+      "paper_date": "2026-07-30T15:40:04.431311",
+      "paper_price": 1155.8764,
+      "replay_price": 1164.3157610212054,
+      "delta_bps": -72.48,
+      "matched": true
+    },
+    {
+      "symbol": "AAPL",
+      "side": "sell",
+      "paper_date": "2026-07-31T13:40:20.393886",
+      "paper_price": 301.2901,
+      "replay_price": 304.80999755859375,
+      "delta_bps": -115.48,
+      "matched": true
+    },
+    {
+      "symbol": "AXON",
+      "side": "sell",
+      "paper_date": "2026-08-03T18:40:00.602691",
+      "paper_price": 570.6801,
+      "replay_price": null,
+      "delta_bps": null,
+      "matched": false
+    }
+  ]
+}
