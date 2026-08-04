@@ -1,0 +1,14 @@
+[
+  {
+    "symbol": "DELL",
+    "side": "sell",
+    "dollar_amount": null,
+    "quantity": 1.3530604980307832,
+    "reason": "take profit triggered (intraday)",
+    "signal_price": 473.0101013183594,
+    "signal_date": "2026-08-04T17:11:14.345582Z",
+    "strategy_name": "ema_cross_rsi_atr_regime",
+    "generated_at": "2026-08-04T17:11:14.345860Z",
+    "broker_order_id": null
+  }
+]
