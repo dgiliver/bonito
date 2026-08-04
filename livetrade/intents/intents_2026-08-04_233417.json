@@ -1,0 +1,38 @@
+[
+  {
+    "symbol": "DELL",
+    "side": "buy",
+    "dollar_amount": 588.78,
+    "quantity": null,
+    "reason": "entry rule matched: ema_fast gt ema_slow, close gt ema_slow, rsi_14 lt 68.0",
+    "signal_price": 467.2699890136719,
+    "signal_date": "2026-08-04T04:00:00",
+    "strategy_name": "ema_cross_rsi_atr_regime",
+    "generated_at": "2026-08-04T23:34:17.469043Z",
+    "broker_order_id": null
+  },
+  {
+    "symbol": "AVGO",
+    "side": "buy",
+    "dollar_amount": 588.78,
+    "quantity": null,
+    "reason": "entry rule matched: ema_fast gt ema_slow, close gt ema_slow, rsi_14 lt 68.0",
+    "signal_price": 418.1600036621094,
+    "signal_date": "2026-08-04T04:00:00",
+    "strategy_name": "ema_cross_rsi_atr_regime",
+    "generated_at": "2026-08-04T23:34:17.585847Z",
+    "broker_order_id": null
+  },
+  {
+    "symbol": "GOOGL",
+    "side": "buy",
+    "dollar_amount": 588.78,
+    "quantity": null,
+    "reason": "entry rule matched: ema_fast gt ema_slow, close gt ema_slow, rsi_14 lt 68.0",
+    "signal_price": 377.6499938964844,
+    "signal_date": "2026-08-04T04:00:00",
+    "strategy_name": "ema_cross_rsi_atr_regime",
+    "generated_at": "2026-08-04T23:34:17.618796Z",
+    "broker_order_id": null
+  }
+]
