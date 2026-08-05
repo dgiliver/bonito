@@ -1,0 +1,50 @@
+[
+  {
+    "symbol": "UNH",
+    "side": "sell",
+    "dollar_amount": null,
+    "quantity": 1.4263858803531668,
+    "reason": "exit rule matched",
+    "signal_price": 412.75,
+    "signal_date": "2026-08-05T04:00:00",
+    "strategy_name": "ema_cross_rsi_atr_regime",
+    "generated_at": "2026-08-05T23:30:54.381679Z",
+    "broker_order_id": null
+  },
+  {
+    "symbol": "AMZN",
+    "side": "buy",
+    "dollar_amount": 585.6,
+    "quantity": null,
+    "reason": "entry rule matched: ema_fast gt ema_slow, close gt ema_slow, rsi_14 lt 68.0",
+    "signal_price": 272.6499938964844,
+    "signal_date": "2026-08-05T04:00:00",
+    "strategy_name": "ema_cross_rsi_atr_regime",
+    "generated_at": "2026-08-05T23:30:54.490527Z",
+    "broker_order_id": null
+  },
+  {
+    "symbol": "AXON",
+    "side": "buy",
+    "dollar_amount": 585.6,
+    "quantity": null,
+    "reason": "entry rule matched: ema_fast gt ema_slow, close gt ema_slow, rsi_14 lt 68.0",
+    "signal_price": 609.489990234375,
+    "signal_date": "2026-08-05T04:00:00",
+    "strategy_name": "ema_cross_rsi_atr_regime",
+    "generated_at": "2026-08-05T23:30:54.494476Z",
+    "broker_order_id": null
+  },
+  {
+    "symbol": "NVDA",
+    "side": "buy",
+    "dollar_amount": 517.57,
+    "quantity": null,
+    "reason": "entry rule matched: ema_fast gt ema_slow, close gt ema_slow, rsi_14 lt 68.0",
+    "signal_price": 219.22000122070312,
+    "signal_date": "2026-08-05T04:00:00",
+    "strategy_name": "ema_cross_rsi_atr_regime",
+    "generated_at": "2026-08-05T23:30:54.501911Z",
+    "broker_order_id": null
+  }
+]
