@@ -1,0 +1,26 @@
+[
+  {
+    "symbol": "DELL",
+    "side": "buy",
+    "dollar_amount": 17.9,
+    "quantity": null,
+    "reason": "entry rule matched: ema_fast gt ema_slow, close gt ema_slow, rsi_14 lt 68.0",
+    "signal_price": 462.70001220703125,
+    "signal_date": "2026-08-05T04:00:00",
+    "strategy_name": "ema_cross_rsi_atr_regime",
+    "generated_at": "2026-08-05T20:48:34.103171Z",
+    "broker_order_id": null
+  },
+  {
+    "symbol": "NVDA",
+    "side": "buy",
+    "dollar_amount": 17.9,
+    "quantity": null,
+    "reason": "entry rule matched: ema_fast gt ema_slow, close gt ema_slow, rsi_14 lt 68.0",
+    "signal_price": 219.22000122070312,
+    "signal_date": "2026-08-05T04:00:00",
+    "strategy_name": "ema_cross_rsi_atr_regime",
+    "generated_at": "2026-08-05T20:48:34.329286Z",
+    "broker_order_id": null
+  }
+]
