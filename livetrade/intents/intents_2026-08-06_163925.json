@@ -1,0 +1,14 @@
+[
+  {
+    "symbol": "AXON",
+    "side": "sell",
+    "dollar_amount": null,
+    "quantity": 0.030551,
+    "reason": "stop loss triggered (intraday)",
+    "signal_price": 535.760009765625,
+    "signal_date": "2026-08-06T16:39:25.557250Z",
+    "strategy_name": "ema_cross_rsi_atr_regime",
+    "generated_at": "2026-08-06T16:39:25.557518Z",
+    "broker_order_id": null
+  }
+]
