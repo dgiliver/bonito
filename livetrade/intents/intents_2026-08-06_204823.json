@@ -1,0 +1,38 @@
+[
+  {
+    "symbol": "LLY",
+    "side": "buy",
+    "dollar_amount": 17.58,
+    "quantity": null,
+    "reason": "entry rule matched: ema_fast gt ema_slow, close gt ema_slow, rsi_14 lt 68.0",
+    "signal_price": 1191.93994140625,
+    "signal_date": "2026-08-06T04:00:00",
+    "strategy_name": "ema_cross_rsi_atr_regime",
+    "generated_at": "2026-08-06T20:48:23.280038Z",
+    "broker_order_id": null
+  },
+  {
+    "symbol": "NVDA",
+    "side": "buy",
+    "dollar_amount": 17.58,
+    "quantity": null,
+    "reason": "entry rule matched: ema_fast gt ema_slow, close gt ema_slow, rsi_14 lt 68.0",
+    "signal_price": 218.99000549316406,
+    "signal_date": "2026-08-06T04:00:00",
+    "strategy_name": "ema_cross_rsi_atr_regime",
+    "generated_at": "2026-08-06T20:48:23.340264Z",
+    "broker_order_id": null
+  },
+  {
+    "symbol": "SMCI",
+    "side": "buy",
+    "dollar_amount": 13.33,
+    "quantity": null,
+    "reason": "entry rule matched: ema_fast gt ema_slow, close gt ema_slow, rsi_14 lt 68.0",
+    "signal_price": 29.3799991607666,
+    "signal_date": "2026-08-06T04:00:00",
+    "strategy_name": "ema_cross_rsi_atr_regime",
+    "generated_at": "2026-08-06T20:48:23.355054Z",
+    "broker_order_id": null
+  }
+]
