@@ -1,0 +1,14 @@
+[
+  {
+    "symbol": "GOOGL",
+    "side": "sell",
+    "dollar_amount": null,
+    "quantity": 1.5590626493201727,
+    "reason": "stop loss triggered (intraday)",
+    "signal_price": 354.1299133300781,
+    "signal_date": "2026-08-07T19:03:48.791412Z",
+    "strategy_name": "ema_cross_rsi_atr_regime",
+    "generated_at": "2026-08-07T19:03:48.791685Z",
+    "broker_order_id": null
+  }
+]
