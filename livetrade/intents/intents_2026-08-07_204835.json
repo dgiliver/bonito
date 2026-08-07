@@ -1,0 +1,26 @@
+[
+  {
+    "symbol": "GOOGL",
+    "side": "buy",
+    "dollar_amount": 17.71,
+    "quantity": null,
+    "reason": "entry rule matched: ema_fast gt ema_slow, close gt ema_slow, rsi_14 lt 68.0",
+    "signal_price": 354.29998779296875,
+    "signal_date": "2026-08-07T04:00:00",
+    "strategy_name": "ema_cross_rsi_atr_regime",
+    "generated_at": "2026-08-07T20:48:35.774119Z",
+    "broker_order_id": null
+  },
+  {
+    "symbol": "AXON",
+    "side": "buy",
+    "dollar_amount": 12.37,
+    "quantity": null,
+    "reason": "entry rule matched: ema_fast gt ema_slow, close gt ema_slow, rsi_14 lt 68.0",
+    "signal_price": 571.010009765625,
+    "signal_date": "2026-08-07T04:00:00",
+    "strategy_name": "ema_cross_rsi_atr_regime",
+    "generated_at": "2026-08-07T20:48:35.787131Z",
+    "broker_order_id": null
+  }
+]
