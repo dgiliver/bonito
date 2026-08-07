@@ -207,7 +207,7 @@
       "quantity": 1.4080256237891144,
       "entry_price": 418.1600036621094,
       "entry_date": "2026-08-04T23:34:17.626960Z",
-      "high_water_mark": 426.55999755859375,
+      "high_water_mark": 427.7699890136719,
       "strategy_name": "ema_cross_rsi_atr_regime",
       "strategy_hash": "da16575a5622",
       "strategy_config": {
@@ -407,7 +407,7 @@
       "quantity": 2.3609615779489412,
       "entry_price": 219.22000122070312,
       "entry_date": "2026-08-05T23:30:54.507668Z",
-      "high_water_mark": 223.625,
+      "high_water_mark": 224.0500030517578,
       "strategy_name": "ema_cross_rsi_atr_regime",
       "strategy_hash": "da16575a5622",
       "strategy_config": {
@@ -607,7 +607,7 @@
       "quantity": 0.6017699286938537,
       "entry_price": 29.3799991607666,
       "entry_date": "2026-08-07T01:37:33.264342Z",
-      "high_water_mark": 31.145000457763672,
+      "high_water_mark": 31.149900436401367,
       "strategy_name": "ema_cross_rsi_atr_regime",
       "strategy_hash": "da16575a5622",
       "strategy_config": {
@@ -1930,5 +1930,5 @@
   "peak_equity": 6004.595534551629,
   "halted": false,
   "halt_reason": "",
-  "updated_at": "2026-08-07T19:03:48.798023Z"
+  "updated_at": "2026-08-07T19:57:48.305543Z"
 }
