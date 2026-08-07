@@ -1,0 +1,38 @@
+[
+  {
+    "symbol": "AXON",
+    "side": "sell",
+    "dollar_amount": null,
+    "quantity": 0.9608033099523288,
+    "reason": "stop loss triggered",
+    "signal_price": 522.4600219726562,
+    "signal_date": "2026-08-06T04:00:00",
+    "strategy_name": "ema_cross_rsi_atr_regime",
+    "generated_at": "2026-08-07T01:37:33.076477Z",
+    "broker_order_id": null
+  },
+  {
+    "symbol": "LLY",
+    "side": "buy",
+    "dollar_amount": 571.06,
+    "quantity": null,
+    "reason": "entry rule matched: ema_fast gt ema_slow, close gt ema_slow, rsi_14 lt 68.0",
+    "signal_price": 1191.93994140625,
+    "signal_date": "2026-08-06T04:00:00",
+    "strategy_name": "ema_cross_rsi_atr_regime",
+    "generated_at": "2026-08-07T01:37:33.215593Z",
+    "broker_order_id": null
+  },
+  {
+    "symbol": "SMCI",
+    "side": "buy",
+    "dollar_amount": 17.68,
+    "quantity": null,
+    "reason": "entry rule matched: ema_fast gt ema_slow, close gt ema_slow, rsi_14 lt 68.0",
+    "signal_price": 29.3799991607666,
+    "signal_date": "2026-08-06T04:00:00",
+    "strategy_name": "ema_cross_rsi_atr_regime",
+    "generated_at": "2026-08-07T01:37:33.256680Z",
+    "broker_order_id": null
+  }
+]
