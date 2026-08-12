@@ -1,0 +1,14 @@
+[
+  {
+    "symbol": "GOOGL",
+    "side": "sell",
+    "dollar_amount": null,
+    "quantity": 1.6254022575256453,
+    "reason": "exit rule matched",
+    "signal_price": 343.5400085449219,
+    "signal_date": "2026-08-12T04:00:00",
+    "strategy_name": "ema_cross_rsi_atr_regime",
+    "generated_at": "2026-08-12T23:12:20.033272Z",
+    "broker_order_id": null
+  }
+]
