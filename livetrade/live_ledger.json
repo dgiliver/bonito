@@ -1031,11 +1031,44 @@
       "filled_at": "2026-08-14T15:53:26.729902Z",
       "strategy_name": "live",
       "broker_order_id": "6a7f39de-5e39-436f-8249-a9674153c20b"
+    },
+    {
+      "symbol": "DELL",
+      "side": "buy",
+      "quantity": 0.0,
+      "price": 490.81,
+      "notional": 0.0,
+      "reason": "no_fill: live fill",
+      "filled_at": "2026-08-14T20:48:22.974115Z",
+      "strategy_name": "live",
+      "broker_order_id": "6a7f7f0d-e72d-4bf0-a5e3-52c5111382e9"
+    },
+    {
+      "symbol": "IREN",
+      "side": "buy",
+      "quantity": 0.0,
+      "price": 44.06,
+      "notional": 0.0,
+      "reason": "no_fill: live fill",
+      "filled_at": "2026-08-14T20:48:27.429876Z",
+      "strategy_name": "live",
+      "broker_order_id": "6a7f7f0e-26e6-4ccb-a634-0149657152c0"
+    },
+    {
+      "symbol": "ASTS",
+      "side": "buy",
+      "quantity": 0.0,
+      "price": 70.965,
+      "notional": 0.0,
+      "reason": "no_fill: live fill",
+      "filled_at": "2026-08-14T20:48:31.200643Z",
+      "strategy_name": "live",
+      "broker_order_id": null
     }
   ],
   "realized_pnl": -7.9146318839999985,
   "peak_equity": 150.14103162835693,
   "halted": false,
   "halt_reason": "",
-  "updated_at": "2026-08-14T19:38:19.081855Z"
+  "updated_at": "2026-08-14T20:48:31.200898Z"
 }

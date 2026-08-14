@@ -1,0 +1,38 @@
+[
+  {
+    "symbol": "DELL",
+    "side": "buy",
+    "dollar_amount": 17.68,
+    "quantity": null,
+    "reason": "entry rule matched: ema_fast gt ema_slow, close gt ema_slow, rsi_14 lt 68.0",
+    "signal_price": 490.80999755859375,
+    "signal_date": "2026-08-14T04:00:00",
+    "strategy_name": "ema_cross_rsi_atr_regime",
+    "generated_at": "2026-08-14T20:47:47.782610Z",
+    "broker_order_id": null
+  },
+  {
+    "symbol": "IREN",
+    "side": "buy",
+    "dollar_amount": 17.68,
+    "quantity": null,
+    "reason": "entry rule matched: ema_fast gt ema_slow, close gt ema_slow, rsi_14 lt 68.0",
+    "signal_price": 44.060001373291016,
+    "signal_date": "2026-08-14T04:00:00",
+    "strategy_name": "ema_cross_rsi_atr_regime",
+    "generated_at": "2026-08-14T20:47:47.796089Z",
+    "broker_order_id": null
+  },
+  {
+    "symbol": "ASTS",
+    "side": "buy",
+    "dollar_amount": 17.68,
+    "quantity": null,
+    "reason": "entry rule matched: ema_fast gt ema_slow, close gt ema_slow, rsi_14 lt 68.0",
+    "signal_price": 70.9800033569336,
+    "signal_date": "2026-08-14T04:00:00",
+    "strategy_name": "ema_cross_rsi_atr_regime",
+    "generated_at": "2026-08-14T20:47:47.836769Z",
+    "broker_order_id": null
+  }
+]
