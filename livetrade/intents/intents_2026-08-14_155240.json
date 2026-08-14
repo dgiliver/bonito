@@ -1,0 +1,14 @@
+[
+  {
+    "symbol": "AVGO",
+    "side": "sell",
+    "dollar_amount": null,
+    "quantity": 0.042745,
+    "reason": "stop loss triggered (intraday)",
+    "signal_price": 394.4800109863281,
+    "signal_date": "2026-08-14T15:52:40.903296Z",
+    "strategy_name": "ema_cross_rsi_atr_regime",
+    "generated_at": "2026-08-14T15:52:40.903502Z",
+    "broker_order_id": null
+  }
+]
