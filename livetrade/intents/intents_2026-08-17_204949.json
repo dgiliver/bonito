@@ -1,0 +1,26 @@
+[
+  {
+    "symbol": "MU",
+    "side": "buy",
+    "dollar_amount": 17.55,
+    "quantity": null,
+    "reason": "entry rule matched: ema_fast gt ema_slow, close gt ema_slow, rsi_14 lt 68.0",
+    "signal_price": 1011.75,
+    "signal_date": "2026-08-17T04:00:00",
+    "strategy_name": "ema_cross_rsi_atr_regime",
+    "generated_at": "2026-08-17T20:49:49.479466Z",
+    "broker_order_id": null
+  },
+  {
+    "symbol": "RKLB",
+    "side": "buy",
+    "dollar_amount": 17.55,
+    "quantity": null,
+    "reason": "entry rule matched: ema_fast gt ema_slow, close gt ema_slow, rsi_14 lt 68.0",
+    "signal_price": 82.08000183105469,
+    "signal_date": "2026-08-17T04:00:00",
+    "strategy_name": "ema_cross_rsi_atr_regime",
+    "generated_at": "2026-08-17T20:49:49.519503Z",
+    "broker_order_id": null
+  }
+]
