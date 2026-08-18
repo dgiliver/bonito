@@ -1,0 +1,98 @@
+[
+  {
+    "symbol": "ASTS",
+    "side": "sell",
+    "dollar_amount": null,
+    "quantity": 7.807466809412019,
+    "reason": "kill switch: drawdown 25.6% >= 25% cap (equity $4468.86, peak $6004.60)",
+    "signal_price": 67.06999969482422,
+    "signal_date": "2026-08-18T22:53:26.125632",
+    "strategy_name": "ema_cross_rsi_atr_regime",
+    "generated_at": "2026-08-18T22:53:26.206288Z",
+    "broker_order_id": null
+  },
+  {
+    "symbol": "AXON",
+    "side": "sell",
+    "dollar_amount": null,
+    "quantity": 0.8351751307614702,
+    "reason": "kill switch: drawdown 25.6% >= 25% cap (equity $4468.86, peak $6004.60)",
+    "signal_price": 619.8499755859375,
+    "signal_date": "2026-08-18T22:53:26.125632",
+    "strategy_name": "ema_cross_rsi_atr_regime",
+    "generated_at": "2026-08-18T22:53:26.206303Z",
+    "broker_order_id": null
+  },
+  {
+    "symbol": "COST",
+    "side": "sell",
+    "dollar_amount": null,
+    "quantity": 0.6053714795894453,
+    "reason": "kill switch: drawdown 25.6% >= 25% cap (equity $4468.86, peak $6004.60)",
+    "signal_price": 961.3499755859375,
+    "signal_date": "2026-08-18T22:53:26.125632",
+    "strategy_name": "ema_cross_rsi_atr_regime",
+    "generated_at": "2026-08-18T22:53:26.206309Z",
+    "broker_order_id": null
+  },
+  {
+    "symbol": "DELL",
+    "side": "sell",
+    "dollar_amount": null,
+    "quantity": 1.2600424034139561,
+    "reason": "kill switch: drawdown 25.6% >= 25% cap (equity $4468.86, peak $6004.60)",
+    "signal_price": 468.6499938964844,
+    "signal_date": "2026-08-18T22:53:26.125632",
+    "strategy_name": "ema_cross_rsi_atr_regime",
+    "generated_at": "2026-08-18T22:53:26.206316Z",
+    "broker_order_id": null
+  },
+  {
+    "symbol": "IREN",
+    "side": "sell",
+    "dollar_amount": null,
+    "quantity": 12.633000060172822,
+    "reason": "kill switch: drawdown 25.6% >= 25% cap (equity $4468.86, peak $6004.60)",
+    "signal_price": 42.0,
+    "signal_date": "2026-08-18T22:53:26.125632",
+    "strategy_name": "ema_cross_rsi_atr_regime",
+    "generated_at": "2026-08-18T22:53:26.206322Z",
+    "broker_order_id": null
+  },
+  {
+    "symbol": "LLY",
+    "side": "sell",
+    "dollar_amount": null,
+    "quantity": 0.47910132059696203,
+    "reason": "kill switch: drawdown 25.6% >= 25% cap (equity $4468.86, peak $6004.60)",
+    "signal_price": 1225.72998046875,
+    "signal_date": "2026-08-18T22:53:26.125632",
+    "strategy_name": "ema_cross_rsi_atr_regime",
+    "generated_at": "2026-08-18T22:53:26.206330Z",
+    "broker_order_id": null
+  },
+  {
+    "symbol": "MU",
+    "side": "sell",
+    "dollar_amount": null,
+    "quantity": 0.5510551025450952,
+    "reason": "kill switch: drawdown 25.6% >= 25% cap (equity $4468.86, peak $6004.60)",
+    "signal_price": 940.760009765625,
+    "signal_date": "2026-08-18T22:53:26.125632",
+    "strategy_name": "ema_cross_rsi_atr_regime",
+    "generated_at": "2026-08-18T22:53:26.206334Z",
+    "broker_order_id": null
+  },
+  {
+    "symbol": "NVDA",
+    "side": "sell",
+    "dollar_amount": null,
+    "quantity": 2.3609615779489412,
+    "reason": "kill switch: drawdown 25.6% >= 25% cap (equity $4468.86, peak $6004.60)",
+    "signal_price": 219.74000549316406,
+    "signal_date": "2026-08-18T22:53:26.125632",
+    "strategy_name": "ema_cross_rsi_atr_regime",
+    "generated_at": "2026-08-18T22:53:26.206343Z",
+    "broker_order_id": null
+  }
+]
