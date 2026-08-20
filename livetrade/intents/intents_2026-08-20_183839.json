@@ -1,0 +1,14 @@
+[
+  {
+    "symbol": "COST",
+    "side": "sell",
+    "dollar_amount": null,
+    "quantity": 0.018208,
+    "reason": "stop loss triggered (intraday)",
+    "signal_price": 929.1300048828125,
+    "signal_date": "2026-08-20T18:38:39.919961Z",
+    "strategy_name": "ema_cross_rsi_atr_regime",
+    "generated_at": "2026-08-20T18:38:39.920119Z",
+    "broker_order_id": null
+  }
+]
