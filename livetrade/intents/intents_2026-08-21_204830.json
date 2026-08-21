@@ -1,0 +1,26 @@
+[
+  {
+    "symbol": "HOOD",
+    "side": "buy",
+    "dollar_amount": 17.18,
+    "quantity": null,
+    "reason": "entry rule matched: ema_fast gt ema_slow, close gt ema_slow, rsi_14 lt 68.0",
+    "signal_price": 108.12999725341797,
+    "signal_date": "2026-08-21T04:00:00",
+    "strategy_name": "ema_cross_rsi_atr_regime",
+    "generated_at": "2026-08-21T20:48:30.445007Z",
+    "broker_order_id": null
+  },
+  {
+    "symbol": "TSM",
+    "side": "buy",
+    "dollar_amount": 17.18,
+    "quantity": null,
+    "reason": "entry rule matched: ema_fast gt ema_slow, close gt ema_slow, rsi_14 lt 68.0",
+    "signal_price": 418.95001220703125,
+    "signal_date": "2026-08-21T04:00:00",
+    "strategy_name": "ema_cross_rsi_atr_regime",
+    "generated_at": "2026-08-21T20:48:30.501194Z",
+    "broker_order_id": null
+  }
+]

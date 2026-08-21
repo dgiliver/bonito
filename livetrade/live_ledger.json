@@ -1241,11 +1241,33 @@
       "filled_at": "2026-08-21T14:40:21.284829Z",
       "strategy_name": "live",
       "broker_order_id": "6a88633c-6a0d-47aa-95bf-d52d98a33edb"
+    },
+    {
+      "symbol": "HOOD",
+      "side": "buy",
+      "quantity": 0.0,
+      "price": 108.2,
+      "notional": 0.0,
+      "reason": "no_fill: live fill",
+      "filled_at": "2026-08-21T20:49:29.417897Z",
+      "strategy_name": "live",
+      "broker_order_id": "6a88b9c1-b546-41a3-a50c-ace2b265e449"
+    },
+    {
+      "symbol": "TSM",
+      "side": "buy",
+      "quantity": 0.0,
+      "price": 418.9,
+      "notional": 0.0,
+      "reason": "no_fill: live fill",
+      "filled_at": "2026-08-21T20:49:33.646128Z",
+      "strategy_name": "live",
+      "broker_order_id": null
     }
   ],
   "realized_pnl": -10.285351540399995,
   "peak_equity": 150.14103162835693,
   "halted": false,
   "halt_reason": "",
-  "updated_at": "2026-08-21T19:39:08.664891Z"
+  "updated_at": "2026-08-21T20:49:33.646403Z"
 }
