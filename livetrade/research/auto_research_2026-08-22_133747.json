@@ -1,0 +1,60 @@
+{
+  "generated_at": "2026-08-22T13:37:47.479170",
+  "universe_path": "config/universe.json",
+  "start": "2022-01-01T00:00:00",
+  "holdout": "2025-02-28T13:22:58.795316",
+  "end": "2026-08-22T13:22:58.795316",
+  "outcome": "rejected",
+  "adopted_bundle": null,
+  "reasons": [
+    "[assignments+bench] train Sharpe degrades: 1.117 < 1.313",
+    "[assignments+bench] holdout Sharpe degrades: 2.436 < 2.471",
+    "[assignments-only] train Sharpe degrades: 1.233 < 1.313"
+  ],
+  "previous_assignments": {
+    "ASML": "strategies/auto_ASML_9dfc85e38e1c.json",
+    "MSFT": "strategies/auto_MSFT_ef10b624536e.json"
+  },
+  "candidate_assignments": {
+    "AAPL": "strategies/auto_AAPL_b5c864a04406.json",
+    "AMZN": "strategies/auto_AMZN_cfb42acff369.json",
+    "MSFT": "strategies/auto_MSFT_ef10b624536e.json",
+    "MU": "strategies/auto_MU_b0d68d4a535e.json",
+    "TSM": "strategies/auto_TSM_df399f9c142a.json"
+  },
+  "added": [
+    "AAPL",
+    "AMZN",
+    "MU",
+    "TSM"
+  ],
+  "removed": [
+    "ASML"
+  ],
+  "updated": [],
+  "default_swap": null,
+  "default_swapped": false,
+  "benched": [
+    "AAOI",
+    "ALAB",
+    "ASML",
+    "DRAM",
+    "HOOD",
+    "INTC",
+    "NBIS",
+    "NVDA",
+    "SKHY"
+  ],
+  "unbenched": [
+    "ORCL"
+  ],
+  "grid_edge_flags": [
+    "AAPL: winner at grid edge (ema=(5, 13))",
+    "MSFT: winner at grid edge (atr=1)",
+    "MU: winner at grid edge (atr=1)"
+  ],
+  "comparisons": [],
+  "baseline_final_equity": 31831.31,
+  "candidate_final_equity": null,
+  "report_path": "livetrade/research/cluster_report_2026-08-22_133009.json"
+}
