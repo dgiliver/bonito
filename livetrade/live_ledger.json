@@ -1,5 +1,5 @@
 {
-  "cash": 54.90760386660004,
+  "cash": 37.72760386660004,
   "starting_cash": 150.0,
   "positions": {
     "LLY": {
@@ -408,6 +408,106 @@
       "entry_price": 1681.0,
       "entry_date": "2026-08-19T13:30:00.435000Z",
       "high_water_mark": 1681.0,
+      "strategy_name": "live",
+      "strategy_hash": "da16575a5622",
+      "strategy_config": {
+        "name": "ema_cross_rsi_atr_regime",
+        "description": "EMA 10/26 cross + RSI<68, 2.0x ATR(14) trailing stop, 10% TP, SPY>SMA200 regime gate. Exit rule VALIDATED 2026-06-12: removing it degrades the account replay despite negative raw attribution (docs/EXPERIMENT_LOG.md) — do not strip it without fresh replay evidence.",
+        "version": "2.0",
+        "symbols": [
+          "SPY"
+        ],
+        "timeframe": "1d",
+        "indicators": [
+          {
+            "type": "ema",
+            "name": "ema_fast",
+            "params": {
+              "period": 10
+            }
+          },
+          {
+            "type": "ema",
+            "name": "ema_slow",
+            "params": {
+              "period": 26
+            }
+          },
+          {
+            "type": "rsi",
+            "name": "rsi_14",
+            "params": {
+              "period": 14
+            }
+          }
+        ],
+        "entry_rules": [
+          {
+            "conditions": [
+              {
+                "left": "ema_fast",
+                "comparison": "gt",
+                "right": "ema_slow",
+                "lookback": null
+              },
+              {
+                "left": "close",
+                "comparison": "gt",
+                "right": "ema_slow",
+                "lookback": null
+              },
+              {
+                "left": "rsi_14",
+                "comparison": "lt",
+                "right": 68.0,
+                "lookback": null
+              }
+            ],
+            "logic": "AND",
+            "side": "long"
+          }
+        ],
+        "exit_rules": [
+          {
+            "conditions": [
+              {
+                "left": "ema_fast",
+                "comparison": "crosses_below",
+                "right": "ema_slow",
+                "lookback": null
+              }
+            ],
+            "logic": "AND",
+            "side": "long"
+          }
+        ],
+        "position_size": {
+          "type": "percent_equity",
+          "value": 98.0
+        },
+        "max_positions": 1,
+        "stop_loss": {
+          "type": "trailing_atr",
+          "value": 2.0,
+          "atr_period": 14,
+          "trigger_percent": null
+        },
+        "take_profit": {
+          "type": "percent",
+          "value": 0.1
+        },
+        "regime_filter": {
+          "symbol": "SPY",
+          "sma_period": 200
+        }
+      }
+    },
+    "HOOD": {
+      "symbol": "HOOD",
+      "quantity": 0.160982,
+      "entry_price": 106.72,
+      "entry_date": "2026-08-24T13:30:01.840000Z",
+      "high_water_mark": 106.72,
       "strategy_name": "live",
       "strategy_hash": "da16575a5622",
       "strategy_config": {
@@ -1143,17 +1243,6 @@
       "broker_order_id": "6a88633c-6a0d-47aa-95bf-d52d98a33edb"
     },
     {
-      "symbol": "HOOD",
-      "side": "buy",
-      "quantity": 0.0,
-      "price": 108.2,
-      "notional": 0.0,
-      "reason": "no_fill: live fill",
-      "filled_at": "2026-08-21T20:49:29.417897Z",
-      "strategy_name": "live",
-      "broker_order_id": "6a88b9c1-b546-41a3-a50c-ace2b265e449"
-    },
-    {
       "symbol": "TSM",
       "side": "buy",
       "quantity": 0.0,
@@ -1174,11 +1263,44 @@
       "filled_at": "2026-08-24T13:40:00.248615Z",
       "strategy_name": "live",
       "broker_order_id": "6a8c4993-0d7b-43b6-87b7-5feac896a178"
+    },
+    {
+      "symbol": "HOOD",
+      "side": "buy",
+      "quantity": 0.160982,
+      "price": 106.72,
+      "notional": 17.18,
+      "reason": "live fill (resolved from queued order)",
+      "filled_at": "2026-08-24T13:30:01.840000Z",
+      "strategy_name": "live",
+      "broker_order_id": "6a88b9c1-b546-41a3-a50c-ace2b265e449"
+    },
+    {
+      "symbol": "COST",
+      "side": "buy",
+      "quantity": 0.0,
+      "price": 970.02,
+      "notional": 0.0,
+      "reason": "no_fill: live fill",
+      "filled_at": "2026-08-24T20:48:27.589261Z",
+      "strategy_name": "live",
+      "broker_order_id": "6a8cae12-bef6-4af0-8d6e-2762e8aad0ce"
+    },
+    {
+      "symbol": "MRVL",
+      "side": "buy",
+      "quantity": 0.0,
+      "price": 229.32,
+      "notional": 0.0,
+      "reason": "no_fill: live fill",
+      "filled_at": "2026-08-24T20:48:28.722597Z",
+      "strategy_name": "live",
+      "broker_order_id": null
     }
   ],
   "realized_pnl": -12.509056243399996,
   "peak_equity": 150.14103162835693,
   "halted": false,
   "halt_reason": "",
-  "updated_at": "2026-08-24T19:39:32.762667Z"
+  "updated_at": "2026-08-24T20:48:28.722753Z"
 }

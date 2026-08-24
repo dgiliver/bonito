@@ -1,0 +1,26 @@
+[
+  {
+    "symbol": "COST",
+    "side": "buy",
+    "dollar_amount": 16.62,
+    "quantity": null,
+    "reason": "entry rule matched: ema_fast gt ema_slow, close gt ema_slow, rsi_14 lt 68.0",
+    "signal_price": 971.4000244140625,
+    "signal_date": "2026-08-24T04:00:00",
+    "strategy_name": "ema_cross_rsi_atr_regime",
+    "generated_at": "2026-08-24T20:48:00.325940Z",
+    "broker_order_id": null
+  },
+  {
+    "symbol": "MRVL",
+    "side": "buy",
+    "dollar_amount": 16.11,
+    "quantity": null,
+    "reason": "entry rule matched: ema_fast gt ema_slow, close gt ema_slow, rsi_14 lt 68.0",
+    "signal_price": 229.2899932861328,
+    "signal_date": "2026-08-24T04:00:00",
+    "strategy_name": "ema_cross_rsi_atr_regime",
+    "generated_at": "2026-08-24T20:48:00.381319Z",
+    "broker_order_id": null
+  }
+]
