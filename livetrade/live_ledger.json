@@ -14,92 +14,20 @@
         "name": "ema_cross_rsi_atr_regime",
         "description": "EMA 10/26 cross + RSI<68, 2.0x ATR(14) trailing stop, 10% TP, SPY>SMA200 regime gate. Exit rule VALIDATED 2026-06-12: removing it degrades the account replay despite negative raw attribution (docs/EXPERIMENT_LOG.md) — do not strip it without fresh replay evidence.",
         "version": "2.0",
-        "symbols": [
-          "SPY"
-        ],
+        "symbols": ["SPY"],
         "timeframe": "1d",
         "indicators": [
-          {
-            "type": "ema",
-            "name": "ema_fast",
-            "params": {
-              "period": 10
-            }
-          },
-          {
-            "type": "ema",
-            "name": "ema_slow",
-            "params": {
-              "period": 26
-            }
-          },
-          {
-            "type": "rsi",
-            "name": "rsi_14",
-            "params": {
-              "period": 14
-            }
-          }
+          {"type": "ema", "name": "ema_fast", "params": {"period": 10}},
+          {"type": "ema", "name": "ema_slow", "params": {"period": 26}},
+          {"type": "rsi", "name": "rsi_14", "params": {"period": 14}}
         ],
-        "entry_rules": [
-          {
-            "conditions": [
-              {
-                "left": "ema_fast",
-                "comparison": "gt",
-                "right": "ema_slow",
-                "lookback": null
-              },
-              {
-                "left": "close",
-                "comparison": "gt",
-                "right": "ema_slow",
-                "lookback": null
-              },
-              {
-                "left": "rsi_14",
-                "comparison": "lt",
-                "right": 68.0,
-                "lookback": null
-              }
-            ],
-            "logic": "AND",
-            "side": "long"
-          }
-        ],
-        "exit_rules": [
-          {
-            "conditions": [
-              {
-                "left": "ema_fast",
-                "comparison": "crosses_below",
-                "right": "ema_slow",
-                "lookback": null
-              }
-            ],
-            "logic": "AND",
-            "side": "long"
-          }
-        ],
-        "position_size": {
-          "type": "percent_equity",
-          "value": 98.0
-        },
+        "entry_rules": [{"conditions": [{"left": "ema_fast", "comparison": "gt", "right": "ema_slow", "lookback": null}, {"left": "close", "comparison": "gt", "right": "ema_slow", "lookback": null}, {"left": "rsi_14", "comparison": "lt", "right": 68.0, "lookback": null}], "logic": "AND", "side": "long"}],
+        "exit_rules": [{"conditions": [{"left": "ema_fast", "comparison": "crosses_below", "right": "ema_slow", "lookback": null}], "logic": "AND", "side": "long"}],
+        "position_size": {"type": "percent_equity", "value": 98.0},
         "max_positions": 1,
-        "stop_loss": {
-          "type": "trailing_atr",
-          "value": 2.0,
-          "atr_period": 14,
-          "trigger_percent": null
-        },
-        "take_profit": {
-          "type": "percent",
-          "value": 0.1
-        },
-        "regime_filter": {
-          "symbol": "SPY",
-          "sma_period": 200
-        }
+        "stop_loss": {"type": "trailing_atr", "value": 2.0, "atr_period": 14, "trigger_percent": null},
+        "take_profit": {"type": "percent", "value": 0.1},
+        "regime_filter": {"symbol": "SPY", "sma_period": 200}
       }
     },
     "AXON": {
@@ -114,92 +42,20 @@
         "name": "ema_cross_rsi_atr_regime",
         "description": "EMA 10/26 cross + RSI<68, 2.0x ATR(14) trailing stop, 10% TP, SPY>SMA200 regime gate. Exit rule VALIDATED 2026-06-12: removing it degrades the account replay despite negative raw attribution (docs/EXPERIMENT_LOG.md) — do not strip it without fresh replay evidence.",
         "version": "2.0",
-        "symbols": [
-          "SPY"
-        ],
+        "symbols": ["SPY"],
         "timeframe": "1d",
         "indicators": [
-          {
-            "type": "ema",
-            "name": "ema_fast",
-            "params": {
-              "period": 10
-            }
-          },
-          {
-            "type": "ema",
-            "name": "ema_slow",
-            "params": {
-              "period": 26
-            }
-          },
-          {
-            "type": "rsi",
-            "name": "rsi_14",
-            "params": {
-              "period": 14
-            }
-          }
+          {"type": "ema", "name": "ema_fast", "params": {"period": 10}},
+          {"type": "ema", "name": "ema_slow", "params": {"period": 26}},
+          {"type": "rsi", "name": "rsi_14", "params": {"period": 14}}
         ],
-        "entry_rules": [
-          {
-            "conditions": [
-              {
-                "left": "ema_fast",
-                "comparison": "gt",
-                "right": "ema_slow",
-                "lookback": null
-              },
-              {
-                "left": "close",
-                "comparison": "gt",
-                "right": "ema_slow",
-                "lookback": null
-              },
-              {
-                "left": "rsi_14",
-                "comparison": "lt",
-                "right": 68.0,
-                "lookback": null
-              }
-            ],
-            "logic": "AND",
-            "side": "long"
-          }
-        ],
-        "exit_rules": [
-          {
-            "conditions": [
-              {
-                "left": "ema_fast",
-                "comparison": "crosses_below",
-                "right": "ema_slow",
-                "lookback": null
-              }
-            ],
-            "logic": "AND",
-            "side": "long"
-          }
-        ],
-        "position_size": {
-          "type": "percent_equity",
-          "value": 98.0
-        },
+        "entry_rules": [{"conditions": [{"left": "ema_fast", "comparison": "gt", "right": "ema_slow", "lookback": null}, {"left": "close", "comparison": "gt", "right": "ema_slow", "lookback": null}, {"left": "rsi_14", "comparison": "lt", "right": 68.0, "lookback": null}], "logic": "AND", "side": "long"}],
+        "exit_rules": [{"conditions": [{"left": "ema_fast", "comparison": "crosses_below", "right": "ema_slow", "lookback": null}], "logic": "AND", "side": "long"}],
+        "position_size": {"type": "percent_equity", "value": 98.0},
         "max_positions": 1,
-        "stop_loss": {
-          "type": "trailing_atr",
-          "value": 2.0,
-          "atr_period": 14,
-          "trigger_percent": null
-        },
-        "take_profit": {
-          "type": "percent",
-          "value": 0.1
-        },
-        "regime_filter": {
-          "symbol": "SPY",
-          "sma_period": 200
-        }
+        "stop_loss": {"type": "trailing_atr", "value": 2.0, "atr_period": 14, "trigger_percent": null},
+        "take_profit": {"type": "percent", "value": 0.1},
+        "regime_filter": {"symbol": "SPY", "sma_period": 200}
       }
     },
     "IREN": {
@@ -214,92 +70,20 @@
         "name": "ema_cross_rsi_atr_regime",
         "description": "EMA 10/26 cross + RSI<68, 2.0x ATR(14) trailing stop, 10% TP, SPY>SMA200 regime gate. Exit rule VALIDATED 2026-06-12: removing it degrades the account replay despite negative raw attribution (docs/EXPERIMENT_LOG.md) — do not strip it without fresh replay evidence.",
         "version": "2.0",
-        "symbols": [
-          "SPY"
-        ],
+        "symbols": ["SPY"],
         "timeframe": "1d",
         "indicators": [
-          {
-            "type": "ema",
-            "name": "ema_fast",
-            "params": {
-              "period": 10
-            }
-          },
-          {
-            "type": "ema",
-            "name": "ema_slow",
-            "params": {
-              "period": 26
-            }
-          },
-          {
-            "type": "rsi",
-            "name": "rsi_14",
-            "params": {
-              "period": 14
-            }
-          }
+          {"type": "ema", "name": "ema_fast", "params": {"period": 10}},
+          {"type": "ema", "name": "ema_slow", "params": {"period": 26}},
+          {"type": "rsi", "name": "rsi_14", "params": {"period": 14}}
         ],
-        "entry_rules": [
-          {
-            "conditions": [
-              {
-                "left": "ema_fast",
-                "comparison": "gt",
-                "right": "ema_slow",
-                "lookback": null
-              },
-              {
-                "left": "close",
-                "comparison": "gt",
-                "right": "ema_slow",
-                "lookback": null
-              },
-              {
-                "left": "rsi_14",
-                "comparison": "lt",
-                "right": 68.0,
-                "lookback": null
-              }
-            ],
-            "logic": "AND",
-            "side": "long"
-          }
-        ],
-        "exit_rules": [
-          {
-            "conditions": [
-              {
-                "left": "ema_fast",
-                "comparison": "crosses_below",
-                "right": "ema_slow",
-                "lookback": null
-              }
-            ],
-            "logic": "AND",
-            "side": "long"
-          }
-        ],
-        "position_size": {
-          "type": "percent_equity",
-          "value": 98.0
-        },
+        "entry_rules": [{"conditions": [{"left": "ema_fast", "comparison": "gt", "right": "ema_slow", "lookback": null}, {"left": "close", "comparison": "gt", "right": "ema_slow", "lookback": null}, {"left": "rsi_14", "comparison": "lt", "right": 68.0, "lookback": null}], "logic": "AND", "side": "long"}],
+        "exit_rules": [{"conditions": [{"left": "ema_fast", "comparison": "crosses_below", "right": "ema_slow", "lookback": null}], "logic": "AND", "side": "long"}],
+        "position_size": {"type": "percent_equity", "value": 98.0},
         "max_positions": 1,
-        "stop_loss": {
-          "type": "trailing_atr",
-          "value": 2.0,
-          "atr_period": 14,
-          "trigger_percent": null
-        },
-        "take_profit": {
-          "type": "percent",
-          "value": 0.1
-        },
-        "regime_filter": {
-          "symbol": "SPY",
-          "sma_period": 200
-        }
+        "stop_loss": {"type": "trailing_atr", "value": 2.0, "atr_period": 14, "trigger_percent": null},
+        "take_profit": {"type": "percent", "value": 0.1},
+        "regime_filter": {"symbol": "SPY", "sma_period": 200}
       }
     },
     "MU": {
@@ -314,92 +98,20 @@
         "name": "ema_cross_rsi_atr_regime",
         "description": "EMA 10/26 cross + RSI<68, 2.0x ATR(14) trailing stop, 10% TP, SPY>SMA200 regime gate. Exit rule VALIDATED 2026-06-12: removing it degrades the account replay despite negative raw attribution (docs/EXPERIMENT_LOG.md) — do not strip it without fresh replay evidence.",
         "version": "2.0",
-        "symbols": [
-          "SPY"
-        ],
+        "symbols": ["SPY"],
         "timeframe": "1d",
         "indicators": [
-          {
-            "type": "ema",
-            "name": "ema_fast",
-            "params": {
-              "period": 10
-            }
-          },
-          {
-            "type": "ema",
-            "name": "ema_slow",
-            "params": {
-              "period": 26
-            }
-          },
-          {
-            "type": "rsi",
-            "name": "rsi_14",
-            "params": {
-              "period": 14
-            }
-          }
+          {"type": "ema", "name": "ema_fast", "params": {"period": 10}},
+          {"type": "ema", "name": "ema_slow", "params": {"period": 26}},
+          {"type": "rsi", "name": "rsi_14", "params": {"period": 14}}
         ],
-        "entry_rules": [
-          {
-            "conditions": [
-              {
-                "left": "ema_fast",
-                "comparison": "gt",
-                "right": "ema_slow",
-                "lookback": null
-              },
-              {
-                "left": "close",
-                "comparison": "gt",
-                "right": "ema_slow",
-                "lookback": null
-              },
-              {
-                "left": "rsi_14",
-                "comparison": "lt",
-                "right": 68.0,
-                "lookback": null
-              }
-            ],
-            "logic": "AND",
-            "side": "long"
-          }
-        ],
-        "exit_rules": [
-          {
-            "conditions": [
-              {
-                "left": "ema_fast",
-                "comparison": "crosses_below",
-                "right": "ema_slow",
-                "lookback": null
-              }
-            ],
-            "logic": "AND",
-            "side": "long"
-          }
-        ],
-        "position_size": {
-          "type": "percent_equity",
-          "value": 98.0
-        },
+        "entry_rules": [{"conditions": [{"left": "ema_fast", "comparison": "gt", "right": "ema_slow", "lookback": null}, {"left": "close", "comparison": "gt", "right": "ema_slow", "lookback": null}, {"left": "rsi_14", "comparison": "lt", "right": 68.0, "lookback": null}], "logic": "AND", "side": "long"}],
+        "exit_rules": [{"conditions": [{"left": "ema_fast", "comparison": "crosses_below", "right": "ema_slow", "lookback": null}], "logic": "AND", "side": "long"}],
+        "position_size": {"type": "percent_equity", "value": 98.0},
         "max_positions": 1,
-        "stop_loss": {
-          "type": "trailing_atr",
-          "value": 2.0,
-          "atr_period": 14,
-          "trigger_percent": null
-        },
-        "take_profit": {
-          "type": "percent",
-          "value": 0.1
-        },
-        "regime_filter": {
-          "symbol": "SPY",
-          "sma_period": 200
-        }
+        "stop_loss": {"type": "trailing_atr", "value": 2.0, "atr_period": 14, "trigger_percent": null},
+        "take_profit": {"type": "percent", "value": 0.1},
+        "regime_filter": {"symbol": "SPY", "sma_period": 200}
       }
     },
     "SNDK": {
@@ -414,92 +126,20 @@
         "name": "ema_cross_rsi_atr_regime",
         "description": "EMA 10/26 cross + RSI<68, 2.0x ATR(14) trailing stop, 10% TP, SPY>SMA200 regime gate. Exit rule VALIDATED 2026-06-12: removing it degrades the account replay despite negative raw attribution (docs/EXPERIMENT_LOG.md) — do not strip it without fresh replay evidence.",
         "version": "2.0",
-        "symbols": [
-          "SPY"
-        ],
+        "symbols": ["SPY"],
         "timeframe": "1d",
         "indicators": [
-          {
-            "type": "ema",
-            "name": "ema_fast",
-            "params": {
-              "period": 10
-            }
-          },
-          {
-            "type": "ema",
-            "name": "ema_slow",
-            "params": {
-              "period": 26
-            }
-          },
-          {
-            "type": "rsi",
-            "name": "rsi_14",
-            "params": {
-              "period": 14
-            }
-          }
+          {"type": "ema", "name": "ema_fast", "params": {"period": 10}},
+          {"type": "ema", "name": "ema_slow", "params": {"period": 26}},
+          {"type": "rsi", "name": "rsi_14", "params": {"period": 14}}
         ],
-        "entry_rules": [
-          {
-            "conditions": [
-              {
-                "left": "ema_fast",
-                "comparison": "gt",
-                "right": "ema_slow",
-                "lookback": null
-              },
-              {
-                "left": "close",
-                "comparison": "gt",
-                "right": "ema_slow",
-                "lookback": null
-              },
-              {
-                "left": "rsi_14",
-                "comparison": "lt",
-                "right": 68.0,
-                "lookback": null
-              }
-            ],
-            "logic": "AND",
-            "side": "long"
-          }
-        ],
-        "exit_rules": [
-          {
-            "conditions": [
-              {
-                "left": "ema_fast",
-                "comparison": "crosses_below",
-                "right": "ema_slow",
-                "lookback": null
-              }
-            ],
-            "logic": "AND",
-            "side": "long"
-          }
-        ],
-        "position_size": {
-          "type": "percent_equity",
-          "value": 98.0
-        },
+        "entry_rules": [{"conditions": [{"left": "ema_fast", "comparison": "gt", "right": "ema_slow", "lookback": null}, {"left": "close", "comparison": "gt", "right": "ema_slow", "lookback": null}, {"left": "rsi_14", "comparison": "lt", "right": 68.0, "lookback": null}], "logic": "AND", "side": "long"}],
+        "exit_rules": [{"conditions": [{"left": "ema_fast", "comparison": "crosses_below", "right": "ema_slow", "lookback": null}], "logic": "AND", "side": "long"}],
+        "position_size": {"type": "percent_equity", "value": 98.0},
         "max_positions": 1,
-        "stop_loss": {
-          "type": "trailing_atr",
-          "value": 2.0,
-          "atr_period": 14,
-          "trigger_percent": null
-        },
-        "take_profit": {
-          "type": "percent",
-          "value": 0.1
-        },
-        "regime_filter": {
-          "symbol": "SPY",
-          "sma_period": 200
-        }
+        "stop_loss": {"type": "trailing_atr", "value": 2.0, "atr_period": 14, "trigger_percent": null},
+        "take_profit": {"type": "percent", "value": 0.1},
+        "regime_filter": {"symbol": "SPY", "sma_period": 200}
       }
     }
   },
