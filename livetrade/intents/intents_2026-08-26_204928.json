@@ -1,0 +1,14 @@
+[
+  {
+    "symbol": "MRVL",
+    "side": "buy",
+    "dollar_amount": 16.73,
+    "quantity": null,
+    "reason": "entry rule matched: ema_fast gt ema_slow, close gt ema_slow, rsi_14 lt 68.0",
+    "signal_price": 245.11000061035156,
+    "signal_date": "2026-08-26T04:00:00",
+    "strategy_name": "ema_cross_rsi_atr_regime",
+    "generated_at": "2026-08-26T20:49:28.523978Z",
+    "broker_order_id": null
+  }
+]
