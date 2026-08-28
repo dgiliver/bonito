@@ -1,0 +1,26 @@
+[
+  {
+    "symbol": "COST",
+    "side": "sell",
+    "dollar_amount": null,
+    "quantity": 0.017195,
+    "reason": "exit rule matched",
+    "signal_price": 945.469970703125,
+    "signal_date": "2026-08-28T04:00:00",
+    "strategy_name": "ema_cross_rsi_atr_regime",
+    "generated_at": "2026-08-28T20:47:59.999675Z",
+    "broker_order_id": null
+  },
+  {
+    "symbol": "AAPL",
+    "side": "buy",
+    "dollar_amount": 15.51,
+    "quantity": null,
+    "reason": "entry rule matched: ema_fast gt ema_slow, close gt ema_slow, rsi_14 lt 68.0",
+    "signal_price": 319.70001220703125,
+    "signal_date": "2026-08-28T04:00:00",
+    "strategy_name": "ema_cross_rsi_atr_regime",
+    "generated_at": "2026-08-28T20:48:00.164282Z",
+    "broker_order_id": null
+  }
+]
