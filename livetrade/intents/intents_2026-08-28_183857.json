@@ -1,0 +1,14 @@
+[
+  {
+    "symbol": "IREN",
+    "side": "sell",
+    "dollar_amount": null,
+    "quantity": 0.390631,
+    "reason": "stop loss triggered (intraday)",
+    "signal_price": 35.10499954223633,
+    "signal_date": "2026-08-28T18:38:57.493966Z",
+    "strategy_name": "ema_cross_rsi_atr_regime",
+    "generated_at": "2026-08-28T18:38:57.494198Z",
+    "broker_order_id": null
+  }
+]
