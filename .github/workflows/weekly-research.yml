@@ -112,31 +112,43 @@ jobs:
           done
           exit 1
 
+      # Notifications are best-effort: a GitHub API hiccup (e.g. a graphql 504)
+      # must never fail the research job itself. continue-on-error keeps the job
+      # green if a notification can't be delivered; `|| echo 0` on each issue
+      # LIST lets the step still attempt the create instead of aborting under
+      # `bash -e`; and all dynamic text is passed via env (never spliced into the
+      # shell through ${{ }}) so backticks/`$()` in a digest can't be executed.
       - name: Open visibility issue when assignments changed
         if: steps.digest.outputs.outcome != 'unchanged'
+        continue-on-error: true
         env:
           GH_TOKEN: ${{ github.token }}
+          ISSUE_BODY: ${{ steps.digest.outputs.body }}
+          TRACKING_SUMMARY: ${{ steps.tracking.outputs.summary }}
+          OUTCOME: ${{ steps.digest.outputs.outcome }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
         run: |
-          printf '%b\n\n%s\n\nRun: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}\n' \
-            "${{ steps.digest.outputs.body }}" \
-            "${{ steps.tracking.outputs.summary }}" > /tmp/issue_body.md
+          printf '%b\n\n%s\n\nRun: %s\n' \
+            "$ISSUE_BODY" "$TRACKING_SUMMARY" "$RUN_URL" > /tmp/issue_body.md
           gh issue create \
-            --title "Weekly research $(date -u +%F): ${{ steps.digest.outputs.outcome }}" \
+            --title "Weekly research $(date -u +%F): $OUTCOME" \
             --body-file /tmp/issue_body.md \
             || echo "::warning::could not create visibility issue"
 
       - name: Open issue on tracking WARN
         if: steps.tracking.outputs.status == 'WARN'
+        continue-on-error: true
         env:
           GH_TOKEN: ${{ github.token }}
+          TRACKING_SUMMARY: ${{ steps.tracking.outputs.summary }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
         run: |
           # The simulation is no longer tracking reality — this gates trust
           # in every replay-based decision, so it gets its own alarm.
           existing=$(gh issue list --state open --search "Paper-vs-replay tracking WARN" \
-            --json number --jq length)
+            --json number --jq length || echo 0)
           if [ "$existing" = "0" ]; then
-            printf '%s\n\nRun: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}\n' \
-              "${{ steps.tracking.outputs.summary }}" > /tmp/tracking_issue.md
+            printf '%s\n\nRun: %s\n' "$TRACKING_SUMMARY" "$RUN_URL" > /tmp/tracking_issue.md
             gh issue create \
               --title "Paper-vs-replay tracking WARN $(date -u +%F)" \
               --body-file /tmp/tracking_issue.md \
@@ -147,15 +159,17 @@ jobs:
 
       - name: Open issue on failure
         if: failure()
+        continue-on-error: true
         env:
           GH_TOKEN: ${{ github.token }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
         run: |
           existing=$(gh issue list --state open --search "Weekly research failing" \
-            --json number --jq length)
+            --json number --jq length || echo 0)
           if [ "$existing" = "0" ]; then
             gh issue create \
               --title "Weekly research failing $(date -u +%F)" \
-              --body "The weekly auto-research cycle failed. Logs: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+              --body "The weekly auto-research cycle failed. Logs: $RUN_URL
 
           Strategy assignments stay frozen at their last validated state until this is fixed or a cycle is run manually: \`bonito research auto --apply\`." \
               || echo "::warning::could not create failure issue"
