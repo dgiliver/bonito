@@ -411,6 +411,59 @@ class TestReconcileCLI:
         assert result.exit_code == 0
 
 
+class TestLiveRunSettledBPCLI:
+    """`live run` must reject a malformed --settled-buying-power at the input
+    boundary — defense-in-depth over the generate_intents fail-closed. The
+    validation fires before any store/ledger access, so a tmp paper universe
+    keeps the test fully isolated even if a regression let it proceed."""
+
+    def _universe_file(self, tmp_path) -> str:
+        strategy_path = tmp_path / "s.json"
+        strategy_path.write_text(json.dumps(ALWAYS_ENTER_STRATEGY))
+        cfg = {
+            "name": "cli_test",
+            "symbols": ["AAA"],
+            "strategy_path": str(strategy_path),
+            "data": {"timeframe": "1d", "start_date": "2026-01-01"},
+            "mode": "paper",
+            "risk": {"starting_cash_usd": 150.0},
+        }
+        path = tmp_path / "universe.json"
+        path.write_text(json.dumps(cfg))
+        return str(path)
+
+    def test_rejects_nan_settled_bp(self, tmp_path):
+        result = _runner.invoke(
+            app,
+            [
+                "live",
+                "run",
+                "--settled-buying-power",
+                "nan",
+                "--no-refresh",
+                "-u",
+                self._universe_file(tmp_path),
+            ],
+        )
+        assert result.exit_code == 1
+        assert "invalid --settled-buying-power" in (result.output or "")
+
+    def test_rejects_negative_settled_bp(self, tmp_path):
+        result = _runner.invoke(
+            app,
+            [
+                "live",
+                "run",
+                "--settled-buying-power=-5",
+                "--no-refresh",
+                "-u",
+                self._universe_file(tmp_path),
+            ],
+        )
+        assert result.exit_code == 1
+        assert "invalid --settled-buying-power" in (result.output or "")
+
+
 # ---------------------------------------------------------------------------
 # B: Fill recording (D3)
 # ---------------------------------------------------------------------------
