@@ -228,6 +228,87 @@ class TestGenerateIntents:
         assert len(sells) == 1
         assert "take profit" in sells[0].reason
 
+    def test_settled_bp_none_is_identical_to_current(self, universe):
+        """settled_buying_power=None (the paper-mode default) must reproduce
+        today's byte-identical sizing: 3 capped $30 buys, same as the
+        pre-existing test_generates_capped_buys with no flag passed at all."""
+        store = uptrend_store(universe.symbols)
+        ledger = PaperLedger(cash=150.0, starting_cash=150.0)
+
+        intents, _ = generate_intents(
+            universe, store, ledger, as_of=AS_OF, settled_buying_power=None
+        )
+
+        buys = [i for i in intents if i.side == "buy"]
+        assert len(buys) == 3
+        assert all(i.dollar_amount == 30.0 for i in buys)
+
+    def test_settled_bp_below_cash_caps_dollar_amount(self, universe):
+        """Primary teeth test: broker settled buying power below ledger.cash
+        must cap the buy, not ledger.cash alone. With cash=150 (abundant) and
+        settled_buying_power=25, spendable = min(150, 25) = 25, available =
+        25 - 5 buffer = 20 -> exactly one $20 buy, not the usual $30 x 3."""
+        store = uptrend_store(universe.symbols)
+        ledger = PaperLedger(cash=150.0, starting_cash=150.0)
+
+        intents, _ = generate_intents(
+            universe, store, ledger, as_of=AS_OF, settled_buying_power=25.0
+        )
+
+        buys = [i for i in intents if i.side == "buy"]
+        assert len(buys) == 1
+        assert buys[0].dollar_amount == 20.0  # 25 - 5 buffer
+
+    def test_cash_still_binds_when_settled_bp_larger(self, universe):
+        """Complementary teeth test: when settled_buying_power is generous
+        but ledger.cash is scarce, cash must still bind (min(), not a bare
+        assignment to settled_buying_power). Fails if `spendable =
+        settled_buying_power` were written without the min(ledger.cash, ...)."""
+        store = uptrend_store(universe.symbols)
+        ledger = PaperLedger(cash=25.0, starting_cash=150.0)
+
+        intents, _ = generate_intents(
+            universe, store, ledger, as_of=AS_OF, settled_buying_power=1000.0
+        )
+
+        buys = [i for i in intents if i.side == "buy"]
+        assert len(buys) == 1
+        assert buys[0].dollar_amount == 20.0  # 25 cash - 5 buffer still binds
+
+    def test_settled_bp_below_min_order_skips_all_buys(self, universe):
+        """settled_buying_power so tight that available (bp - buffer) falls
+        under MIN_ORDER_USD (1.0) must skip every entry, exactly like the
+        existing cash-buffer floor does for ledger.cash alone."""
+        store = uptrend_store(universe.symbols)
+        ledger = PaperLedger(cash=150.0, starting_cash=150.0)
+
+        intents, _ = generate_intents(
+            universe, store, ledger, as_of=AS_OF, settled_buying_power=5.5
+        )
+
+        assert [i for i in intents if i.side == "buy"] == []
+
+    def test_exit_never_gated_by_settled_bp_zero(self, universe):
+        """Exits are generated before the buy-sizing line and never read
+        `available`/`spendable` — settled_buying_power=0.0 must not suppress
+        a stop-loss exit, even though it fully blocks new entries."""
+        store = uptrend_store(universe.symbols)
+        ledger = PaperLedger(cash=0.0, starting_cash=150.0)
+        # Entry at 200 vs uptrend last close 129 fires the trailing stop,
+        # exactly like test_exit_generated_for_stop_breach.
+        _open_position(ledger, "AAA", quantity=0.5, entry_price=200.0)
+
+        intents, _ = generate_intents(
+            universe, store, ledger, as_of=AS_OF, settled_buying_power=0.0
+        )
+
+        sells = [i for i in intents if i.side == "sell"]
+        assert len(sells) == 1
+        assert sells[0].symbol == "AAA"
+        assert sells[0].quantity == 0.5
+        assert "stop loss" in sells[0].reason
+        assert [i for i in intents if i.side == "buy"] == []
+
 
 class TestExecutePaper:
     def test_sells_run_before_buys(self, universe):
