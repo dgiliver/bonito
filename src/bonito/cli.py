@@ -1029,6 +1029,12 @@ def live_signals(
 def live_run(
     universe_path: str = typer.Option("config/universe.json", "--universe", "-u"),
     refresh: bool = typer.Option(True, "--refresh/--no-refresh", help="Refresh data first"),
+    settled_buying_power: float = typer.Option(
+        None,
+        "--settled-buying-power",
+        help="Live settled buying power from the broker; caps buy sizing so queued "
+        "orders don't exceed unsettled (T+1) cash. Omit in paper mode.",
+    ),
 ) -> None:
     """Full daily cycle: refresh data, generate intents, fill in paper mode.
 
@@ -1059,7 +1065,9 @@ def live_run(
 
     ledger = _load_ledger(universe)
     try:
-        intents, prices = generate_intents(universe, store, ledger)
+        intents, prices = generate_intents(
+            universe, store, ledger, settled_buying_power=settled_buying_power
+        )
     except LivePricingError as exc:
         console.print(f"[bold red]PRICING ERROR — aborting cycle:[/bold red] {exc}")
         raise typer.Exit(1) from None

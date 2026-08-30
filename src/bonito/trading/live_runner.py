@@ -210,6 +210,7 @@ def generate_intents(
     ledger: PaperLedger,
     as_of: datetime | None = None,
     require_settled: bool = True,
+    settled_buying_power: float | None = None,
 ) -> tuple[list[TradeIntent], dict[str, float]]:
     """Evaluate per-symbol strategies across the universe and produce intents.
 
@@ -227,6 +228,10 @@ def generate_intents(
 
     Trailing-stop high-water marks and the peak-equity watermark on the
     ledger are updated as side effects (caller saves the ledger).
+
+    `settled_buying_power`, when set, is the live broker's settled buying
+    power and caps buy sizing; `None` (default) leaves the paper-mode
+    calculation unchanged.
 
     Returns:
         (intents, last_close_prices) — prices cover every symbol that had
@@ -331,7 +336,13 @@ def generate_intents(
     open_after_exits = len(ledger.positions) - len(sells)
     # Cash freed by pending sells isn't counted — entries spend only
     # currently-settled cash, which is the conservative cash-account behavior.
-    available = ledger.cash - universe.risk.min_cash_buffer_usd
+    # In live mode the broker's real settled buying power (T+1 in a cash account)
+    # can be below ledger.cash, which books sale proceeds immediately; cap by it
+    # so we don't queue buys the broker rejects. None ⇒ paper path byte-identical.
+    spendable = (
+        ledger.cash if settled_buying_power is None else min(ledger.cash, settled_buying_power)
+    )
+    available = spendable - universe.risk.min_cash_buffer_usd
     buys = 0
     regime_cache: dict[tuple[str, int], bool] = {}
     allowset = (
