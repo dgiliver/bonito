@@ -42,11 +42,26 @@ broker's real settled buying power, passed in from the routine.
 
 | ID | Role | Task | Status | Result |
 |----|------|------|--------|--------|
-| P | Planner | file:line diff + test plan | dispatched | — |
-| B | Builder | implement plan | blocked on P | — |
+| P | Planner | file:line diff + test plan | ✅ done | plan verified (see below) |
+| B | Builder | implement plan | dispatched | — |
 | T | Tester | write non-vacuous tests | blocked on B | — |
 | V | Validator | independent PASS/FAIL | blocked on T | — |
 
+## Planner output (verified by orchestrator)
+
+Spot-check PASSED: `available` (the variable) is read only at `live_runner.py:334/368/412`, all inside the buy loop (`for symbol in universe.symbols:` @349); lines 478/496 are the English word. **Exits (242–278) never touch it → cap cannot gate exits.** Call sites confirmed: `cli.py:1007`=`live_signals` (leave), `cli.py:1062`=`live_run` (modify).
+
+Planner corrections folded in:
+- The CLI command is **`live_signals`** (the `signals` cmd @1007), NOT `live_generate` — leave untouched.
+- Typer option must be bare **`float = typer.Option(None, …)`** (cli.py has no `from __future__ import annotations`; mirror the `--dollars` idiom @1606), not `float | None`.
+- The one-line ternary is 102 chars → use the `ruff format`-canonical wrapped form.
+- Do **NOT** renumber `AUTONOMOUS_LIVE_ROUTINE.md` steps (cross-referenced throughout) — fold the `get_portfolio` fetch into step 7 prose; also add "one get_portfolio" to the tool-call preamble @193.
+- `position_pct_equity` composes for free: `available` is already inside `min(target, max_position_usd, available)` @368 — lowering it can only lower `dollar`.
+- Replay (`portfolio_backtest.py:282`, keyword args) + `live_signals` never pass the param → both stay None/byte-identical. Builder must NOT thread it into the replay.
+
+Touchpoints: `live_runner.py` sig 207–213 + `available` 330–334; `cli.py` `live_run` sig 1028–1032 + call 1062; `docs/AUTONOMOUS_LIVE_ROUTINE.md` step 7 @287–289 + preamble @193; tests → `TestGenerateIntents` @107 (fixtures `universe`@82, `uptrend_store`@102, `_open_position`@697, `AS_OF`@29).
+
 ## Run log
 
-- **44fb078** base (main tip). Branch `claude/settled-cash-sizing` created. Venv rebuilt with `[dev]`; `pytest tests/test_live_runner.py` = 105 passed. Coordination doc committed. Planner dispatched.
+- **44fb078** base (main tip). Branch created, venv rebuilt with `[dev]`, `pytest tests/test_live_runner.py` = 105 passed. Coordination doc committed (**bc219dc**). Planner dispatched.
+- **Planner returned + spot-checked (PASS).** Load-bearing claim (exits-never-gated) independently grep-verified. Plan + corrections folded above. Builder dispatched with the plan embedded verbatim.
