@@ -43,8 +43,8 @@ broker's real settled buying power, passed in from the routine.
 | ID | Role | Task | Status | Result |
 |----|------|------|--------|--------|
 | P | Planner | file:line diff + test plan | ✅ done | plan verified (see below) |
-| B | Builder | implement plan | dispatched | — |
-| T | Tester | write non-vacuous tests | blocked on B | — |
+| B | Builder | implement plan | ✅ done | 3832f6a |
+| T | Tester | write non-vacuous tests | dispatched | — |
 | V | Validator | independent PASS/FAIL | blocked on T | — |
 
 ## Planner output (verified by orchestrator)
@@ -65,3 +65,4 @@ Touchpoints: `live_runner.py` sig 207–213 + `available` 330–334; `cli.py` `l
 
 - **44fb078** base (main tip). Branch created, venv rebuilt with `[dev]`, `pytest tests/test_live_runner.py` = 105 passed. Coordination doc committed (**bc219dc**). Planner dispatched.
 - **Planner returned + spot-checked (PASS).** Load-bearing claim (exits-never-gated) independently grep-verified. Plan + corrections folded above. Builder dispatched with the plan embedded verbatim.
+- **Builder returned; orchestrator reviewed diffs directly.** Builder's `ruff format` had normalized ~7 pre-existing unrelated lines (reconcile/resolve_pending/read_cycle_lock in live_runner; 4 console.print/qty_label in cli). To keep the PR surgical I reverted both `.py` files to main and re-applied only the 5 intended edits by hand; the doc edit kept as-is. Result: `git diff --stat` = 3 files, +33/−8. `ruff check` clean; none of the new lines appear in `ruff format --diff`; `import bonito.cli` OK. Full fast suite: **917 passed, 8 skipped, 1 failed**. The 1 failure (`test_trailing_stops.py::…test_full_flow_create_and_backtest_trailing`) is **pre-existing + unrelated**: fails identically on clean main (verified by stashing), references none of the changed code, and fails on `No data found for SPY. Run 'bonito ingest SPY'` — an empty-DuckDB env/data-setup issue, not a regression. Implementation committed **3832f6a**. Tester dispatched.
