@@ -1,5 +1,6 @@
 """Command-line interface for the Bonito agent."""
 
+import math
 from datetime import datetime, timedelta
 from pathlib import Path
 
@@ -1029,6 +1030,13 @@ def live_signals(
 def live_run(
     universe_path: str = typer.Option("config/universe.json", "--universe", "-u"),
     refresh: bool = typer.Option(True, "--refresh/--no-refresh", help="Refresh data first"),
+    settled_buying_power: float = typer.Option(
+        None,
+        "--settled-buying-power",
+        help="Live broker settled (non-T+1-pending) buying power; caps buy sizing to "
+        "settled cash so queued orders aren't rejected for insufficient funds. "
+        "Omit in paper mode.",
+    ),
 ) -> None:
     """Full daily cycle: refresh data, generate intents, fill in paper mode.
 
@@ -1050,6 +1058,22 @@ def live_run(
         )
         raise typer.Exit(1)
 
+    if settled_buying_power is not None and (
+        not math.isfinite(settled_buying_power) or settled_buying_power < 0
+    ):
+        # Fail closed at the untrusted input boundary: a NaN/inf slips past the
+        # sizing min() and would silently disable the cap; a negative is nonsense.
+        console.print(
+            f"[red]invalid --settled-buying-power {settled_buying_power!r} — must be a "
+            "finite, non-negative number.[/red]"
+        )
+        raise typer.Exit(1)
+    if settled_buying_power is not None and universe.mode != "live":
+        console.print(
+            "[yellow]--settled-buying-power given in non-live mode; it caps buys and can "
+            "skew paper-vs-replay tracking. Omit it in paper mode.[/yellow]"
+        )
+
     store = _get_store()
 
     if refresh:
@@ -1059,7 +1083,9 @@ def live_run(
 
     ledger = _load_ledger(universe)
     try:
-        intents, prices = generate_intents(universe, store, ledger)
+        intents, prices = generate_intents(
+            universe, store, ledger, settled_buying_power=settled_buying_power
+        )
     except LivePricingError as exc:
         console.print(f"[bold red]PRICING ERROR — aborting cycle:[/bold red] {exc}")
         raise typer.Exit(1) from None

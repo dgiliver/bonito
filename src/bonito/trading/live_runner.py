@@ -11,6 +11,7 @@ instead — small dollar-based fractional orders across many symbols.
 
 import json
 import logging
+import math
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from zoneinfo import ZoneInfo
@@ -210,6 +211,7 @@ def generate_intents(
     ledger: PaperLedger,
     as_of: datetime | None = None,
     require_settled: bool = True,
+    settled_buying_power: float | None = None,
 ) -> tuple[list[TradeIntent], dict[str, float]]:
     """Evaluate per-symbol strategies across the universe and produce intents.
 
@@ -227,6 +229,10 @@ def generate_intents(
 
     Trailing-stop high-water marks and the peak-equity watermark on the
     ledger are updated as side effects (caller saves the ledger).
+
+    `settled_buying_power`, when set, is the live broker's settled buying
+    power and caps buy sizing; `None` (default) leaves the paper-mode
+    calculation unchanged.
 
     Returns:
         (intents, last_close_prices) — prices cover every symbol that had
@@ -331,7 +337,24 @@ def generate_intents(
     open_after_exits = len(ledger.positions) - len(sells)
     # Cash freed by pending sells isn't counted — entries spend only
     # currently-settled cash, which is the conservative cash-account behavior.
-    available = ledger.cash - universe.risk.min_cash_buffer_usd
+    # In live mode the broker's real settled buying power (T+1 in a cash account)
+    # can be below ledger.cash, which books sale proceeds immediately; cap by it
+    # so we don't queue buys the broker rejects. None ⇒ paper path byte-identical.
+    if settled_buying_power is None:
+        spendable = ledger.cash
+    elif not math.isfinite(settled_buying_power):
+        # A malformed settled-cash figure (NaN/inf) must NOT silently disable the
+        # cap: min() drops NaN and would revert to ledger.cash (uncapped). Fail
+        # closed to zero spend so no buy is queued this cycle. Exits are generated
+        # above and are unaffected. The CLI also rejects a non-finite value up front.
+        logger.warning(
+            "non-finite settled_buying_power=%r — failing closed: no entries this cycle",
+            settled_buying_power,
+        )
+        spendable = 0.0
+    else:
+        spendable = min(ledger.cash, settled_buying_power)
+    available = spendable - universe.risk.min_cash_buffer_usd
     buys = 0
     regime_cache: dict[tuple[str, int], bool] = {}
     allowset = (
@@ -410,13 +433,13 @@ def generate_intents(
         )
         buys += 1
         available -= dollar
-        # TODO(D4): gate on settled buying power once the MCP `get_accounts` is wired
-        # on the Routine side; for now log only so the broker is the backstop on
-        # T+1 settlement — revisit if rejections appear.
-        if universe.mode == "live":
+        # When settled_buying_power was supplied, this entry is already sized to the
+        # broker's settled cash (see `spendable` above), so there's no T+1 caveat.
+        # Only when it's absent is the broker the sole backstop on settlement — say so.
+        if universe.mode == "live" and settled_buying_power is None:
             logger.info(
-                f"D4 note: {symbol} buy ${dollar:.2f} queued — verify settled buying "
-                "power before placing (T+1 settlement may block this order)"
+                f"D4 note: {symbol} buy ${dollar:.2f} queued WITHOUT a settled-BP cap "
+                "— broker is the backstop (T+1 settlement may block this order)"
             )
 
     return intents, prices

@@ -192,9 +192,9 @@ Token discipline (this runs daily, unattended — be lean):
   price, filled qty, order id).
 - Minimum tool calls: one get_accounts, one get_equity_positions to reconcile,
   one get_equity_orders per pending order id in step 3 (usually zero or one),
-  then per intent review→place→record, one `live tracking`, and the git
-  pushes steps 2 and 11 require. Never re-fetch or re-run a step that
-  already succeeded.
+  one get_portfolio for settled buying power in step 7, then per intent
+  review→place→record, one `live tracking`, and the git pushes steps 2 and
+  11 require. Never re-fetch or re-run a step that already succeeded.
 - Final report ≤ 8 lines: what filled / didn't / queued, pending orders
   resolved, reconcile + tracking status, any abort reason. Nothing else.
   Intraday stop-loss/take-profit protection is handled by the separate
@@ -284,9 +284,19 @@ Setup:
 6. Preflight: `.venv/bin/bonito live preflight -u config/universe.live.json`.
    Non-zero exit = ABORT: STOP and report (kill switch, data outage, or
    flag mismatch). Do not trade.
-7. Generate intents: `.venv/bin/bonito live run --no-refresh
-   -u config/universe.live.json`. This writes livetrade/intents/*.json and
-   places NOTHING itself.
+7. Generate intents: first fetch settled buying power for the Agentic
+   account resolved in step 1 — Robinhood get_portfolio, then read the
+   nested `buying_power.buying_power` field (get_portfolio returns a
+   buying_power OBJECT whose own `buying_power` key is the value). On a cash
+   account this is the SETTLED figure: it already excludes unsettled T+1
+   sale proceeds, which is exactly the cap we want. Do NOT substitute ledger
+   cash, the top-level `cash`, or get_accounts `unsettled_funds`. Then
+   `.venv/bin/bonito live run --no-refresh --settled-buying-power <bp>
+   -u config/universe.live.json`. This caps buy sizing to real settled cash
+   so queued orders aren't rejected (EQUITY_NOT_ENOUGH_BP); it writes
+   livetrade/intents/*.json and places NOTHING itself. The broker call stays
+   here in the Routine (it has the MCP); the CLI stays offline — it only
+   consumes the number you pass, and rejects a non-finite or negative value.
 8. Execute ONLY the intents in the newest intents file, sells before buys:
    for each, Robinhood review_equity_order then place_equity_order (fresh
    UUID ref_id). Then read the order's actual state (from
