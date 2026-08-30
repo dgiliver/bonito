@@ -285,14 +285,18 @@ Setup:
    Non-zero exit = ABORT: STOP and report (kill switch, data outage, or
    flag mismatch). Do not trade.
 7. Generate intents: first fetch settled buying power for the Agentic
-   account resolved in step 1 — Robinhood get_portfolio →
-   buying_power.buying_power (the settled, T+1 figure, NOT ledger cash) —
-   then `.venv/bin/bonito live run --no-refresh
-   --settled-buying-power <bp> -u config/universe.live.json`. This caps buy
-   sizing to real settled cash so queued orders aren't rejected
-   (EQUITY_NOT_ENOUGH_BP); it writes livetrade/intents/*.json and places
-   NOTHING itself. The broker call stays here in the Routine (it has the
-   MCP); the CLI stays offline — it only consumes the number you pass.
+   account resolved in step 1 — Robinhood get_portfolio, then read the
+   nested `buying_power.buying_power` field (get_portfolio returns a
+   buying_power OBJECT whose own `buying_power` key is the value). On a cash
+   account this is the SETTLED figure: it already excludes unsettled T+1
+   sale proceeds, which is exactly the cap we want. Do NOT substitute ledger
+   cash, the top-level `cash`, or get_accounts `unsettled_funds`. Then
+   `.venv/bin/bonito live run --no-refresh --settled-buying-power <bp>
+   -u config/universe.live.json`. This caps buy sizing to real settled cash
+   so queued orders aren't rejected (EQUITY_NOT_ENOUGH_BP); it writes
+   livetrade/intents/*.json and places NOTHING itself. The broker call stays
+   here in the Routine (it has the MCP); the CLI stays offline — it only
+   consumes the number you pass, and rejects a non-finite or negative value.
 8. Execute ONLY the intents in the newest intents file, sells before buys:
    for each, Robinhood review_equity_order then place_equity_order (fresh
    UUID ref_id). Then read the order's actual state (from

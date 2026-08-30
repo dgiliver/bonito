@@ -1,5 +1,6 @@
 """Command-line interface for the Bonito agent."""
 
+import math
 from datetime import datetime, timedelta
 from pathlib import Path
 
@@ -1032,8 +1033,9 @@ def live_run(
     settled_buying_power: float = typer.Option(
         None,
         "--settled-buying-power",
-        help="Live settled buying power from the broker; caps buy sizing so queued "
-        "orders don't exceed unsettled (T+1) cash. Omit in paper mode.",
+        help="Live broker settled (non-T+1-pending) buying power; caps buy sizing to "
+        "settled cash so queued orders aren't rejected for insufficient funds. "
+        "Omit in paper mode.",
     ),
 ) -> None:
     """Full daily cycle: refresh data, generate intents, fill in paper mode.
@@ -1055,6 +1057,22 @@ def live_run(
             "[red]mode is 'live' but live_enabled is false in universe.json — refusing.[/red]"
         )
         raise typer.Exit(1)
+
+    if settled_buying_power is not None and (
+        not math.isfinite(settled_buying_power) or settled_buying_power < 0
+    ):
+        # Fail closed at the untrusted input boundary: a NaN/inf slips past the
+        # sizing min() and would silently disable the cap; a negative is nonsense.
+        console.print(
+            f"[red]invalid --settled-buying-power {settled_buying_power!r} — must be a "
+            "finite, non-negative number.[/red]"
+        )
+        raise typer.Exit(1)
+    if settled_buying_power is not None and universe.mode != "live":
+        console.print(
+            "[yellow]--settled-buying-power given in non-live mode; it caps buys and can "
+            "skew paper-vs-replay tracking. Omit it in paper mode.[/yellow]"
+        )
 
     store = _get_store()
 

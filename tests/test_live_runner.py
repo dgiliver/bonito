@@ -309,6 +309,51 @@ class TestGenerateIntents:
         assert "stop loss" in sells[0].reason
         assert [i for i in intents if i.side == "buy"] == []
 
+    def test_nan_settled_bp_fails_closed_no_buys(self, universe):
+        """A malformed (NaN) settled_buying_power must FAIL CLOSED — zero buys —
+        not silently revert to uncapped ledger.cash. min(cash, NaN) returns cash
+        (NaN compares False), so without an explicit guard the safety cap would
+        vanish on a bad upstream broker figure. Exits stay unaffected."""
+        store = uptrend_store(universe.symbols)
+        ledger = PaperLedger(cash=150.0, starting_cash=150.0)
+        _open_position(ledger, "AAA", quantity=0.5, entry_price=200.0)  # stops out
+
+        intents, _ = generate_intents(
+            universe, store, ledger, as_of=AS_OF, settled_buying_power=float("nan")
+        )
+
+        assert [i for i in intents if i.side == "buy"] == []  # fail closed, not uncapped
+        assert any(i.side == "sell" and i.symbol == "AAA" for i in intents)  # exit still fires
+
+    def test_negative_settled_bp_fails_closed_no_buys(self, universe):
+        """A negative settled_buying_power is nonsensical; available drops below
+        MIN_ORDER_USD so every entry is skipped — never a buy."""
+        store = uptrend_store(universe.symbols)
+        ledger = PaperLedger(cash=150.0, starting_cash=150.0)
+
+        intents, _ = generate_intents(
+            universe, store, ledger, as_of=AS_OF, settled_buying_power=-10.0
+        )
+
+        assert [i for i in intents if i.side == "buy"] == []
+
+    def test_settled_bp_caps_the_pct_equity_path(self, universe):
+        """The cap composes with position_pct_equity sizing: with pct set the
+        per-buy target is equity-scaled (0.5*150=75, itself capped at $30), but
+        settled_buying_power still binds it through the existing
+        min(target, max_position_usd, available). settled 25 - 5 buffer = 20."""
+        universe.risk.position_pct_equity = 0.5
+        store = uptrend_store(universe.symbols)
+        ledger = PaperLedger(cash=150.0, starting_cash=150.0)
+
+        intents, _ = generate_intents(
+            universe, store, ledger, as_of=AS_OF, settled_buying_power=25.0
+        )
+
+        buys = [i for i in intents if i.side == "buy"]
+        assert len(buys) == 1
+        assert buys[0].dollar_amount == 20.0  # settled cap binds below target and max
+
 
 class TestExecutePaper:
     def test_sells_run_before_buys(self, universe):
