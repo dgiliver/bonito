@@ -1,5 +1,5 @@
 {
-  "cash": 48.90007614390004,
+  "cash": 33.310076143900034,
   "starting_cash": 150.0,
   "positions": {
     "MU": {
@@ -408,6 +408,106 @@
       "entry_price": 427.49,
       "entry_date": "2026-08-28T13:30:01.404000Z",
       "high_water_mark": 427.49,
+      "strategy_name": "live",
+      "strategy_hash": "da16575a5622",
+      "strategy_config": {
+        "name": "ema_cross_rsi_atr_regime",
+        "description": "EMA 10/26 cross + RSI<68, 2.0x ATR(14) trailing stop, 10% TP, SPY>SMA200 regime gate. Exit rule VALIDATED 2026-06-12: removing it degrades the account replay despite negative raw attribution (docs/EXPERIMENT_LOG.md) — do not strip it without fresh replay evidence.",
+        "version": "2.0",
+        "symbols": [
+          "SPY"
+        ],
+        "timeframe": "1d",
+        "indicators": [
+          {
+            "type": "ema",
+            "name": "ema_fast",
+            "params": {
+              "period": 10
+            }
+          },
+          {
+            "type": "ema",
+            "name": "ema_slow",
+            "params": {
+              "period": 26
+            }
+          },
+          {
+            "type": "rsi",
+            "name": "rsi_14",
+            "params": {
+              "period": 14
+            }
+          }
+        ],
+        "entry_rules": [
+          {
+            "conditions": [
+              {
+                "left": "ema_fast",
+                "comparison": "gt",
+                "right": "ema_slow",
+                "lookback": null
+              },
+              {
+                "left": "close",
+                "comparison": "gt",
+                "right": "ema_slow",
+                "lookback": null
+              },
+              {
+                "left": "rsi_14",
+                "comparison": "lt",
+                "right": 68.0,
+                "lookback": null
+              }
+            ],
+            "logic": "AND",
+            "side": "long"
+          }
+        ],
+        "exit_rules": [
+          {
+            "conditions": [
+              {
+                "left": "ema_fast",
+                "comparison": "crosses_below",
+                "right": "ema_slow",
+                "lookback": null
+              }
+            ],
+            "logic": "AND",
+            "side": "long"
+          }
+        ],
+        "position_size": {
+          "type": "percent_equity",
+          "value": 98.0
+        },
+        "max_positions": 1,
+        "stop_loss": {
+          "type": "trailing_atr",
+          "value": 2.0,
+          "atr_period": 14,
+          "trigger_percent": null
+        },
+        "take_profit": {
+          "type": "percent",
+          "value": 0.1
+        },
+        "regime_filter": {
+          "symbol": "SPY",
+          "sma_period": 200
+        }
+      }
+    },
+    "AMZN": {
+      "symbol": "AMZN",
+      "quantity": 0.061192,
+      "entry_price": 254.77,
+      "entry_date": "2026-09-01T13:30:01.631000Z",
+      "high_water_mark": 254.9199981689453,
       "strategy_name": "live",
       "strategy_hash": "da16575a5622",
       "strategy_config": {
@@ -1288,18 +1388,62 @@
     {
       "symbol": "AMZN",
       "side": "buy",
-      "quantity": 0.0,
-      "price": 259.85,
-      "notional": 0.0,
-      "reason": "no_fill: live fill",
-      "filled_at": "2026-08-31T20:48:57.744597Z",
+      "quantity": 0.061192,
+      "price": 254.77,
+      "notional": 15.59,
+      "reason": "live fill (resolved from queued order)",
+      "filled_at": "2026-09-01T13:30:01.631000Z",
       "strategy_name": "live",
       "broker_order_id": "6a95e8b1-2a02-46b1-a76a-ad7bdb834fbd"
+    },
+    {
+      "symbol": "DELL",
+      "side": "sell",
+      "quantity": 0.0,
+      "price": 425.0,
+      "notional": 0.0,
+      "reason": "no_fill: live fill",
+      "filled_at": "2026-09-01T20:49:18.663810Z",
+      "strategy_name": "live",
+      "broker_order_id": "6a973a3a-5fa6-4c57-9734-02ec0a5dec4d"
+    },
+    {
+      "symbol": "TSM",
+      "side": "sell",
+      "quantity": 0.0,
+      "price": 414.0,
+      "notional": 0.0,
+      "reason": "no_fill: live fill",
+      "filled_at": "2026-09-01T20:49:22.795447Z",
+      "strategy_name": "live",
+      "broker_order_id": "6a973a3c-192d-431c-839f-cca8427fe0c0"
+    },
+    {
+      "symbol": "AAPL",
+      "side": "buy",
+      "quantity": 0.0,
+      "price": 325.13,
+      "notional": 0.0,
+      "reason": "no_fill: live fill",
+      "filled_at": "2026-09-01T20:49:44.243232Z",
+      "strategy_name": "live",
+      "broker_order_id": "6a973a5f-1fd3-46d6-a60a-156ad6c925a2"
+    },
+    {
+      "symbol": "NVDA",
+      "side": "buy",
+      "quantity": 0.0,
+      "price": 217.44,
+      "notional": 0.0,
+      "reason": "no_fill: live fill",
+      "filled_at": "2026-09-01T20:49:48.091432Z",
+      "strategy_name": "live",
+      "broker_order_id": "6a973a61-0b8a-499a-b1cf-97e49abff8e2"
     }
   ],
   "realized_pnl": -16.075867226099994,
   "peak_equity": 150.14103162835693,
   "halted": false,
   "halt_reason": "",
-  "updated_at": "2026-09-01T19:39:25.100371Z"
+  "updated_at": "2026-09-01T20:49:48.091655Z"
 }

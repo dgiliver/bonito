@@ -1,0 +1,50 @@
+[
+  {
+    "symbol": "DELL",
+    "side": "sell",
+    "dollar_amount": null,
+    "quantity": 0.035577,
+    "reason": "stop loss triggered",
+    "signal_price": 425.0,
+    "signal_date": "2026-09-01T04:00:00",
+    "strategy_name": "ema_cross_rsi_atr_regime",
+    "generated_at": "2026-09-01T20:48:38.774052Z",
+    "broker_order_id": null
+  },
+  {
+    "symbol": "TSM",
+    "side": "sell",
+    "dollar_amount": null,
+    "quantity": 0.039252,
+    "reason": "exit rule matched",
+    "signal_price": 414.0,
+    "signal_date": "2026-09-01T04:00:00",
+    "strategy_name": "ema_cross_rsi_atr_regime",
+    "generated_at": "2026-09-01T20:48:38.796139Z",
+    "broker_order_id": null
+  },
+  {
+    "symbol": "AAPL",
+    "side": "buy",
+    "dollar_amount": 16.25,
+    "quantity": null,
+    "reason": "entry rule matched: ema_fast gt ema_slow, close gt ema_slow, rsi_14 lt 68.0",
+    "signal_price": 325.1300048828125,
+    "signal_date": "2026-09-01T04:00:00",
+    "strategy_name": "ema_cross_rsi_atr_regime",
+    "generated_at": "2026-09-01T20:48:38.926670Z",
+    "broker_order_id": null
+  },
+  {
+    "symbol": "NVDA",
+    "side": "buy",
+    "dollar_amount": 12.06,
+    "quantity": null,
+    "reason": "entry rule matched: ema_fast gt ema_slow, close gt ema_slow, rsi_14 lt 68.0",
+    "signal_price": 217.44000244140625,
+    "signal_date": "2026-09-01T04:00:00",
+    "strategy_name": "ema_cross_rsi_atr_regime",
+    "generated_at": "2026-09-01T20:48:38.958504Z",
+    "broker_order_id": null
+  }
+]
