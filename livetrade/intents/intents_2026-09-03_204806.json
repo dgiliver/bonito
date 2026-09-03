@@ -1,0 +1,26 @@
+[
+  {
+    "symbol": "DELL",
+    "side": "buy",
+    "dollar_amount": 16.9,
+    "quantity": null,
+    "reason": "entry rule matched: ema_fast gt ema_slow, close gt ema_slow, rsi_14 lt 68.0",
+    "signal_price": 516.3900146484375,
+    "signal_date": "2026-09-03T04:00:00",
+    "strategy_name": "ema_cross_rsi_atr_regime",
+    "generated_at": "2026-09-03T20:48:05.972778Z",
+    "broker_order_id": null
+  },
+  {
+    "symbol": "META",
+    "side": "buy",
+    "dollar_amount": 15.82,
+    "quantity": null,
+    "reason": "entry rule matched: ema_fast gt ema_slow, close gt ema_slow, rsi_14 lt 68.0",
+    "signal_price": 610.6799926757812,
+    "signal_date": "2026-09-03T04:00:00",
+    "strategy_name": "ema_cross_rsi_atr_regime",
+    "generated_at": "2026-09-03T20:48:06.084963Z",
+    "broker_order_id": null
+  }
+]

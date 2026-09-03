@@ -1350,11 +1350,33 @@
       "filled_at": "2026-09-03T13:40:28.537629Z",
       "strategy_name": "live",
       "broker_order_id": "6a9978b7-7c3e-436b-9f24-56254d4d5b10"
+    },
+    {
+      "symbol": "DELL",
+      "side": "buy",
+      "quantity": 0.0,
+      "price": 514.32,
+      "notional": 0.0,
+      "reason": "no_fill: live fill",
+      "filled_at": "2026-09-03T20:48:44.321137Z",
+      "strategy_name": "live",
+      "broker_order_id": "6a99dd22-1833-4f04-86f8-509e5dd0cfd0"
+    },
+    {
+      "symbol": "META",
+      "side": "buy",
+      "quantity": 0.0,
+      "price": 585.49,
+      "notional": 0.0,
+      "reason": "no_fill: live fill",
+      "filled_at": "2026-09-03T20:49:05.712863Z",
+      "strategy_name": "live",
+      "broker_order_id": "6a99dd3a-beb6-4004-bbff-87f7388fcca3"
     }
   ],
   "realized_pnl": -14.264801447899995,
   "peak_equity": 150.14103162835693,
   "halted": false,
   "halt_reason": "",
-  "updated_at": "2026-09-03T19:38:41.522219Z"
+  "updated_at": "2026-09-03T20:49:05.713050Z"
 }
