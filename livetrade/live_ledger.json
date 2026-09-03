@@ -1,5 +1,5 @@
 {
-  "cash": 37.64198066390003,
+  "cash": 56.88095558210003,
   "starting_cash": 150.0,
   "positions": {
     "MU": {
@@ -202,112 +202,12 @@
         }
       }
     },
-    "HOOD": {
-      "symbol": "HOOD",
-      "quantity": 0.160982,
-      "entry_price": 106.72,
-      "entry_date": "2026-08-24T13:30:01.840000Z",
-      "high_water_mark": 112.11530303955078,
-      "strategy_name": "live",
-      "strategy_hash": "da16575a5622",
-      "strategy_config": {
-        "name": "ema_cross_rsi_atr_regime",
-        "description": "EMA 10/26 cross + RSI<68, 2.0x ATR(14) trailing stop, 10% TP, SPY>SMA200 regime gate. Exit rule VALIDATED 2026-06-12: removing it degrades the account replay despite negative raw attribution (docs/EXPERIMENT_LOG.md) — do not strip it without fresh replay evidence.",
-        "version": "2.0",
-        "symbols": [
-          "SPY"
-        ],
-        "timeframe": "1d",
-        "indicators": [
-          {
-            "type": "ema",
-            "name": "ema_fast",
-            "params": {
-              "period": 10
-            }
-          },
-          {
-            "type": "ema",
-            "name": "ema_slow",
-            "params": {
-              "period": 26
-            }
-          },
-          {
-            "type": "rsi",
-            "name": "rsi_14",
-            "params": {
-              "period": 14
-            }
-          }
-        ],
-        "entry_rules": [
-          {
-            "conditions": [
-              {
-                "left": "ema_fast",
-                "comparison": "gt",
-                "right": "ema_slow",
-                "lookback": null
-              },
-              {
-                "left": "close",
-                "comparison": "gt",
-                "right": "ema_slow",
-                "lookback": null
-              },
-              {
-                "left": "rsi_14",
-                "comparison": "lt",
-                "right": 68.0,
-                "lookback": null
-              }
-            ],
-            "logic": "AND",
-            "side": "long"
-          }
-        ],
-        "exit_rules": [
-          {
-            "conditions": [
-              {
-                "left": "ema_fast",
-                "comparison": "crosses_below",
-                "right": "ema_slow",
-                "lookback": null
-              }
-            ],
-            "logic": "AND",
-            "side": "long"
-          }
-        ],
-        "position_size": {
-          "type": "percent_equity",
-          "value": 98.0
-        },
-        "max_positions": 1,
-        "stop_loss": {
-          "type": "trailing_atr",
-          "value": 2.0,
-          "atr_period": 14,
-          "trigger_percent": null
-        },
-        "take_profit": {
-          "type": "percent",
-          "value": 0.1
-        },
-        "regime_filter": {
-          "symbol": "SPY",
-          "sma_period": 200
-        }
-      }
-    },
     "AMZN": {
       "symbol": "AMZN",
       "quantity": 0.061192,
       "entry_price": 254.77,
       "entry_date": "2026-09-01T13:30:01.631000Z",
-      "high_water_mark": 255.01499938964844,
+      "high_water_mark": 258.4700012207031,
       "strategy_name": "live",
       "strategy_hash": "da16575a5622",
       "strategy_config": {
@@ -507,7 +407,7 @@
       "quantity": 0.055083,
       "entry_price": 218.94,
       "entry_date": "2026-09-02T13:30:01.539000Z",
-      "high_water_mark": 224.41000366210938,
+      "high_water_mark": 227.31500244140625,
       "strategy_name": "live",
       "strategy_hash": "da16575a5622",
       "strategy_config": {
@@ -1439,11 +1339,22 @@
       "filled_at": "2026-09-02T13:30:01.539000Z",
       "strategy_name": "live",
       "broker_order_id": "6a973a61-0b8a-499a-b1cf-97e49abff8e2"
+    },
+    {
+      "symbol": "HOOD",
+      "side": "sell",
+      "quantity": 0.160982,
+      "price": 119.5101,
+      "notional": 19.238974918199997,
+      "reason": "live fill",
+      "filled_at": "2026-09-03T13:40:28.537629Z",
+      "strategy_name": "live",
+      "broker_order_id": "6a9978b7-7c3e-436b-9f24-56254d4d5b10"
     }
   ],
-  "realized_pnl": -16.323777326099993,
+  "realized_pnl": -14.264801447899995,
   "peak_equity": 150.14103162835693,
   "halted": false,
   "halt_reason": "",
-  "updated_at": "2026-09-02T20:49:04.360644Z"
+  "updated_at": "2026-09-03T13:40:28.537915Z"
 }
