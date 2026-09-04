@@ -1,0 +1,14 @@
+[
+  {
+    "symbol": "HOOD",
+    "side": "buy",
+    "dollar_amount": 17.29,
+    "quantity": null,
+    "reason": "entry rule matched: ema_fast gt ema_slow, close gt ema_slow, rsi_14 lt 68.0",
+    "signal_price": 122.11000061035156,
+    "signal_date": "2026-09-04T04:00:00",
+    "strategy_name": "ema_cross_rsi_atr_regime",
+    "generated_at": "2026-09-04T20:48:34.958851Z",
+    "broker_order_id": null
+  }
+]
