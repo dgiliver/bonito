@@ -1,0 +1,57 @@
+{
+  "generated_at": "2026-09-05T15:56:07.485322",
+  "universe_path": "config/universe.json",
+  "start": "2022-01-01T00:00:00",
+  "holdout": "2025-03-14T15:40:49.718985",
+  "end": "2026-09-05T15:40:49.718985",
+  "outcome": "rejected",
+  "adopted_bundle": null,
+  "reasons": [
+    "[assignments+bench] train Sharpe degrades: 0.998 < 1.209",
+    "[assignments-only] train Sharpe degrades: 1.048 < 1.209",
+    "[assignments-only] holdout Sharpe degrades: 2.523 < 2.621"
+  ],
+  "previous_assignments": {
+    "ASML": "strategies/auto_ASML_9dfc85e38e1c.json",
+    "MSFT": "strategies/auto_MSFT_ef10b624536e.json"
+  },
+  "candidate_assignments": {
+    "AMZN": "strategies/auto_AMZN_cfb42acff369.json",
+    "DASH": "strategies/auto_DASH_55b6a6b21abc.json",
+    "LLY": "strategies/auto_LLY_1c854de83a94.json",
+    "MSFT": "strategies/auto_MSFT_ef10b624536e.json"
+  },
+  "added": [
+    "AMZN",
+    "DASH",
+    "LLY"
+  ],
+  "removed": [
+    "ASML"
+  ],
+  "updated": [],
+  "default_swap": null,
+  "default_swapped": false,
+  "benched": [
+    "AAOI",
+    "ALAB",
+    "ASML",
+    "DRAM",
+    "INTC",
+    "NBIS",
+    "NVDA"
+  ],
+  "unbenched": [
+    "DASH",
+    "ORCL"
+  ],
+  "grid_edge_flags": [
+    "DASH: winner at grid edge (atr=1)",
+    "LLY: winner at grid edge (ema=(20, 50), atr=1)",
+    "MSFT: winner at grid edge (atr=1)"
+  ],
+  "comparisons": [],
+  "baseline_final_equity": 32393.13,
+  "candidate_final_equity": null,
+  "report_path": "livetrade/research/cluster_report_2026-09-05_154815.json"
+}
