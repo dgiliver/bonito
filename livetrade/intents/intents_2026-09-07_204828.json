@@ -1,0 +1,14 @@
+[
+  {
+    "symbol": "BE",
+    "side": "buy",
+    "dollar_amount": 1.95,
+    "quantity": null,
+    "reason": "entry rule matched: ema_fast gt ema_slow, close gt ema_slow, rsi_14 lt 68.0",
+    "signal_price": 252.8699951171875,
+    "signal_date": "2026-09-04T04:00:00",
+    "strategy_name": "ema_cross_rsi_atr_regime",
+    "generated_at": "2026-09-07T20:48:28.363611Z",
+    "broker_order_id": null
+  }
+]
