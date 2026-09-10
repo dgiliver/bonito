@@ -1,0 +1,14 @@
+[
+  {
+    "symbol": "NVDA",
+    "side": "sell",
+    "dollar_amount": null,
+    "quantity": 0.055083,
+    "reason": "stop loss triggered (intraday)",
+    "signal_price": 218.27499389648438,
+    "signal_date": "2026-09-10T17:39:41.067617Z",
+    "strategy_name": "ema_cross_rsi_atr_regime",
+    "generated_at": "2026-09-10T17:39:41.068079Z",
+    "broker_order_id": null
+  }
+]
