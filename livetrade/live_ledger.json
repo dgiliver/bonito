@@ -1616,11 +1616,22 @@
       "filled_at": "2026-09-10T17:40:13.965505Z",
       "strategy_name": "live",
       "broker_order_id": "6aa2eb6d-0a18-495f-a7c4-896665123fc7"
+    },
+    {
+      "symbol": "IREN",
+      "side": "buy",
+      "quantity": 0.0,
+      "price": 43.83,
+      "notional": 0.0,
+      "reason": "no_fill: live fill",
+      "filled_at": "2026-09-10T20:49:53.622472Z",
+      "strategy_name": "live",
+      "broker_order_id": "6aa317ea-7276-424b-a467-803a9a5d18d4"
     }
   ],
   "realized_pnl": -14.185389479599996,
   "peak_equity": 150.14103162835693,
   "halted": false,
   "halt_reason": "",
-  "updated_at": "2026-09-10T19:40:55.835932Z"
+  "updated_at": "2026-09-10T20:49:53.622659Z"
 }
