@@ -1,5 +1,5 @@
 {
-  "cash": 34.44531585240003,
+  "cash": 32.37531585240003,
   "starting_cash": 150.0,
   "positions": {
     "MU": {
@@ -407,7 +407,7 @@
       "quantity": 0.032893,
       "entry_price": 513.78,
       "entry_date": "2026-09-04T13:30:01.198000Z",
-      "high_water_mark": 564.5150146484375,
+      "high_water_mark": 567.2899780273438,
       "strategy_name": "live",
       "strategy_hash": "da16575a5622",
       "strategy_config": {
@@ -508,6 +508,106 @@
       "entry_price": 612.02,
       "entry_date": "2026-09-04T13:30:00.333000Z",
       "high_water_mark": 659.5900268554688,
+      "strategy_name": "live",
+      "strategy_hash": "da16575a5622",
+      "strategy_config": {
+        "name": "ema_cross_rsi_atr_regime",
+        "description": "EMA 10/26 cross + RSI<68, 2.0x ATR(14) trailing stop, 10% TP, SPY>SMA200 regime gate. Exit rule VALIDATED 2026-06-12: removing it degrades the account replay despite negative raw attribution (docs/EXPERIMENT_LOG.md) — do not strip it without fresh replay evidence.",
+        "version": "2.0",
+        "symbols": [
+          "SPY"
+        ],
+        "timeframe": "1d",
+        "indicators": [
+          {
+            "type": "ema",
+            "name": "ema_fast",
+            "params": {
+              "period": 10
+            }
+          },
+          {
+            "type": "ema",
+            "name": "ema_slow",
+            "params": {
+              "period": 26
+            }
+          },
+          {
+            "type": "rsi",
+            "name": "rsi_14",
+            "params": {
+              "period": 14
+            }
+          }
+        ],
+        "entry_rules": [
+          {
+            "conditions": [
+              {
+                "left": "ema_fast",
+                "comparison": "gt",
+                "right": "ema_slow",
+                "lookback": null
+              },
+              {
+                "left": "close",
+                "comparison": "gt",
+                "right": "ema_slow",
+                "lookback": null
+              },
+              {
+                "left": "rsi_14",
+                "comparison": "lt",
+                "right": 68.0,
+                "lookback": null
+              }
+            ],
+            "logic": "AND",
+            "side": "long"
+          }
+        ],
+        "exit_rules": [
+          {
+            "conditions": [
+              {
+                "left": "ema_fast",
+                "comparison": "crosses_below",
+                "right": "ema_slow",
+                "lookback": null
+              }
+            ],
+            "logic": "AND",
+            "side": "long"
+          }
+        ],
+        "position_size": {
+          "type": "percent_equity",
+          "value": 98.0
+        },
+        "max_positions": 1,
+        "stop_loss": {
+          "type": "trailing_atr",
+          "value": 2.0,
+          "atr_period": 14,
+          "trigger_percent": null
+        },
+        "take_profit": {
+          "type": "percent",
+          "value": 0.1
+        },
+        "regime_filter": {
+          "symbol": "SPY",
+          "sma_period": 200
+        }
+      }
+    },
+    "IREN": {
+      "symbol": "IREN",
+      "quantity": 0.046684,
+      "entry_price": 44.34,
+      "entry_date": "2026-09-11T13:30:01.722000Z",
+      "high_water_mark": 44.34,
       "strategy_name": "live",
       "strategy_hash": "da16575a5622",
       "strategy_config": {
@@ -1518,17 +1618,6 @@
       "broker_order_id": "6aa2eb6d-0a18-495f-a7c4-896665123fc7"
     },
     {
-      "symbol": "IREN",
-      "side": "buy",
-      "quantity": 0.0,
-      "price": 43.83,
-      "notional": 0.0,
-      "reason": "no_fill: live fill",
-      "filled_at": "2026-09-10T20:49:53.622472Z",
-      "strategy_name": "live",
-      "broker_order_id": "6aa317ea-7276-424b-a467-803a9a5d18d4"
-    },
-    {
       "symbol": "HOOD",
       "side": "sell",
       "quantity": 0.13832,
@@ -1538,11 +1627,44 @@
       "filled_at": "2026-09-11T13:39:41.477494Z",
       "strategy_name": "live",
       "broker_order_id": "6aa4048c-edbc-43f6-8d4a-0af6e21005f2"
+    },
+    {
+      "symbol": "IREN",
+      "side": "buy",
+      "quantity": 0.046684,
+      "price": 44.34,
+      "notional": 2.07,
+      "reason": "live fill (resolved from queued order)",
+      "filled_at": "2026-09-11T13:30:01.722000Z",
+      "strategy_name": "live",
+      "broker_order_id": "6aa317ea-7276-424b-a467-803a9a5d18d4"
+    },
+    {
+      "symbol": "DELL",
+      "side": "sell",
+      "quantity": 0.0,
+      "price": 567.29,
+      "notional": 0.0,
+      "reason": "no_fill: live fill",
+      "filled_at": "2026-09-11T20:49:08.413242Z",
+      "strategy_name": "live",
+      "broker_order_id": "6aa4693c-4fec-404c-bb00-4f718c50db32"
+    },
+    {
+      "symbol": "AMD",
+      "side": "buy",
+      "quantity": 0.0,
+      "price": 516.13,
+      "notional": 0.0,
+      "reason": "no_fill: live fill",
+      "filled_at": "2026-09-11T20:49:25.873682Z",
+      "strategy_name": "live",
+      "broker_order_id": "6aa4694d-7547-4275-86eb-7cd9d483b56b"
     }
   ],
   "realized_pnl": -16.040246847599995,
   "peak_equity": 150.14103162835693,
   "halted": false,
   "halt_reason": "",
-  "updated_at": "2026-09-11T19:38:50.690284Z"
+  "updated_at": "2026-09-11T20:49:25.873910Z"
 }
