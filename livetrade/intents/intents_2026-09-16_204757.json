@@ -1,0 +1,14 @@
+[
+  {
+    "symbol": "MSFT",
+    "side": "buy",
+    "dollar_amount": 16.49,
+    "quantity": null,
+    "reason": "entry rule matched: ema_fast gt ema_slow, close gt ema_slow, rsi_14 lt 55.0",
+    "signal_price": 490.29998779296875,
+    "signal_date": "2026-09-16T04:00:00",
+    "strategy_name": "c_ema12-26_rsi55_atr1.0_tp20",
+    "generated_at": "2026-09-16T20:47:57.668964Z",
+    "broker_order_id": null
+  }
+]
