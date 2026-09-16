@@ -1,0 +1,26 @@
+[
+  {
+    "symbol": "AMZN",
+    "side": "sell",
+    "dollar_amount": null,
+    "quantity": 0.061192,
+    "reason": "stop loss triggered (intraday)",
+    "signal_price": 247.13999938964844,
+    "signal_date": "2026-09-16T13:39:09.258494Z",
+    "strategy_name": "ema_cross_rsi_atr_regime",
+    "generated_at": "2026-09-16T13:39:09.258953Z",
+    "broker_order_id": null
+  },
+  {
+    "symbol": "META",
+    "side": "sell",
+    "dollar_amount": null,
+    "quantity": 0.025848,
+    "reason": "take profit triggered (intraday)",
+    "signal_price": 679.8400268554688,
+    "signal_date": "2026-09-16T13:39:09.258494Z",
+    "strategy_name": "ema_cross_rsi_atr_regime",
+    "generated_at": "2026-09-16T13:39:09.259223Z",
+    "broker_order_id": null
+  }
+]
