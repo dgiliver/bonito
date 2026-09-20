@@ -146,14 +146,16 @@ strategy pinned at entry.
 drawdown from peak equity reaches `risk.max_drawdown_halt` (25%). While
 halted, exits/stops still process but no entries are generated. Do NOT
 clear it yourself — report to the user; only after their explicit sign-off
-run `bonito live resume`. Entries are also skipped (silently, logged) when
-the strategy's regime filter is risk-off (e.g. SPY below its 200-day SMA);
-that is normal operation, not an error.
+run `bonito live resume --yes` (previews by default; `--yes` applies and,
+by default, also re-baselines the drawdown peak to current equity — pass
+`--keep-peak` to clear the halt only). Entries are also skipped (silently,
+logged) when the strategy's regime filter is risk-off (e.g. SPY below its
+200-day SMA); that is normal operation, not an error.
 
 ## Hard rules
 
 - NEVER place an order the intents file doesn't contain.
-- NEVER run `bonito live resume` without explicit user sign-off.
+- NEVER run `bonito live resume --yes` without explicit user sign-off.
 - NEVER trade on the margin account (••••7982); only the Agentic account.
 - NEVER exceed `risk` caps in universe.json; the code enforces them — if a
   number looks wrong, stop and ask, don't override.

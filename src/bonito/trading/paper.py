@@ -299,7 +299,9 @@ class PaperLedger(BaseModel):
             broker_order_id=broker_order_id,
         )
         self.fills.append(fill)
-        logger.info(f"NO FILL recorded {side.upper()} {symbol.upper()} @ ${signal_price:.2f} — {reason}")
+        logger.info(
+            f"NO FILL recorded {side.upper()} {symbol.upper()} @ ${signal_price:.2f} — {reason}"
+        )
         return fill
 
     def update_high_water_mark(self, symbol: str, price: float) -> None:
@@ -326,13 +328,37 @@ class PaperLedger(BaseModel):
         self.halt_reason = reason
         logger.error(f"LEDGER HALTED: {reason}")
 
-    def resume(self, *, confirm: bool = False) -> None:
-        """Clear the kill switch (explicit human action only)."""
+    def resume(self, *, confirm: bool = False, peak_equity: float | None = None) -> None:
+        """Clear the kill switch (explicit human action only).
+
+        Args:
+            peak_equity: Re-baselines the drawdown watermark to the account's
+                current equity. The kill switch measures drawdown against
+                ``self.peak_equity``, and ``note_equity`` only ever ratchets
+                that watermark UP — so clearing ``halted`` alone leaves the
+                old, pre-drawdown peak in place and the very next cycle
+                re-halts as soon as it recomputes the same drawdown. Passing
+                the account's current equity here re-baselines the
+                watermark, so resume() without it is a no-op in exactly the
+                case it exists for. ``None`` (the default) leaves
+                ``peak_equity`` untouched — byte-identical to the previous
+                behaviour.
+        """
         if confirm is not True:
             raise ValueError(
                 "PaperLedger.resume() requires confirm=True — kill-switch clearance is a "
                 "human-only action (see bonito live resume)"
             )
+        if peak_equity is not None and peak_equity <= 0:
+            raise ValueError(f"peak_equity must be positive, got {peak_equity}")
+        if peak_equity is not None:
+            prior = self.peak_equity
+            prior_label = f"${prior:.2f}" if prior is not None else "None"
+            logger.warning(
+                f"Re-baselining kill-switch peak: {prior_label} -> ${peak_equity:.2f} "
+                f"(was halted: {self.halt_reason})"
+            )
+            self.peak_equity = peak_equity
         self.halted = False
         self.halt_reason = ""
 

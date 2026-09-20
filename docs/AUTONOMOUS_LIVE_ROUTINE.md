@@ -362,7 +362,9 @@ Setup:
     force-pushing to "fix" either is not — never do it.
 
 Hard rules: never place a market/limit order that isn't in the intents file;
-never trade the margin account; never run `bonito live resume`; never edit
+never trade the margin account; never run `bonito live resume` (it now
+requires `--yes` and, by default, re-baselines the drawdown peak to current
+equity — human-only, after explicit review); never edit
 mode or live_enabled; never use `git push --force`/`-f` or `git commit
 --amend` for any step in this prompt — `main` is shared with other
 automation, and a forced push can silently discard someone else's commit
@@ -452,4 +454,6 @@ see `docs/EXPERIMENT_LOG.md`'s standing-follow-up note, not this prompt.
 - **Occasional:** read a GitHub issue when the weekly research adopts/rejects
   a change, or when a run reports an abort (drift, halt, data outage).
 - **Human-only, never automated:** the `mode`/`live_enabled` flags, risk
-  caps, and `bonito live resume` after a kill-switch halt.
+  caps, and `bonito live resume --yes` after a kill-switch halt (previews by
+  default; `--yes` applies and, unless `--keep-peak` is passed, re-baselines
+  the drawdown peak to current equity).
