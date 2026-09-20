@@ -73,7 +73,7 @@ unable to pass, and live traded a month with no working shadow.
 | P | Planner | file:line diff + test plan | ✅ done | verified; D1 reproduced by orchestrator |
 | B | Builder | implement plan | ✅ done | f8c54e4 |
 | T | Tester | non-vacuous tests | ✅ done | 34372f8 |
-| V | Validator | independent PASS/FAIL | dispatched | — |
+| V | Validator | independent PASS/FAIL | ✅ **PASS** | all 10 claims re-derived |
 
 ## Planner output — key decisions (orchestrator-verified)
 
@@ -82,7 +82,7 @@ unable to pass, and live traded a month with no working shadow.
 
 **Design decisions resolved by the Planner:**
 - **Re-baseline by DEFAULT + required `--yes`**, *not* a `--reset-peak` opt-in. A flag reproduces the bug for anyone unaware of it — the un-flagged call would still "succeed" and silently re-halt. `--yes` gives explicitness without a silent-wrong default; without it the command *previews* and exits 1 printing the exact command. `--keep-peak` preserves today's behaviour.
-- **Staleness = 10 trading sessions** (not calendar). Evidence: longest *legitimate* no-fill gap before the halt was **2 sessions** (paper) / 1 (live). N=10 is 5× that. The 08-18 halt would have alarmed **2026-09-01**, 19 days before the audit found it. ET session dates via `np.busday_count` (3 paper fills have a UTC date a day ahead of their ET session).
+- **Staleness = 10 trading sessions** (not calendar). Evidence: longest *legitimate* no-fill gap before the halt was **3 sessions** (paper; 2026-07-02→07-07 spanning July 4th — the Validator corrected the Planner's "2") / 1 (live). N=10 is 3.3× that. The 08-18 halt would have alarmed **2026-09-01**, 19 days before the audit found it. ET session dates via `np.busday_count` (3 paper fills have a UTC date a day ahead of their ET session).
 - **New `src/bonito/trading/health.py` + `bonito live health`** — NOT `preflight` (fail-closed gate; would abort cycles and stop exits being evaluated) and NOT `status` (exits 0, called inside `live run`/`performance`; changing its contract leaks into the trading path).
 - **Exit codes: 0 OK / 3 ALARM / 1 cannot evaluate.** Not 2 — Click reserves 2 for usage errors. CI consumes the JSON `status` field; the trading job never depends on the code.
 - Three independent booleans: `halted` (definitive defect) / `fills_stale` (investigate) / `cycle_idle` (the job itself stopped). Named `fills_stale` not `stale` — "stale" already means bar-age in preflight.
@@ -95,3 +95,11 @@ unable to pass, and live traded a month with no working shadow.
 - **Planner returned + spot-checked (PASS).** D1 reproduced independently by the orchestrator. Decisions folded above. Builder dispatched with the plan embedded verbatim.
 - **Builder returned; orchestrator reviewed diffs directly.** Diff is surgical — 5 files + new `health.py`, 2 hunks in paper.py / 6 in cli.py, **no whole-file `ruff format` churn** (the failure mode of the two prior Builders). One incidental line-wrap in `paper.py` is the ruff-canonical form (`ruff format --check` passes), so kept. Safety invariant verified independently: `grep health src/bonito/trading/live_runner.py` → no matches; `health` imported only at `cli.py:1563`. Acceptance smoke run by the orchestrator: paper `ALARM exit 3` (`halted=true fills_stale=true sessions_since_fill=23 last_fill=2026-08-18`), live `OK exit 0` (no false alarm), `live resume` preview `exit 1` with the ledger **byte-identical** (sha256 before/after). Full fast suite **907 passed, 1 skipped**; ruff check + format clean; YAML valid. Implementation committed **f8c54e4**. Tester dispatched.
 - **Tester returned; orchestrator re-verified non-vacuity independently.** 29 tests added (4 in `test_paper_ledger.py`, `TestResumeRebaseline` + `TestHealthNeverGates` in `test_live_runner.py`, new 392-line `test_live_health.py`). Diff surgical: 2+1 hunks and one new file, **no pre-existing reformatting** (Tester formatted only its new file, as instructed). I reproduced the D1 mutation myself with copy-based restore: neutering `self.peak_equity = peak_equity` reddens `TestResumeRebaseline::test_resume_with_rebaseline_survives_next_cycle`; restore → 2 passed; `git status src/` clean. Full fast suite **907 → 936 passed**, ruff clean. Tests committed **34372f8**. Validator dispatched.
+- **Validator returned: PASS** (all 10 items independently re-derived). Highlights: `live_runner.py` has a **zero-line diff** vs main; a shell simulation of the workflow proved the health step's exit-3 is genuinely swallowed (job exit 0); both mutations reproduced; all 29 tests audited individually, none vacuous; `git diff main...HEAD -- config/ strategies/ .claude/CLAUDE.md` empty.
+  - **Finding addressed (aead283):** `PaperLedger.resume()` did not itself refuse to re-baseline a *non-halted* ledger — the invariant held only because the CLI checks `halted` first. A future caller bypassing the CLI could have moved the kill-switch watermark with no halt, shrinking measured drawdown. Now enforced at the model layer + a mutation-verified test. Suite 936 → **937**.
+  - **Correction accepted:** longest legitimate no-fill gap is 3 sessions, not 2 (July 4th week). N=10 stands.
+  - **Retracted:** the Validator's branch-hygiene note ("10 unique livetrade commits") was a **stale local `main` ref** (local 46fb42f vs origin/main df9b4ac). Against the real base the branch has exactly its 6 commits.
+
+## Phase 1 CLOSEOUT
+
+**Validator PASS.** Implementation `f8c54e4`, tests `34372f8`, Validator fix `aead283`. Suite 937 green, ruff clean, YAML valid, diff surgical. Next: PR + gated pr-reviewer → merge → then resume the paper shadow (33-day outage) with `bonito live resume --yes`.
