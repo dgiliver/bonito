@@ -303,3 +303,44 @@ class TestKillSwitchState:
         s = ledger.summary()
         assert s["halted"] is True
         assert s["halt_reason"] == "why"
+
+    def test_resume_leaves_peak_untouched_by_default(self):
+        ledger = PaperLedger(cash=150.0, starting_cash=150.0, peak_equity=200.0)
+        ledger.halt("drawdown breach")
+
+        ledger.resume(confirm=True)
+
+        assert ledger.peak_equity == 200.0
+
+    def test_resume_rebaselines_peak_when_given(self):
+        ledger = PaperLedger(cash=150.0, starting_cash=150.0, peak_equity=200.0)
+        ledger.halt("drawdown breach")
+
+        ledger.resume(confirm=True, peak_equity=150.0)
+
+        assert ledger.peak_equity == 150.0
+        assert ledger.halted is False
+        assert ledger.halt_reason == ""
+
+    def test_resume_rejects_non_positive_peak(self):
+        for bad_peak in (0.0, -1.0):
+            ledger = PaperLedger(cash=150.0, starting_cash=150.0, peak_equity=200.0)
+            ledger.halt("drawdown breach")
+
+            with pytest.raises(ValueError, match="peak_equity must be positive"):
+                ledger.resume(confirm=True, peak_equity=bad_peak)
+
+            # Fail closed: rejection must not partially apply.
+            assert ledger.halted is True
+            assert ledger.peak_equity == 200.0
+
+    def test_resume_without_confirm_ignores_peak_equity(self):
+        ledger = PaperLedger(cash=150.0, starting_cash=150.0, peak_equity=200.0)
+        ledger.halt("drawdown breach")
+
+        with pytest.raises(ValueError, match="confirm=True"):
+            ledger.resume(peak_equity=100.0)
+
+        # The confirm gate is checked before peak_equity is ever touched.
+        assert ledger.halted is True
+        assert ledger.peak_equity == 200.0
