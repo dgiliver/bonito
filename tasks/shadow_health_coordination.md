@@ -70,11 +70,26 @@ unable to pass, and live traded a month with no working shadow.
 
 | ID | Role | Task | Status | Result |
 |----|------|------|--------|--------|
-| P | Planner | file:line diff + test plan | dispatched | — |
-| B | Builder | implement plan | blocked on P | — |
+| P | Planner | file:line diff + test plan | ✅ done | verified; D1 reproduced by orchestrator |
+| B | Builder | implement plan | dispatched | — |
 | T | Tester | non-vacuous tests | blocked on B | — |
 | V | Validator | independent PASS/FAIL | blocked on T | — |
 
+## Planner output — key decisions (orchestrator-verified)
+
+**Orchestrator spot-check PASSED — D1 reproduced independently:**
+`resume(confirm=True)` alone → next `generate_intents` re-halts (`halted=True`, **0 buys**, peak still 6004.60). With `peak_equity` re-baselined to 4468.86 → `halted=False`, **entries generated**. Resume is confirmed a no-op in exactly its intended case.
+
+**Design decisions resolved by the Planner:**
+- **Re-baseline by DEFAULT + required `--yes`**, *not* a `--reset-peak` opt-in. A flag reproduces the bug for anyone unaware of it — the un-flagged call would still "succeed" and silently re-halt. `--yes` gives explicitness without a silent-wrong default; without it the command *previews* and exits 1 printing the exact command. `--keep-peak` preserves today's behaviour.
+- **Staleness = 10 trading sessions** (not calendar). Evidence: longest *legitimate* no-fill gap before the halt was **2 sessions** (paper) / 1 (live). N=10 is 5× that. The 08-18 halt would have alarmed **2026-09-01**, 19 days before the audit found it. ET session dates via `np.busday_count` (3 paper fills have a UTC date a day ahead of their ET session).
+- **New `src/bonito/trading/health.py` + `bonito live health`** — NOT `preflight` (fail-closed gate; would abort cycles and stop exits being evaluated) and NOT `status` (exits 0, called inside `live run`/`performance`; changing its contract leaks into the trading path).
+- **Exit codes: 0 OK / 3 ALARM / 1 cannot evaluate.** Not 2 — Click reserves 2 for usage errors. CI consumes the JSON `status` field; the trading job never depends on the code.
+- Three independent booleans: `halted` (definitive defect) / `fills_stale` (investigate) / `cycle_idle` (the job itself stopped). Named `fills_stale` not `stale` — "stale" already means bar-age in preflight.
+
+**Planner corrections to my brief:** kill switch is `live_runner.py:302-311` (not ~303-308); CLAUDE.md's "33-symbol universe" is **stale — it's 45** (do not "fix" here); paper-trading.yml's backticks are already escaped so injection is NOT its bug — its real gaps are **missing dedupe** (opens a new issue daily) and **no `continue-on-error`**. Flagged out-of-scope: `intraday-stops.yml:103` has an unguarded `gh issue list` (same latent `bash -e` abort weekly-research already fixed).
+
 ## Run log
 
-- Audit 2026-09-20 surfaced D1 + D2. Branch cut from `main`. Coordination doc committed. Planner dispatched.
+- Audit 2026-09-20 surfaced D1 + D2. Branch cut from `main`. Coordination doc committed (**2a962ba**). Planner dispatched.
+- **Planner returned + spot-checked (PASS).** D1 reproduced independently by the orchestrator. Decisions folded above. Builder dispatched with the plan embedded verbatim.
