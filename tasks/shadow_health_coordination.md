@@ -72,8 +72,8 @@ unable to pass, and live traded a month with no working shadow.
 |----|------|------|--------|--------|
 | P | Planner | file:line diff + test plan | ✅ done | verified; D1 reproduced by orchestrator |
 | B | Builder | implement plan | ✅ done | f8c54e4 |
-| T | Tester | non-vacuous tests | dispatched | — |
-| V | Validator | independent PASS/FAIL | blocked on T | — |
+| T | Tester | non-vacuous tests | ✅ done | 34372f8 |
+| V | Validator | independent PASS/FAIL | dispatched | — |
 
 ## Planner output — key decisions (orchestrator-verified)
 
@@ -94,3 +94,4 @@ unable to pass, and live traded a month with no working shadow.
 - Audit 2026-09-20 surfaced D1 + D2. Branch cut from `main`. Coordination doc committed (**2a962ba**). Planner dispatched.
 - **Planner returned + spot-checked (PASS).** D1 reproduced independently by the orchestrator. Decisions folded above. Builder dispatched with the plan embedded verbatim.
 - **Builder returned; orchestrator reviewed diffs directly.** Diff is surgical — 5 files + new `health.py`, 2 hunks in paper.py / 6 in cli.py, **no whole-file `ruff format` churn** (the failure mode of the two prior Builders). One incidental line-wrap in `paper.py` is the ruff-canonical form (`ruff format --check` passes), so kept. Safety invariant verified independently: `grep health src/bonito/trading/live_runner.py` → no matches; `health` imported only at `cli.py:1563`. Acceptance smoke run by the orchestrator: paper `ALARM exit 3` (`halted=true fills_stale=true sessions_since_fill=23 last_fill=2026-08-18`), live `OK exit 0` (no false alarm), `live resume` preview `exit 1` with the ledger **byte-identical** (sha256 before/after). Full fast suite **907 passed, 1 skipped**; ruff check + format clean; YAML valid. Implementation committed **f8c54e4**. Tester dispatched.
+- **Tester returned; orchestrator re-verified non-vacuity independently.** 29 tests added (4 in `test_paper_ledger.py`, `TestResumeRebaseline` + `TestHealthNeverGates` in `test_live_runner.py`, new 392-line `test_live_health.py`). Diff surgical: 2+1 hunks and one new file, **no pre-existing reformatting** (Tester formatted only its new file, as instructed). I reproduced the D1 mutation myself with copy-based restore: neutering `self.peak_equity = peak_equity` reddens `TestResumeRebaseline::test_resume_with_rebaseline_survives_next_cycle`; restore → 2 passed; `git status src/` clean. Full fast suite **907 → 936 passed**, ruff clean. Tests committed **34372f8**. Validator dispatched.
