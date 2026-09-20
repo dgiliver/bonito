@@ -334,6 +334,20 @@ class TestKillSwitchState:
             assert ledger.halted is True
             assert ledger.peak_equity == 200.0
 
+    def test_resume_refuses_to_rebaseline_a_healthy_ledger(self):
+        """Re-baselining is kill-switch RECOVERY, not a peak setter. Lowering the
+        watermark on a non-halted ledger would shrink the measured drawdown and
+        defer a future halt — the model must refuse it itself, not rely on the
+        CLI's own halted-check, so no future caller can weaken the kill switch."""
+        ledger = PaperLedger(cash=150.0, starting_cash=150.0, peak_equity=200.0)
+        assert ledger.halted is False
+
+        with pytest.raises(ValueError, match="only valid on a HALTED ledger"):
+            ledger.resume(confirm=True, peak_equity=150.0)
+
+        # Fail closed: the watermark must be untouched.
+        assert ledger.peak_equity == 200.0
+
     def test_resume_without_confirm_ignores_peak_equity(self):
         ledger = PaperLedger(cash=150.0, starting_cash=150.0, peak_equity=200.0)
         ledger.halt("drawdown breach")

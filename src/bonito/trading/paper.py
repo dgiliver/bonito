@@ -351,6 +351,16 @@ class PaperLedger(BaseModel):
             )
         if peak_equity is not None and peak_equity <= 0:
             raise ValueError(f"peak_equity must be positive, got {peak_equity}")
+        if peak_equity is not None and not self.halted:
+            # Re-baselining is a kill-switch RECOVERY step, not a general setter.
+            # Lowering the watermark on a healthy ledger would silently shrink the
+            # measured drawdown and defer a future halt — enforce it here rather
+            # than relying on the CLI's own `if not ledger.halted` guard, so no
+            # future caller can weaken the kill switch by bypassing the CLI.
+            raise ValueError(
+                "peak_equity re-baselining is only valid on a HALTED ledger — refusing "
+                "to move the kill-switch watermark on a healthy one"
+            )
         if peak_equity is not None:
             prior = self.peak_equity
             prior_label = f"${prior:.2f}" if prior is not None else "None"
