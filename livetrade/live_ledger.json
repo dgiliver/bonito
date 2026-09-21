@@ -107,7 +107,7 @@
       "quantity": 0.046684,
       "entry_price": 44.34,
       "entry_date": "2026-09-11T13:30:01.722000Z",
-      "high_water_mark": 48.04499816894531,
+      "high_water_mark": 48.61000061035156,
       "strategy_name": "live",
       "strategy_hash": "da16575a5622",
       "strategy_config": {
@@ -407,7 +407,7 @@
       "quantity": 0.033112,
       "entry_price": 498.0,
       "entry_date": "2026-09-17T13:30:00.057000Z",
-      "high_water_mark": 498.0350036621094,
+      "high_water_mark": 499.17498779296875,
       "strategy_name": "live",
       "strategy_hash": "ef10b624536e",
       "strategy_config": {
@@ -1709,5 +1709,5 @@
   "peak_equity": 150.14103162835693,
   "halted": false,
   "halt_reason": "",
-  "updated_at": "2026-09-21T17:48:43.671981Z"
+  "updated_at": "2026-09-21T18:48:29.555418Z"
 }
