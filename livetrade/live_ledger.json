@@ -7,7 +7,7 @@
       "quantity": 0.049537,
       "entry_price": 328.0328,
       "entry_date": "2026-09-02T13:30:03.146000Z",
-      "high_water_mark": 338.9200134277344,
+      "high_water_mark": 338.9800109863281,
       "strategy_name": "live",
       "strategy_hash": "da16575a5622",
       "strategy_config": {
@@ -407,7 +407,7 @@
       "quantity": 0.033112,
       "entry_price": 498.0,
       "entry_date": "2026-09-17T13:30:00.057000Z",
-      "high_water_mark": 499.17498779296875,
+      "high_water_mark": 501.6099853515625,
       "strategy_name": "live",
       "strategy_hash": "ef10b624536e",
       "strategy_config": {
@@ -1703,11 +1703,22 @@
       "filled_at": "2026-09-21T13:41:46.112369Z",
       "strategy_name": "live",
       "broker_order_id": "6ab13414-b86d-4115-8df9-d3943378d4c3"
+    },
+    {
+      "symbol": "SNDK",
+      "side": "buy",
+      "quantity": 0.0,
+      "price": 1761.0,
+      "notional": 0.0,
+      "reason": "no_fill: live fill",
+      "filled_at": "2026-09-21T20:48:35.376109Z",
+      "strategy_name": "live",
+      "broker_order_id": "6ab1981e-53e0-4f33-964f-d78d76778f17"
     }
   ],
   "realized_pnl": -11.99856148739999,
   "peak_equity": 150.14103162835693,
   "halted": false,
   "halt_reason": "",
-  "updated_at": "2026-09-21T18:48:29.555418Z"
+  "updated_at": "2026-09-21T20:48:35.376321Z"
 }
