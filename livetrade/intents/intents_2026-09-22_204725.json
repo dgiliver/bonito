@@ -1,0 +1,26 @@
+[
+  {
+    "symbol": "MU",
+    "side": "buy",
+    "dollar_amount": 17.8,
+    "quantity": null,
+    "reason": "entry rule matched: ema_fast gt ema_slow, close gt ema_slow, rsi_14 lt 68.0",
+    "signal_price": 1096.1600341796875,
+    "signal_date": "2026-09-22T04:00:00",
+    "strategy_name": "ema_cross_rsi_atr_regime",
+    "generated_at": "2026-09-22T20:47:25.746221Z",
+    "broker_order_id": null
+  },
+  {
+    "symbol": "HOOD",
+    "side": "buy",
+    "dollar_amount": 17.8,
+    "quantity": null,
+    "reason": "entry rule matched: ema_fast gt ema_slow, close gt ema_slow, rsi_14 lt 68.0",
+    "signal_price": 124.25,
+    "signal_date": "2026-09-22T04:00:00",
+    "strategy_name": "ema_cross_rsi_atr_regime",
+    "generated_at": "2026-09-22T20:47:25.772607Z",
+    "broker_order_id": null
+  }
+]
