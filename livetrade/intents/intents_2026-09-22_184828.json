@@ -1,0 +1,14 @@
+[
+  {
+    "symbol": "MU",
+    "side": "sell",
+    "dollar_amount": null,
+    "quantity": 0.017383,
+    "reason": "take profit triggered (intraday)",
+    "signal_price": 1087.0250244140625,
+    "signal_date": "2026-09-22T18:48:28.013711Z",
+    "strategy_name": "ema_cross_rsi_atr_regime",
+    "generated_at": "2026-09-22T18:48:28.014050Z",
+    "broker_order_id": null
+  }
+]
