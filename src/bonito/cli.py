@@ -1420,9 +1420,7 @@ def live_reconcile(
 
     if report.fatal_drift:
         # D1: drift exceeds 0.5% tolerance — hard-halt new entries (exits still allowed).
-        console.print(
-            "[bold red]DRIFT — refusing new entries (exits still allowed)[/bold red]"
-        )
+        console.print("[bold red]DRIFT — refusing new entries (exits still allowed)[/bold red]")
         console.print(report.describe())
         console.print(
             "[dim]Resolve with `bonito live record-fill` using the actual fill data "
@@ -1447,9 +1445,7 @@ def live_reconcile(
 
     if not report.in_sync:
         # Sub-tolerance drift — surface it but proceed (D1 relaxation).
-        console.print(
-            "[yellow]sub-tolerance drift (<0.5%), proceeding[/yellow]"
-        )
+        console.print("[yellow]sub-tolerance drift (<0.5%), proceeding[/yellow]")
         console.print(report.describe())
         return
 
@@ -1541,6 +1537,56 @@ def _print_status(ledger, prices: dict[str, float]) -> None:
                 f"${p['unrealized_pnl']:+.2f}",
             )
         console.print(table)
+
+
+@live_app.command("health")
+def live_health(
+    universe_path: str = typer.Option("config/universe.json", "--universe", "-u"),
+    stale_sessions: int = typer.Option(
+        10,
+        "--stale-sessions",
+        help="Trading sessions with zero real fills before the ledger is flagged stale",
+    ),
+    idle_sessions: int = typer.Option(
+        3,
+        "--idle-sessions",
+        help="Trading sessions with no cycle writing the ledger before it's flagged idle",
+    ),
+    as_json: bool = typer.Option(False, "--json", help="One JSON line on stdout, for CI"),
+) -> None:
+    """Alarm-only ledger liveness check. NEVER gates trading — diagnostic only.
+
+    Flags a stale kill-switch halt, a strategy that's stopped generating
+    fills, or a scheduled cycle that's stopped running. Exits 3 on ALARM so
+    CI can open an issue without failing the job.
+    """
+    from bonito.trading.health import check_ledger_health
+    from bonito.trading.paper import ledger_path_for_mode
+
+    universe = _load_universe(universe_path)
+    path = ledger_path_for_mode(universe.mode)
+    if not path.exists():
+        console.print(f"[red]No ledger at {path} — nothing to check.[/red]")
+        raise typer.Exit(1)
+
+    ledger = _load_ledger(universe)
+    report = check_ledger_health(
+        ledger,
+        mode=universe.mode,
+        ledger_path=str(path),
+        stale_after_sessions=stale_sessions,
+        idle_after_sessions=idle_sessions,
+    )
+
+    if as_json:
+        typer.echo(report.model_dump_json())
+    else:
+        border = "red" if report.status == "ALARM" else "green"
+        console.print(Panel.fit(report.describe(), border_style=border))
+        typer.echo(report.status_line())
+
+    if report.status == "ALARM":
+        raise typer.Exit(code=3)
 
 
 @live_app.command("performance")
@@ -1687,8 +1733,7 @@ def live_record_fill(
         )
         ledger.save()
         console.print(
-            f"[yellow]NO FILL recorded {side.upper()} {symbol} @ ${price:.2f} "
-            f"— {reason}[/yellow]"
+            f"[yellow]NO FILL recorded {side.upper()} {symbol} @ ${price:.2f} — {reason}[/yellow]"
         )
         return
 
@@ -1735,7 +1780,9 @@ def live_record_fill(
             raise typer.Exit(1) from None
 
     ledger.save()
-    qty_label = f"{fill.quantity:.4f} sh" if shares else f"${dollar_amount:.2f}" if dollar_amount else ""
+    qty_label = (
+        f"{fill.quantity:.4f} sh" if shares else f"${dollar_amount:.2f}" if dollar_amount else ""
+    )
     console.print(f"Recorded {side.upper()} {symbol} {qty_label} @ ${price:.2f}")
 
 
@@ -1754,20 +1801,103 @@ def dashboard(
 @live_app.command("resume")
 def live_resume(
     universe_path: str = typer.Option("config/universe.json", "--universe", "-u"),
+    yes: bool = typer.Option(
+        False,
+        "--yes",
+        "-y",
+        help="Apply it. Without this the command only PREVIEWS the change and exits 1 "
+        "without writing.",
+    ),
+    keep_peak: bool = typer.Option(
+        False,
+        "--keep-peak",
+        help="Clear the halt WITHOUT re-baselining the kill-switch peak (old behaviour; "
+        "the next cycle re-halts if equity is still under the cap).",
+    ),
+    prices_json: str = typer.Option(
+        None,
+        "--prices",
+        help="Current prices JSON for marking open positions, e.g. '{\"AAPL\": 241.5}'",
+    ),
 ) -> None:
     """Clear a kill-switch halt (explicit human action).
 
     The kill switch flattens all positions and blocks new entries when
     account drawdown breaches risk.max_drawdown_halt. Resuming requires a
-    human to have reviewed what went wrong.
+    human to have reviewed what went wrong. By default this ALSO
+    re-baselines the drawdown watermark to current equity — clearing the
+    halt without doing so is a no-op in the exact case it exists for: the
+    very next cycle re-halts as soon as it recomputes the same drawdown
+    against the stale peak. Pass --keep-peak for the old behaviour.
     """
+    import json as _json
+
     universe = _load_universe(universe_path)
     ledger = _load_ledger(universe)
     if not ledger.halted:
         console.print("[dim]Ledger is not halted.[/dim]")
         return
+
+    prices: dict[str, float] = (
+        {k.upper(): float(v) for k, v in _json.loads(prices_json).items()} if prices_json else {}
+    )
+    unpriced = [s for s in ledger.positions if s not in prices]
+    if unpriced:
+        from bonito.data.quotes import fetch_latest_quotes
+
+        prices.update(fetch_latest_quotes(unpriced))
+        unpriced = [s for s in ledger.positions if s not in prices]
+    if unpriced:
+        console.print(
+            f"[red]No price for open position(s) {unpriced} — cannot mark equity.[/red]\n"
+            "Re-run with --prices '{\"SYM\": 123.45}' for the missing symbol(s)."
+        )
+        raise typer.Exit(1)
+
     reason = ledger.halt_reason
-    ledger.resume(confirm=True)
+    new_peak = ledger.equity(prices)
+    old_peak = ledger.peak_equity
+    threshold = universe.risk.max_drawdown_halt
+    dd = 1 - new_peak / old_peak if old_peak else 0.0
+    will_rehalt = threshold is not None and bool(old_peak) and dd >= threshold
+    old_peak_label = f"${old_peak:.2f}" if old_peak is not None else "n/a"
+
+    action = (
+        f"clear the halt only (--keep-peak); the kill-switch peak stays {old_peak_label}"
+        if keep_peak
+        else f"clear the halt AND re-baseline the peak to ${new_peak:.2f}"
+    )
+    console.print(
+        Panel.fit(
+            f"[bold red]Halt reason:[/bold red] {reason}\n"
+            f"Equity now: ${new_peak:.2f} | Old peak: {old_peak_label} | Drawdown: {dd:.1%}\n"
+            f"Action: {action}",
+            title="Resume Preview",
+            border_style="yellow",
+        )
+    )
+
+    rehalt_warning = (
+        "[red]--keep-peak leaves the old peak in place — the next cycle WILL "
+        "re-halt immediately.[/red]"
+    )
+
+    if not yes:
+        console.print(f"Run [bold]bonito live resume -u {universe_path} --yes[/bold] to apply.")
+        if keep_peak and will_rehalt:
+            console.print(rehalt_warning)
+        raise typer.Exit(1)
+
+    if keep_peak:
+        ledger.resume(confirm=True)
+        if will_rehalt:
+            console.print(rehalt_warning)
+    else:
+        ledger.resume(confirm=True, peak_equity=new_peak)
+        console.print(
+            f"Peak equity re-baselined {old_peak_label} → ${new_peak:.2f} "
+            f"(forgave a {dd:.1%} drawdown)"
+        )
     ledger.save()
     console.print(f"[green]Halt cleared[/green] (was: {reason})")
 

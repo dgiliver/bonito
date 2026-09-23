@@ -1167,6 +1167,44 @@ class TestKillSwitch:
         assert len([i for i in intents if i.side == "buy"]) == 3
 
 
+class TestResumeRebaseline:
+    """D1: resume() without a re-baselined peak is a no-op — the kill switch
+    re-halts on the very next cycle since note_equity only ratchets the peak up.
+    """
+
+    def _halted_ledger(self) -> PaperLedger:
+        return PaperLedger(
+            cash=4468.86,
+            starting_cash=5000.0,
+            peak_equity=6004.60,
+            halted=True,
+            halt_reason="drawdown 25.6% >= 25% cap",
+        )
+
+    def test_resume_without_rebaseline_rehalts_next_cycle(self, universe):
+        store = uptrend_store(universe.symbols)
+        ledger = self._halted_ledger()
+
+        ledger.resume(confirm=True)
+        intents, _ = generate_intents(universe, store, ledger, as_of=AS_OF)
+
+        assert ledger.halted is True
+        assert "drawdown" in ledger.halt_reason
+        assert [i for i in intents if i.side == "buy"] == []
+        assert ledger.peak_equity == 6004.60
+
+    def test_resume_with_rebaseline_survives_next_cycle(self, universe):
+        store = uptrend_store(universe.symbols)
+        ledger = self._halted_ledger()
+
+        ledger.resume(confirm=True, peak_equity=4468.86)
+        intents, _ = generate_intents(universe, store, ledger, as_of=AS_OF)
+
+        assert ledger.halted is False
+        assert len([i for i in intents if i.side == "buy"]) > 0
+        assert ledger.peak_equity == pytest.approx(4468.86)
+
+
 class TestPerSymbolStrategies:
     def test_symbol_override_controls_entries(self, universe, tmp_path):
         never_path = tmp_path / "never.json"
@@ -1628,3 +1666,60 @@ class TestPreflight:
                            FakeStore({}), as_of=AS_OF, exits_only=True)
         assert not report.ok
         assert any("live_enabled is false" in r for r in report.reasons)
+
+
+class TestHealthNeverGates:
+    """D2: a stale/idle ledger health ALARM must never block or alter trading —
+    only the kill switch (halted=True) is allowed to gate entries, and exits
+    always process regardless of fill staleness.
+    """
+
+    def _stale_but_not_halted_ledger(self) -> PaperLedger:
+        ledger = PaperLedger(cash=100.0, starting_cash=150.0)
+        ledger.fills.append(
+            PaperFill(
+                symbol="AAA",
+                side="buy",
+                quantity=0.5,
+                price=200.0,
+                notional=100.0,
+                reason="ancient entry",
+                filled_at=datetime(2020, 1, 1, tzinfo=UTC_TZ),
+                strategy_name="test",
+            )
+        )
+        _open_position(ledger, "AAA", 0.5, entry_price=200.0)  # deep stop breach
+        return ledger
+
+    def test_stale_ledger_still_generates_exit_intents(self, universe):
+        from bonito.trading.health import check_ledger_health
+
+        store = uptrend_store(universe.symbols)
+        ledger = self._stale_but_not_halted_ledger()
+
+        intents, _ = generate_intents(universe, store, ledger, as_of=AS_OF)
+        sells = [i for i in intents if i.side == "sell"]
+        assert len(sells) == 1
+        assert "stop loss" in sells[0].reason
+
+        report = check_ledger_health(ledger, as_of=datetime(2026, 9, 20, tzinfo=UTC_TZ))
+        assert report.status == "ALARM"
+
+    def test_stale_ledger_does_not_abort_preflight(self, universe):
+        store = uptrend_store(universe.symbols)
+        ledger = self._stale_but_not_halted_ledger()
+
+        report = preflight(universe, ledger, store, as_of=AS_OF)
+
+        assert report.ok is True
+        assert not any("fill" in r.lower() and "stale" in r.lower() for r in report.reasons)
+
+    def test_live_runner_does_not_import_health(self):
+        from pathlib import Path
+
+        repo_root = Path(__file__).resolve().parent.parent
+        source = (repo_root / "src" / "bonito" / "trading" / "live_runner.py").read_text()
+
+        forbidden = ("from .health", "from bonito.trading.health", "import health")
+        for needle in forbidden:
+            assert needle not in source, f"live_runner.py must never import health.py ({needle!r})"

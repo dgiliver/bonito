@@ -80,6 +80,38 @@ jobs:
             echo '```'
           } >> "$GITHUB_STEP_SUMMARY"
 
+      - name: Ledger health check
+        id: health
+        if: always()
+        run: |
+          set +e
+          bonito live health --json > /tmp/health.json
+          set -e
+          {
+            echo "## Ledger health"
+            echo '```json'
+            cat /tmp/health.json
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+          python - <<'EOF' >> "$GITHUB_OUTPUT"
+          import json
+
+          try:
+              report = json.load(open("/tmp/health.json"))
+              status = report["status"]
+              reasons = "; ".join(report.get("reasons", [])) or "none"
+              summary = (
+                  f"{status}: halted={report['halted']} "
+                  f"fills_stale={report['fills_stale']} cycle_idle={report['cycle_idle']} "
+                  f"reasons={reasons}"
+              ).replace("\n", " ")
+          except Exception as exc:
+              status = "UNKNOWN"
+              summary = f"could not parse bonito live health output: {exc}".replace("\n", " ")
+          print(f"status={status}")
+          print(f"summary={summary}")
+          EOF
+
       - name: Commit ledger state
         run: |
           git config user.name "bonito-paper-bot"
@@ -100,12 +132,39 @@ jobs:
 
       - name: Open issue on failure
         if: failure()
+        continue-on-error: true
         env:
           GH_TOKEN: ${{ github.token }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
         run: |
-          gh issue create \
-            --title "Paper trading cycle failed $(date -u +%F)" \
-            --body "The scheduled paper-trading cycle failed. Logs: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+          existing=$(gh issue list --state open --search "Paper trading cycle failed" --json number --jq length || echo 0)
+          if [ "$existing" = "0" ]; then
+            gh issue create \
+              --title "Paper trading cycle failed $(date -u +%F)" \
+              --body "The scheduled paper-trading cycle failed. Logs: $RUN_URL
 
           Positions are NOT being managed (stops included) until this is fixed or a cycle is run manually: \`bonito live refresh && bonito live run --no-refresh\`." \
-            || echo "::warning::could not create failure issue"
+              || echo "::warning::could not create failure issue"
+          fi
+
+      - name: Open issue on ledger health alarm
+        if: always() && steps.health.outputs.status == 'ALARM'
+        continue-on-error: true
+        env:
+          GH_TOKEN: ${{ github.token }}
+          SUMMARY: ${{ steps.health.outputs.summary }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: |
+          existing=$(gh issue list --state open --search "Paper ledger health alarm" --json number --jq length || echo 0)
+          if [ "$existing" = "0" ]; then
+            gh issue create \
+              --title "Paper ledger health alarm $(date -u +%F)" \
+              --body "Diagnostic alarm only — nothing is gated by this; the kill switch and preflight checks are unaffected.
+
+          Summary: $SUMMARY
+
+          Logs: $RUN_URL
+
+          Triage: \`bonito live health\` for the full report, \`bonito live status\` for positions/P&L. If the kill switch is latched, \`bonito live resume --yes\` clears the halt AND re-baselines the drawdown peak to current equity (\`--keep-peak\` clears the halt only)." \
+              || echo "::warning::could not create ledger health alarm issue"
+          fi
