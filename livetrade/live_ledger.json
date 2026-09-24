@@ -1858,11 +1858,22 @@
       "filled_at": "2026-09-24T13:41:58.453147Z",
       "strategy_name": "live",
       "broker_order_id": "6ab5289d-4021-4485-98f4-ac526e21badc"
+    },
+    {
+      "symbol": "ARM",
+      "side": "buy",
+      "quantity": 0.0,
+      "price": 308.13,
+      "notional": 0.0,
+      "reason": "no_fill: live fill",
+      "filled_at": "2026-09-24T20:47:31.813536Z",
+      "strategy_name": "live",
+      "broker_order_id": "6ab58c5f-a0d5-4d03-993c-74dee7689dc8"
     }
   ],
   "realized_pnl": -10.365509002099987,
   "peak_equity": 150.14103162835693,
   "halted": false,
   "halt_reason": "",
-  "updated_at": "2026-09-24T17:41:52.292951Z"
+  "updated_at": "2026-09-24T20:47:31.813769Z"
 }
