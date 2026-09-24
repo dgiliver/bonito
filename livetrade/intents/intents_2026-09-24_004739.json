@@ -1,0 +1,38 @@
+[
+  {
+    "symbol": "MU",
+    "side": "buy",
+    "dollar_amount": 558.61,
+    "quantity": null,
+    "reason": "entry rule matched: ema_fast gt ema_slow, close gt ema_slow, rsi_14 lt 68.0",
+    "signal_price": 1096.1600341796875,
+    "signal_date": "2026-09-22T04:00:00",
+    "strategy_name": "ema_cross_rsi_atr_regime",
+    "generated_at": "2026-09-24T00:47:39.472520Z",
+    "broker_order_id": null
+  },
+  {
+    "symbol": "SNDK",
+    "side": "buy",
+    "dollar_amount": 558.61,
+    "quantity": null,
+    "reason": "entry rule matched: ema_fast gt ema_slow, close gt ema_slow, rsi_14 lt 68.0",
+    "signal_price": 1887.0400390625,
+    "signal_date": "2026-09-22T04:00:00",
+    "strategy_name": "ema_cross_rsi_atr_regime",
+    "generated_at": "2026-09-24T00:47:39.475928Z",
+    "broker_order_id": null
+  },
+  {
+    "symbol": "DELL",
+    "side": "buy",
+    "dollar_amount": 558.61,
+    "quantity": null,
+    "reason": "entry rule matched: ema_fast gt ema_slow, close gt ema_slow, rsi_14 lt 68.0",
+    "signal_price": 548.9199829101562,
+    "signal_date": "2026-09-22T04:00:00",
+    "strategy_name": "ema_cross_rsi_atr_regime",
+    "generated_at": "2026-09-24T00:47:39.480860Z",
+    "broker_order_id": null
+  }
+]
