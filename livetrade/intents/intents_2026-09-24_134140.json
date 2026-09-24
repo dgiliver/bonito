@@ -1,0 +1,14 @@
+[
+  {
+    "symbol": "MSFT",
+    "side": "sell",
+    "dollar_amount": null,
+    "quantity": 0.033112,
+    "reason": "stop loss triggered (intraday)",
+    "signal_price": 493.7699890136719,
+    "signal_date": "2026-09-24T13:41:40.776478Z",
+    "strategy_name": "c_ema12-26_rsi55_atr1.0_tp20",
+    "generated_at": "2026-09-24T13:41:40.776779Z",
+    "broker_order_id": null
+  }
+]
