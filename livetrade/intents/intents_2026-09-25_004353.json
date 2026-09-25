@@ -1,0 +1,38 @@
+[
+  {
+    "symbol": "IREN",
+    "side": "buy",
+    "dollar_amount": 554.57,
+    "quantity": null,
+    "reason": "entry rule matched: ema_fast gt ema_slow, close gt ema_slow, rsi_14 lt 68.0",
+    "signal_price": 47.04999923706055,
+    "signal_date": "2026-09-23T04:00:00",
+    "strategy_name": "ema_cross_rsi_atr_regime",
+    "generated_at": "2026-09-25T00:43:53.090697Z",
+    "broker_order_id": null
+  },
+  {
+    "symbol": "HOOD",
+    "side": "buy",
+    "dollar_amount": 554.57,
+    "quantity": null,
+    "reason": "entry rule matched: ema_fast gt ema_slow, close gt ema_slow, rsi_14 lt 68.0",
+    "signal_price": 122.69999694824219,
+    "signal_date": "2026-09-23T04:00:00",
+    "strategy_name": "ema_cross_rsi_atr_regime",
+    "generated_at": "2026-09-25T00:43:53.106576Z",
+    "broker_order_id": null
+  },
+  {
+    "symbol": "BE",
+    "side": "buy",
+    "dollar_amount": 554.57,
+    "quantity": null,
+    "reason": "entry rule matched: ema_fast gt ema_slow, close gt ema_slow, rsi_14 lt 68.0",
+    "signal_price": 275.19000244140625,
+    "signal_date": "2026-09-23T04:00:00",
+    "strategy_name": "ema_cross_rsi_atr_regime",
+    "generated_at": "2026-09-25T00:43:53.132782Z",
+    "broker_order_id": null
+  }
+]
