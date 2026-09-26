@@ -1,0 +1,26 @@
+[
+  {
+    "symbol": "ARM",
+    "side": "buy",
+    "dollar_amount": 546.5,
+    "quantity": null,
+    "reason": "entry rule matched: ema_fast gt ema_slow, close gt ema_slow, rsi_14 lt 68.0",
+    "signal_price": 306.3399963378906,
+    "signal_date": "2026-09-24T04:00:00",
+    "strategy_name": "ema_cross_rsi_atr_regime",
+    "generated_at": "2026-09-26T00:48:18.670996Z",
+    "broker_order_id": null
+  },
+  {
+    "symbol": "MSFT",
+    "side": "buy",
+    "dollar_amount": 482.83,
+    "quantity": null,
+    "reason": "entry rule matched: ema_fast gt ema_slow, close gt ema_slow, rsi_14 lt 55.0",
+    "signal_price": 497.92999267578125,
+    "signal_date": "2026-09-24T04:00:00",
+    "strategy_name": "c_ema12-26_rsi55_atr1.0_tp20",
+    "generated_at": "2026-09-26T00:48:18.681690Z",
+    "broker_order_id": null
+  }
+]
