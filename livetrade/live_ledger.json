@@ -1,5 +1,5 @@
 {
-  "cash": 24.89134666630006,
+  "cash": 37.53420136630006,
   "starting_cash": 150.0,
   "positions": {
     "AAPL": {
@@ -208,106 +208,6 @@
       "entry_price": 265.47,
       "entry_date": "2026-09-16T13:30:02.281000Z",
       "high_water_mark": 291.07000732421875,
-      "strategy_name": "live",
-      "strategy_hash": "da16575a5622",
-      "strategy_config": {
-        "name": "ema_cross_rsi_atr_regime",
-        "description": "EMA 10/26 cross + RSI<68, 2.0x ATR(14) trailing stop, 10% TP, SPY>SMA200 regime gate. Exit rule VALIDATED 2026-06-12: removing it degrades the account replay despite negative raw attribution (docs/EXPERIMENT_LOG.md) — do not strip it without fresh replay evidence.",
-        "version": "2.0",
-        "symbols": [
-          "SPY"
-        ],
-        "timeframe": "1d",
-        "indicators": [
-          {
-            "type": "ema",
-            "name": "ema_fast",
-            "params": {
-              "period": 10
-            }
-          },
-          {
-            "type": "ema",
-            "name": "ema_slow",
-            "params": {
-              "period": 26
-            }
-          },
-          {
-            "type": "rsi",
-            "name": "rsi_14",
-            "params": {
-              "period": 14
-            }
-          }
-        ],
-        "entry_rules": [
-          {
-            "conditions": [
-              {
-                "left": "ema_fast",
-                "comparison": "gt",
-                "right": "ema_slow",
-                "lookback": null
-              },
-              {
-                "left": "close",
-                "comparison": "gt",
-                "right": "ema_slow",
-                "lookback": null
-              },
-              {
-                "left": "rsi_14",
-                "comparison": "lt",
-                "right": 68.0,
-                "lookback": null
-              }
-            ],
-            "logic": "AND",
-            "side": "long"
-          }
-        ],
-        "exit_rules": [
-          {
-            "conditions": [
-              {
-                "left": "ema_fast",
-                "comparison": "crosses_below",
-                "right": "ema_slow",
-                "lookback": null
-              }
-            ],
-            "logic": "AND",
-            "side": "long"
-          }
-        ],
-        "position_size": {
-          "type": "percent_equity",
-          "value": 98.0
-        },
-        "max_positions": 1,
-        "stop_loss": {
-          "type": "trailing_atr",
-          "value": 2.0,
-          "atr_period": 14,
-          "trigger_percent": null
-        },
-        "take_profit": {
-          "type": "percent",
-          "value": 0.1
-        },
-        "regime_filter": {
-          "symbol": "SPY",
-          "sma_period": 200
-        }
-      }
-    },
-    "SNDK": {
-      "symbol": "SNDK",
-      "quantity": 0.007545,
-      "entry_price": 1758.55,
-      "entry_date": "2026-09-22T13:30:00.492000Z",
-      "high_water_mark": 1887.0400390625,
       "strategy_name": "live",
       "strategy_hash": "da16575a5622",
       "strategy_config": {
@@ -1880,11 +1780,22 @@
       "filled_at": "2026-09-28T13:42:02.705415Z",
       "strategy_name": "live",
       "broker_order_id": "6aba6e9d-ad7f-4b51-8db0-7fc56e691c6f"
+    },
+    {
+      "symbol": "SNDK",
+      "side": "sell",
+      "quantity": 0.007545,
+      "price": 1675.66,
+      "notional": 12.6428547,
+      "reason": "live fill",
+      "filled_at": "2026-09-28T14:42:52.619982Z",
+      "strategy_name": "live",
+      "broker_order_id": "6aba7cd9-0dd9-4554-b38b-71402ef6573a"
     }
   ],
-  "realized_pnl": -10.408920453699988,
+  "realized_pnl": -11.034325503699987,
   "peak_equity": 150.14103162835693,
   "halted": false,
   "halt_reason": "",
-  "updated_at": "2026-09-28T13:42:02.705588Z"
+  "updated_at": "2026-09-28T14:42:52.620228Z"
 }
