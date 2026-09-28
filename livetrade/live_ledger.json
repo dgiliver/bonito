@@ -1791,11 +1791,22 @@
       "filled_at": "2026-09-28T14:42:52.619982Z",
       "strategy_name": "live",
       "broker_order_id": "6aba7cd9-0dd9-4554-b38b-71402ef6573a"
+    },
+    {
+      "symbol": "SNDK",
+      "side": "buy",
+      "quantity": 0.0,
+      "price": 1708.5,
+      "notional": 0.0,
+      "reason": "no_fill: live fill",
+      "filled_at": "2026-09-28T20:48:22.148868Z",
+      "strategy_name": "live",
+      "broker_order_id": "6abad290-cf17-42ee-b9db-5bc0f2c2aea9"
     }
   ],
   "realized_pnl": -11.034325503699987,
   "peak_equity": 150.14103162835693,
   "halted": false,
   "halt_reason": "",
-  "updated_at": "2026-09-28T19:41:36.902958Z"
+  "updated_at": "2026-09-28T20:48:22.149090Z"
 }
