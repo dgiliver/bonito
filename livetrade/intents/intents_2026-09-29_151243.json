@@ -1,0 +1,14 @@
+[
+  {
+    "symbol": "BE",
+    "side": "sell",
+    "dollar_amount": null,
+    "quantity": 0.062944,
+    "reason": "take profit triggered (intraday)",
+    "signal_price": 297.0199890136719,
+    "signal_date": "2026-09-29T15:12:43.945269Z",
+    "strategy_name": "ema_cross_rsi_atr_regime",
+    "generated_at": "2026-09-29T15:12:43.945743Z",
+    "broker_order_id": null
+  }
+]
