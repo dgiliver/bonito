@@ -1,0 +1,26 @@
+[
+  {
+    "symbol": "AAPL",
+    "side": "sell",
+    "dollar_amount": null,
+    "quantity": 0.049537,
+    "reason": "stop loss triggered",
+    "signal_price": 329.3999938964844,
+    "signal_date": "2026-09-29T04:00:00",
+    "strategy_name": "ema_cross_rsi_atr_regime",
+    "generated_at": "2026-09-29T20:48:27.959075Z",
+    "broker_order_id": null
+  },
+  {
+    "symbol": "AMD",
+    "side": "buy",
+    "dollar_amount": 15.64,
+    "quantity": null,
+    "reason": "entry rule matched: ema_fast gt ema_slow, close gt ema_slow, rsi_14 lt 68.0",
+    "signal_price": 607.5700073242188,
+    "signal_date": "2026-09-29T04:00:00",
+    "strategy_name": "ema_cross_rsi_atr_regime",
+    "generated_at": "2026-09-29T20:48:28.110609Z",
+    "broker_order_id": null
+  }
+]
