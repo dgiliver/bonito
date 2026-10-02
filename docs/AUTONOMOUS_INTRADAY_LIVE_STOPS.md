@@ -160,10 +160,12 @@ Setup:
    position's `quantity` field (copy the string as-is) — NOT
    `intraday_quantity` (today's buys only) and NOT
    `shares_available_for_sells` -> `.venv/bin/bonito live reconcile
-   '<json>' -u config/universe.live.json`. Pass {} ONLY when the call
-   succeeded and listed zero positions: an error, a timeout or an
-   empty/garbled response is a FAILED READ, not a flat account.
-   - Any non-zero exit: re-read ONCE before believing it — call
+   '<json>' -u config/universe.live.json`. A successful response with an
+   empty positions list means flat: pass {}. An error, a timeout, or a
+   blank/unparseable response is a FAILED READ, not a flat account: call
+   get_equity_positions once more, and if that fails too, STOP and report
+   "positions read failing" without running reconcile.
+   - Any non-zero reconcile exit: re-read ONCE before believing it — call
      get_equity_positions again, rebuild the JSON from scratch, re-run
      reconcile. Exit 0 now -> proceed normally (report "first positions
      read was bad; re-read OK"). One bad read must not cost an hour of
@@ -171,10 +173,12 @@ Setup:
      of the 7 positions the account actually held.
    - Non-zero again -> STOP, report, do not act — this catches a prior
      crash between placing and recording an order, same reasoning as the
-     daily cycle's steps 4/9. If reconcile printed "LIKELY BAD POSITIONS
-     READ", report exactly that (the positions are probably fine; the read
-     keeps failing), not "genuine drift". Exit 2 = the JSON itself was
-     malformed (the error says how).
+     daily cycle's steps 4/9. If both runs printed "LIKELY BAD POSITIONS
+     READ", report exactly: "two consecutive positions reads held none of
+     the ledger's positions — either the read is failing or they were sold
+     without being recorded; needs a human check of get_equity_orders / the
+     Robinhood app". Exit 2 = the JSON itself was malformed (the error
+     says how).
    - reconcile now AUTO-TOLERATES expected pending fills in EITHER direction
      (the daily cycle's overnight-queued orders settling at today's open):
      a broker position the ledger doesn't hold, matched by a pending-BUY
@@ -189,9 +193,10 @@ Setup:
      daily cycle's step 3 resolve-pending records them tonight. This is what
      keeps the intraday sweep running instead of aborting all day after a
      daily-cycle buy OR sell.
-   - So a FATAL that survives the re-read means GENUINE, unexplained drift
-     — a real unrecorded order, or a holding too large to be an expected
-     fill, the crash case — STOP and report.
+   - So a FATAL that survives the re-read is treated as GENUINE,
+     unexplained drift — a real unrecorded order, or a holding too large to
+     be an expected fill, the crash case — STOP and report (worded as above
+     if it carried the bad-read label).
    - Never run `bonito live resolve-pending` yourself (exclusively the daily
      cycle's job — one writer owns sentinel healing so two runs never race
      to heal the same record).

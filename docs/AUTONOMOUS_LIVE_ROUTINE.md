@@ -191,7 +191,7 @@ Token discipline (this runs daily, unattended — be lean):
   output or paste raw MCP/JSON blobs — pull only the field you need (fill
   price, filled qty, order id).
 - Minimum tool calls: one get_accounts, one get_equity_positions per reconcile
-  (plus the single re-read step 4 allows when reconcile fails),
+  (plus the one re-read step 4 allows when the read or the reconcile fails),
   one get_equity_orders per pending order id in step 3 (usually zero or one),
   one get_portfolio for settled buying power in step 7, then per intent
   review→place→record, one `live tracking`, and the git pushes steps 2 and
@@ -270,18 +270,23 @@ Setup:
    position's `quantity` field (copy the string as-is) — NOT
    `intraday_quantity` (today's buys only) and NOT
    `shares_available_for_sells` → `.venv/bin/bonito live reconcile
-   '<json>' -u config/universe.live.json`. Pass {} ONLY when the call
-   succeeded and listed zero positions: an error, a timeout or an
-   empty/garbled response is a FAILED READ, not a flat account.
-   - Any non-zero exit: re-read ONCE before believing it — call
+   '<json>' -u config/universe.live.json`. A successful response with an
+   empty positions list means flat: pass {}. An error, a timeout, or a
+   blank/unparseable response is a FAILED READ, not a flat account: call
+   get_equity_positions once more, and if that fails too, STOP and report
+   "positions read failing" — do not trade.
+   - Any non-zero reconcile exit: re-read ONCE before believing it — call
      get_equity_positions again, rebuild the JSON from scratch, re-run
      reconcile. Exit 0 now → proceed (report "first positions read was
      bad; re-read OK").
    - Non-zero again → STOP, report, do not trade. Exit 1 = FATAL drift
      (>0.5% of a position's shares, or a position in one side but not the
-     other); if it printed "LIKELY BAD POSITIONS READ", report exactly that
-     (the positions are probably fine; the read keeps failing), not drift.
-     Exit 2 = the JSON itself was malformed (the error says how).
+     other). If both runs printed "LIKELY BAD POSITIONS READ", report
+     exactly: "two consecutive positions reads held none of the ledger's
+     positions — either the read is failing or they were sold without
+     being recorded; needs a human check of get_equity_orders / the
+     Robinhood app". Exit 2 = the JSON itself was malformed (the error
+     says how).
    - Exit 0 with a "sub-tolerance drift" warning is fine to proceed — the
      0.5% gate absorbs fractional-rounding noise. The drift gate blocks new
      entries only; it never blocks an exit.

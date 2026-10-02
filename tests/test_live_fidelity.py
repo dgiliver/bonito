@@ -362,7 +362,7 @@ class TestReconcileCLI:
         ledger_dir.mkdir()
         ledger_path = ledger_dir / f"{mode}_ledger.json"
         ledger = PaperLedger(cash=100.0, starting_cash=150.0)
-        for symbol, quantity in (held or {"AAA": 1.0}).items():
+        for symbol, quantity in ({"AAA": 1.0} if held is None else held).items():
             _open_position(ledger, symbol, quantity=quantity, entry_price=100.0)
         ledger.save(ledger_path)
         return str(universe_path), str(ledger_path)
@@ -425,25 +425,37 @@ class TestReconcileCLI:
         result = self._invoke_reconcile(tmp_path, '{"AAA": "1.0"}')
         assert result.exit_code == 0
 
+    @staticmethod
+    def _flat_output(result) -> str:
+        """Lower-cased output with whitespace collapsed — Rich wraps long lines."""
+        return " ".join(((result.stdout or "") + (result.output or "")).lower().split())
+
+    def test_lowercase_symbols_are_normalized(self, tmp_path):
+        """Symbols are matched case-insensitively against the (uppercase) ledger."""
+        result = self._invoke_reconcile(tmp_path, '{"aaa": 1.0}')
+        assert result.exit_code == 0
+
     def test_suspect_snapshot_fails_closed_with_reread_guidance(self, tmp_path):
         """A snapshot holding none of 2+ ledger positions (the 2026-10-02 false
         abort) still exits 1 — never trades on it — but says it is a likely BAD
-        READ to re-fetch, not drift to 'resolve' with record-fill (the ledger is
-        fine; record-filling against a bad read would corrupt it)."""
+        READ to re-fetch, not drift to 'resolve' with record-fill (the ledger may
+        be fine; record-filling against a bad read would corrupt it)."""
         result = self._invoke_reconcile(tmp_path, "{}", held={"AAA": 1.0, "BBB": 2.0})
         assert result.exit_code == 1
-        output = ((result.stdout or "") + (result.output or "")).lower()
+        output = self._flat_output(result)
         assert "likely bad positions read" in output
-        assert "resolve with `bonito live record-fill`" not in output
+        assert "never record-fill from a snapshot" in output
+        assert "resolve it with" not in output
 
     def test_genuine_drift_keeps_record_fill_guidance(self, tmp_path):
         """One of two positions missing is the real unrecorded-order shape: plain
-        FATAL with the record-fill guidance, no bad-read label."""
+        FATAL, re-read first, then the record-fill guidance; no bad-read label."""
         result = self._invoke_reconcile(tmp_path, '{"AAA": 1.0}', held={"AAA": 1.0, "BBB": 2.0})
         assert result.exit_code == 1
-        output = ((result.stdout or "") + (result.output or "")).lower()
+        output = self._flat_output(result)
         assert "likely bad positions read" not in output
-        assert "record-fill" in output
+        assert "re-read positions once before resolving anything" in output
+        assert "resolve it with `bonito live record-fill`" in output
 
     @pytest.mark.parametrize(
         "broker_json",
@@ -457,6 +469,8 @@ class TestReconcileCLI:
             '{"AAA": -1.0}',
             '{"AAA": NaN}',
             '{"AAA": "inf"}',
+            '{"aaa": 1.0, "AAA": 1.0}',  # same symbol twice
+            pytest.param('{"AAA": 1' + "0" * 400 + "}", id="int-too-large-for-float"),
         ],
     )
     def test_malformed_snapshot_is_a_usage_error_not_a_traceback(self, tmp_path, broker_json):

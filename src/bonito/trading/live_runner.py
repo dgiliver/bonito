@@ -991,6 +991,11 @@ def reconcile_positions(
     for symbol in sorted(all_symbols):
         ledger_qty = ledger.positions[symbol].quantity if symbol in ledger.positions else 0.0
         broker_qty = broker.get(symbol, 0.0)
+        if not math.isfinite(broker_qty):
+            # A corrupt snapshot, never a holding — and inf would slip past the
+            # relative test below (inf > 0.005 * inf is False).
+            report.fatal_reasons.append(f"{symbol}: non-finite broker quantity {broker_qty}")
+            continue
         larger = max(ledger_qty, broker_qty)
         if larger <= dust:
             continue  # both sides are dust — not fatal

@@ -32,18 +32,21 @@ git pull origin <current-branch>   # pick up latest ledger state
 0. **Reconcile (MANDATORY in live mode, before anything else)**:
    - `get_equity_positions` for the Agentic account → build
      `{"SYMBOL": quantity}` JSON from every position's `quantity` field (not
-     `intraday_quantity`). `{}` only if the call succeeded and listed no
-     positions — a failed or empty read is not a flat account.
+     `intraday_quantity`). A successful empty positions list → `{}`; an
+     error, timeout or blank/unparseable response is a failed read, not a
+     flat account — retry it once, then stop and tell the user.
    - `.venv/bin/bonito live reconcile '<positions_json>'`
    - Non-zero exit: re-read positions once and re-run before believing it.
-     **"LIKELY BAD POSITIONS READ"** means the snapshot held none of the
-     ledger's positions — fix the read; never record-fill against it.
    - Non-zero again = drift (e.g. a prior session crashed between placing an
      order and recording the fill). **HARD STOP — do not trade.** Pull the
      truth from `get_equity_orders` (placed_agent=agentic), repair the
      ledger with `bonito live record-fill` (actual fill price +
      `--broker-order-id` from that same order), re-run reconcile until
-     green, and report what happened to the user.
+     green, and report what happened to the user. Repair only what
+     `get_equity_orders` proves — never from the positions snapshot. If it
+     says **"LIKELY BAD POSITIONS READ"** (none of the ledger's positions in
+     the snapshot) and the orders show nothing unrecorded, the read is the
+     problem, not the ledger: tell the user and stop.
 1. **Refresh data**: `.venv/bin/bonito live refresh`
    - If Yahoo is blocked ("Host not in allowlist"), STOP and tell the user
      to add `query1.finance.yahoo.com` / `query2.finance.yahoo.com` to the

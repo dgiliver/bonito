@@ -1414,13 +1414,16 @@ def _parse_broker_positions(positions_json: str) -> dict[str, float]:
         numeric = isinstance(qty, int | float | str) and not isinstance(qty, bool)
         try:
             value = float(qty) if numeric else math.nan
-        except ValueError:  # non-numeric string
+        except (ValueError, OverflowError):  # non-numeric string / int too large
             value = math.nan
         if not math.isfinite(value) or value < 0:
             raise typer.BadParameter(
                 f"{symbol}: quantity {qty!r} is not a finite number >= 0", param_hint=hint
             )
-        positions[symbol.upper()] = value
+        key = symbol.upper()
+        if key in positions:
+            raise typer.BadParameter(f"{symbol}: duplicate symbol", param_hint=hint)
+        positions[key] = value
     return positions
 
 
@@ -1460,9 +1463,10 @@ def live_reconcile(
         console.print(report.describe())
         console.print(
             "[dim]Re-fetch get_equity_positions, rebuild the JSON from EVERY position's "
-            "`quantity` field, and re-run reconcile once. Do NOT record-fill anything. "
-            "If a fresh read still shows none of them, treat it as real drift and check "
-            "get_equity_orders for unrecorded sells.[/dim]"
+            "`quantity` field, and re-run reconcile once. Never record-fill from a "
+            "snapshot. If a fresh read still shows none of them, treat it as real drift: "
+            "they may have been sold without being recorded — check get_equity_orders "
+            "before changing anything.[/dim]"
         )
         raise typer.Exit(1)
 
@@ -1471,8 +1475,9 @@ def live_reconcile(
         console.print("[bold red]DRIFT — refusing new entries (exits still allowed)[/bold red]")
         console.print(report.describe())
         console.print(
-            "[dim]Resolve with `bonito live record-fill` using the actual fill data "
-            "from Robinhood order history (get_equity_orders, placed_agent=agentic).[/dim]"
+            "[dim]Re-read positions once before resolving anything. If the drift persists, "
+            "resolve it with `bonito live record-fill` using the actual fill data from "
+            "Robinhood order history (get_equity_orders, placed_agent=agentic).[/dim]"
         )
         raise typer.Exit(1)
 

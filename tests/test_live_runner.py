@@ -1157,6 +1157,29 @@ class TestReconcile:
         assert sorted(report.pending_explained) == ["ARM", "HOOD"]
         assert report.snapshot_suspect is False
 
+    def test_dust_ledger_positions_do_not_count_toward_suspect(self):
+        """A dust remnant (<=1e-4 sh) is not a position the broker must show, so one
+        real position plus dust is a single-position book: plain FATAL, no label."""
+        from bonito.trading.live_runner import reconcile_positions
+
+        ledger = self._ledger_with("AAA", qty=1.0)
+        _open_position(ledger, "BBB", quantity=5e-5, entry_price=100.0)
+        report = reconcile_positions(ledger, {}, max_position_usd=30.0)
+        assert report.fatal_drift is True
+        assert report.snapshot_suspect is False
+
+    def test_non_finite_broker_quantity_is_fatal(self):
+        """inf slips past the relative drift test (inf > 0.005 * inf is False), so a
+        corrupt snapshot must be fatal explicitly — never waved through as in sync."""
+        from bonito.trading.live_runner import reconcile_positions
+
+        ledger = self._ledger_with("AAA", qty=1.0)
+        inf = float("inf")
+        held = reconcile_positions(ledger, {"AAA": inf}, max_position_usd=30.0)
+        assert held.fatal_drift is True
+        extra = reconcile_positions(ledger, {"AAA": 1.0, "ZZZ": inf}, max_position_usd=30.0)
+        assert extra.fatal_drift is True
+
 
 NEVER_ENTER_STRATEGY = {
     **ALWAYS_ENTER_STRATEGY,
