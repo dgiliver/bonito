@@ -435,6 +435,13 @@ class TestReconcileCLI:
         result = self._invoke_reconcile(tmp_path, '{"aaa": 1.0}')
         assert result.exit_code == 0
 
+    def test_parser_normalizes_symbols_and_quantities(self):
+        """The parser itself hands the gate uppercase symbols and float quantities."""
+        from bonito.cli import _parse_broker_positions
+
+        parsed = _parse_broker_positions('{"aapl": "0.000037", "HOOD": 0.145033, "Mu": 1}')
+        assert parsed == {"AAPL": 0.000037, "HOOD": 0.145033, "MU": 1.0}
+
     def test_suspect_snapshot_fails_closed_with_reread_guidance(self, tmp_path):
         """A snapshot holding none of 2+ ledger positions (the 2026-10-02 false
         abort) still exits 1 — never trades on it — but says it is a likely BAD
@@ -469,7 +476,9 @@ class TestReconcileCLI:
             '{"AAA": -1.0}',
             '{"AAA": NaN}',
             '{"AAA": "inf"}',
-            '{"aaa": 1.0, "AAA": 1.0}',  # same symbol twice
+            '{"AAA": 0.4, "AAA": 1.0}',  # same symbol twice — json.loads keeps the last
+            '{"aaa": 1.0, "AAA": 1.0}',  # same symbol twice, differing only in case
+            '{"AAA": 1.0, "aaa": 0.4}',  # ...in either order
             pytest.param('{"AAA": 1' + "0" * 400 + "}", id="int-too-large-for-float"),
         ],
     )

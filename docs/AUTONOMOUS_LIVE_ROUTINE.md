@@ -191,7 +191,8 @@ Token discipline (this runs daily, unattended — be lean):
   output or paste raw MCP/JSON blobs — pull only the field you need (fill
   price, filled qty, order id).
 - Minimum tool calls: one get_accounts, one get_equity_positions per reconcile
-  (plus the one re-read step 4 allows when the read or the reconcile fails),
+  (step 4 allows one retry of a failed read and one re-read of a failed
+  reconcile),
   one get_equity_orders per pending order id in step 3 (usually zero or one),
   one get_portfolio for settled buying power in step 7, then per intent
   review→place→record, one `live tracking`, and the git pushes steps 2 and
@@ -382,6 +383,8 @@ Setup:
     force-pushing to "fix" either is not — never do it.
 
 Hard rules: never place a market/limit order that isn't in the intents file;
+never run `bonito live record-fill` except to record an order this run
+placed in step 8 — never to "fix" a reconcile mismatch;
 never trade the margin account; never run `bonito live resume` (it now
 requires `--yes` and, by default, re-baselines the drawdown peak to current
 equity — human-only, after explicit review); never edit

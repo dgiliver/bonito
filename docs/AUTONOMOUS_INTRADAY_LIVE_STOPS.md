@@ -291,7 +291,9 @@ symbol step 5's sweep actually flagged; never place a `trigger: stop`
 order (confirmed rejected for fractional quantities on this account);
 never trade the margin account; never edit mode or live_enabled; never
 run `bonito live resolve-pending` (that is exclusively the daily
-cycle's job); never use `git push --force`/`-f` or `git commit --amend`
+cycle's job); never run `bonito live record-fill` except to record a
+sell this run placed in step 6 — never to "fix" a reconcile mismatch;
+never use `git push --force`/`-f` or `git commit --amend`
 for any reason — the TWO narrowly-scoped exceptions in this entire
 prompt are step 8's bounded `git pull --rebase` retry (not a force-push;
 never rewrites shared history) and step 2's `git reset --hard

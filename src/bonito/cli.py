@@ -1403,8 +1403,20 @@ def _parse_broker_positions(positions_json: str) -> dict[str, float]:
     import json as _json
 
     hint = "'POSITIONS_JSON'"
+
+    def _unique_symbols(pairs: list[tuple[str, object]]) -> dict[str, object]:
+        # json.loads would silently keep the last of two identical keys; a symbol
+        # listed twice (in any case) is a mis-built snapshot, not a holding.
+        seen: set[str] = set()
+        for key, _ in pairs:
+            symbol = key.upper()
+            if symbol in seen:
+                raise typer.BadParameter(f"{key}: duplicate symbol", param_hint=hint)
+            seen.add(symbol)
+        return dict(pairs)
+
     try:
-        raw = _json.loads(positions_json)
+        raw = _json.loads(positions_json, object_pairs_hook=_unique_symbols)
     except ValueError as e:
         raise typer.BadParameter(f"not valid JSON ({e})", param_hint=hint) from e
     if not isinstance(raw, dict):
@@ -1420,10 +1432,7 @@ def _parse_broker_positions(positions_json: str) -> dict[str, float]:
             raise typer.BadParameter(
                 f"{symbol}: quantity {qty!r} is not a finite number >= 0", param_hint=hint
             )
-        key = symbol.upper()
-        if key in positions:
-            raise typer.BadParameter(f"{symbol}: duplicate symbol", param_hint=hint)
-        positions[key] = value
+        positions[symbol.upper()] = value
     return positions
 
 
