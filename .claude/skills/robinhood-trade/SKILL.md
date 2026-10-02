@@ -31,9 +31,14 @@ git pull origin <current-branch>   # pick up latest ledger state
 
 0. **Reconcile (MANDATORY in live mode, before anything else)**:
    - `get_equity_positions` for the Agentic account → build
-     `{"SYMBOL": quantity}` JSON (or `{}` if flat).
+     `{"SYMBOL": quantity}` JSON from every position's `quantity` field (not
+     `intraday_quantity`). `{}` only if the call succeeded and listed no
+     positions — a failed or empty read is not a flat account.
    - `.venv/bin/bonito live reconcile '<positions_json>'`
-   - Non-zero exit = drift (e.g. a prior session crashed between placing an
+   - Non-zero exit: re-read positions once and re-run before believing it.
+     **"LIKELY BAD POSITIONS READ"** means the snapshot held none of the
+     ledger's positions — fix the read; never record-fill against it.
+   - Non-zero again = drift (e.g. a prior session crashed between placing an
      order and recording the fill). **HARD STOP — do not trade.** Pull the
      truth from `get_equity_orders` (placed_agent=agentic), repair the
      ledger with `bonito live record-fill` (actual fill price +

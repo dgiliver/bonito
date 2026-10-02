@@ -155,11 +155,26 @@ Setup:
      commit + push (skipping the trading parts) before ending — a held
      lock self-heals via staleness in 20 minutes, but releasing promptly
      is the polite default.
-3. Reconcile: get_equity_positions for that account -> build {"SYMBOL": qty}
-   JSON ({} if flat) -> `.venv/bin/bonito live reconcile '<json>' -u
-   config/universe.live.json`. Exit 1 = FATAL drift: STOP, report, do not
-   act — this catches a prior crash between placing and recording an
-   order, same reasoning as the daily cycle's steps 4/9.
+3. Reconcile: get_equity_positions for that account -> build
+   {"SYMBOL": quantity} JSON from EVERY position it returns, using each
+   position's `quantity` field (copy the string as-is) — NOT
+   `intraday_quantity` (today's buys only) and NOT
+   `shares_available_for_sells` -> `.venv/bin/bonito live reconcile
+   '<json>' -u config/universe.live.json`. Pass {} ONLY when the call
+   succeeded and listed zero positions: an error, a timeout or an
+   empty/garbled response is a FAILED READ, not a flat account.
+   - Any non-zero exit: re-read ONCE before believing it — call
+     get_equity_positions again, rebuild the JSON from scratch, re-run
+     reconcile. Exit 0 now -> proceed normally (report "first positions
+     read was bad; re-read OK"). One bad read must not cost an hour of
+     stop coverage: on 2026-10-02 a run aborted on a snapshot holding none
+     of the 7 positions the account actually held.
+   - Non-zero again -> STOP, report, do not act — this catches a prior
+     crash between placing and recording an order, same reasoning as the
+     daily cycle's steps 4/9. If reconcile printed "LIKELY BAD POSITIONS
+     READ", report exactly that (the positions are probably fine; the read
+     keeps failing), not "genuine drift". Exit 2 = the JSON itself was
+     malformed (the error says how).
    - reconcile now AUTO-TOLERATES expected pending fills in EITHER direction
      (the daily cycle's overnight-queued orders settling at today's open):
      a broker position the ledger doesn't hold, matched by a pending-BUY
@@ -174,9 +189,9 @@ Setup:
      daily cycle's step 3 resolve-pending records them tonight. This is what
      keeps the intraday sweep running instead of aborting all day after a
      daily-cycle buy OR sell.
-   - So an exit-1 FATAL now means GENUINE, unexplained drift — a real
-     unrecorded order, or a holding too large to be an expected fill, the
-     crash case — STOP and report.
+   - So a FATAL that survives the re-read means GENUINE, unexplained drift
+     — a real unrecorded order, or a holding too large to be an expected
+     fill, the crash case — STOP and report.
    - Never run `bonito live resolve-pending` yourself (exclusively the daily
      cycle's job — one writer owns sentinel healing so two runs never race
      to heal the same record).
@@ -232,8 +247,9 @@ Setup:
    daily cycle's resolve-pending step heal it) — and name it in the
    report. On any order error: STOP, report what filled and what didn't,
    do not retry.
-7. If step 6 acted: reconcile again (get_equity_positions vs ledger).
-   Report any FATAL mismatch; do not silently fix it.
+7. If step 6 acted: reconcile again (get_equity_positions vs ledger, built
+   and re-read exactly as in step 3). Report any FATAL mismatch; do not
+   silently fix it.
 8. Persist and release the lock: `.venv/bin/bonito live status -u
    config/universe.live.json`, then `.venv/bin/bonito live lock-release
    <run_id from step 2> -u config/universe.live.json`, then `git add

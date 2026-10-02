@@ -190,7 +190,8 @@ Token discipline (this runs daily, unattended — be lean):
 - Run each command, check its exit code, move on. Do NOT echo full command
   output or paste raw MCP/JSON blobs — pull only the field you need (fill
   price, filled qty, order id).
-- Minimum tool calls: one get_accounts, one get_equity_positions to reconcile,
+- Minimum tool calls: one get_accounts, one get_equity_positions per reconcile
+  (plus the single re-read step 4 allows when reconcile fails),
   one get_equity_orders per pending order id in step 3 (usually zero or one),
   one get_portfolio for settled buying power in step 7, then per intent
   review→place→record, one `live tracking`, and the git pushes steps 2 and
@@ -265,12 +266,25 @@ Setup:
      STOP, report the printed errors, do not trade — the ledger may be
      half-healed and reconcile can't be trusted to judge it.
 4. Reconcile: get_equity_positions for that account → build
-   {"SYMBOL": qty} JSON ({} if flat) → `.venv/bin/bonito live reconcile
-   '<json>' -u config/universe.live.json`. Exit 1 = FATAL drift (>0.5% of a
-   position's shares, or a position in one side but not the other): STOP,
-   report, do not trade. Exit 0 with a "sub-tolerance drift" warning is fine
-   to proceed — the 0.5% gate absorbs fractional-rounding noise. The drift
-   gate blocks new entries only; it never blocks an exit.
+   {"SYMBOL": quantity} JSON from EVERY position it returns, using each
+   position's `quantity` field (copy the string as-is) — NOT
+   `intraday_quantity` (today's buys only) and NOT
+   `shares_available_for_sells` → `.venv/bin/bonito live reconcile
+   '<json>' -u config/universe.live.json`. Pass {} ONLY when the call
+   succeeded and listed zero positions: an error, a timeout or an
+   empty/garbled response is a FAILED READ, not a flat account.
+   - Any non-zero exit: re-read ONCE before believing it — call
+     get_equity_positions again, rebuild the JSON from scratch, re-run
+     reconcile. Exit 0 now → proceed (report "first positions read was
+     bad; re-read OK").
+   - Non-zero again → STOP, report, do not trade. Exit 1 = FATAL drift
+     (>0.5% of a position's shares, or a position in one side but not the
+     other); if it printed "LIKELY BAD POSITIONS READ", report exactly that
+     (the positions are probably fine; the read keeps failing), not drift.
+     Exit 2 = the JSON itself was malformed (the error says how).
+   - Exit 0 with a "sub-tolerance drift" warning is fine to proceed — the
+     0.5% gate absorbs fractional-rounding noise. The drift gate blocks new
+     entries only; it never blocks an exit.
 5. Refresh data: `YF_DISABLE_CURL_CFFI=1 .venv/bin/bonito live refresh
    -u config/universe.live.json`. The env var forces yfinance's plain-
    `requests`-with-realistic-User-Agent fallback instead of its default
@@ -328,8 +342,9 @@ Setup:
      rejection). Logs the divergence as an explicit no-fill instead of
      silently assuming the position exists.
    On any order error: STOP, report what filled and what didn't, do not retry.
-9. Reconcile again (get_equity_positions vs ledger). Report any FATAL
-   mismatch; do not silently fix it. A position bought this cycle whose
+9. Reconcile again (get_equity_positions vs ledger, built and re-read
+   exactly as in step 4). Report any FATAL mismatch; do not silently fix
+   it. A position bought this cycle whose
    order QUEUED (step 8's queued branch) is expected to be absent from
    the broker until the next open — that is what the pending sentinel
    records; it is not drift to fix here.

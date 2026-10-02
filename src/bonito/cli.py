@@ -1392,12 +1392,45 @@ def live_lock_release(
         console.print("[dim]no-op (already clear, or held by a different run)[/dim]")
 
 
+def _parse_broker_positions(positions_json: str) -> dict[str, float]:
+    """Parse reconcile's {"SYMBOL": quantity} snapshot, rejecting malformed input.
+
+    The snapshot is hand-built by an unattended Routine, so a bad build must fail
+    as a clear usage error (exit 2) — not a traceback exiting 1, which reads as
+    FATAL drift. Numeric strings are accepted: Robinhood returns quantities as
+    strings ("0.145033").
+    """
+    import json as _json
+
+    hint = "'POSITIONS_JSON'"
+    try:
+        raw = _json.loads(positions_json)
+    except ValueError as e:
+        raise typer.BadParameter(f"not valid JSON ({e})", param_hint=hint) from e
+    if not isinstance(raw, dict):
+        raise typer.BadParameter('expected an object {"SYMBOL": quantity, ...}', param_hint=hint)
+    positions: dict[str, float] = {}
+    for symbol, qty in raw.items():
+        numeric = isinstance(qty, int | float | str) and not isinstance(qty, bool)
+        try:
+            value = float(qty) if numeric else math.nan
+        except ValueError:  # non-numeric string
+            value = math.nan
+        if not math.isfinite(value) or value < 0:
+            raise typer.BadParameter(
+                f"{symbol}: quantity {qty!r} is not a finite number >= 0", param_hint=hint
+            )
+        positions[symbol.upper()] = value
+    return positions
+
+
 @live_app.command("reconcile")
 def live_reconcile(
     positions_json: str = typer.Argument(
         ...,
-        help='Broker positions as JSON {"SYMBOL": quantity, ...} '
-        "(from Robinhood MCP get_equity_positions; {} if account is flat)",
+        help='Broker positions as JSON {"SYMBOL": quantity, ...} — every position from '
+        "Robinhood MCP get_equity_positions, using its `quantity` field ({} only when "
+        "that call succeeded and listed no positions)",
     ),
     universe_path: str = typer.Option("config/universe.json", "--universe", "-u"),
 ) -> None:
@@ -1406,17 +1439,32 @@ def live_reconcile(
     MUST pass before any live-mode trading. Exits non-zero on drift so
     automated sessions hard-stop instead of trading on bad state.
     """
-    import json as _json
-
     from bonito.trading.live_runner import reconcile_gate
 
     universe = _load_universe(universe_path)
     ledger = _load_ledger(universe)
-    broker_positions = {k.upper(): float(v) for k, v in _json.loads(positions_json).items()}
+    broker_positions = _parse_broker_positions(positions_json)
 
     report = reconcile_gate(
         ledger, broker_positions, max_position_usd=universe.risk.max_position_usd
     )
+
+    if report.snapshot_suspect:
+        # None of the open positions are in the snapshot: almost always a failed or
+        # mis-built positions read, not lost positions. Still fail closed, but steer
+        # to a re-read — record-filling against a bad read would corrupt the ledger.
+        console.print(
+            "[bold red]LIKELY BAD POSITIONS READ — the snapshot holds none of the "
+            "ledger's open positions; refusing to trade on it[/bold red]"
+        )
+        console.print(report.describe())
+        console.print(
+            "[dim]Re-fetch get_equity_positions, rebuild the JSON from EVERY position's "
+            "`quantity` field, and re-run reconcile once. Do NOT record-fill anything. "
+            "If a fresh read still shows none of them, treat it as real drift and check "
+            "get_equity_orders for unrecorded sells.[/dim]"
+        )
+        raise typer.Exit(1)
 
     if report.fatal_drift:
         # D1: drift exceeds 0.5% tolerance — hard-halt new entries (exits still allowed).

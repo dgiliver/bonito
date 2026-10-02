@@ -712,6 +712,14 @@ class ReconcileReport(BaseModel):
         "will heal, NOT drift. Excluded from fatal_drift; still surfaced in "
         "missing_in_ledger / missing_at_broker.",
     )
+    snapshot_suspect: bool = Field(
+        default=False,
+        description="The broker snapshot holds NONE of the 2+ open ledger positions it "
+        "should (pending sells excluded) — the signature of a failed or mis-built "
+        "positions read (empty response, wrong field, wrong account), not of a real "
+        "unrecorded order, which only moves the symbols it traded. Implies fatal_drift; "
+        "classification only — it never relaxes the gate.",
+    )
 
     def describe(self) -> str:
         if self.in_sync:
@@ -999,6 +1007,15 @@ def reconcile_positions(
                 f"diff={diff:.4f} ({diff/larger:.2%} of {larger:.4f})"
             )
     report.fatal_drift = bool(report.fatal_reasons)
+
+    # A real unrecorded order only moves the symbols it traded, so a snapshot that
+    # holds NONE of 2+ positions we expect at the broker is almost always a bad read
+    # (failed/empty response, wrong field such as intraday_quantity, wrong account).
+    # Each such position is necessarily a fatal reason above, so this only labels a
+    # FATAL — letting the caller say "re-read" rather than "genuine drift".
+    held = {s for s, p in ledger.positions.items() if p.quantity > dust}
+    expected = held - set(report.pending_explained)
+    report.snapshot_suspect = len(expected) >= 2 and not expected & broker.keys()
     return report
 
 

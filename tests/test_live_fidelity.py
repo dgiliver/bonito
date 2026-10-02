@@ -340,8 +340,10 @@ class TestReconcileCLI:
     real config files.
     """
 
-    def _make_universe_file(self, tmp_path, mode: str = "paper") -> tuple[str, str]:
-        """Write a minimal universe.json and an empty ledger; return their paths."""
+    def _make_universe_file(
+        self, tmp_path, mode: str = "paper", held: dict[str, float] | None = None
+    ) -> tuple[str, str]:
+        """Write a minimal universe.json and a ledger holding `held` (default 1.0 AAA)."""
         strategy_path = tmp_path / "s.json"
         strategy_path.write_text(json.dumps(ALWAYS_ENTER_STRATEGY))
         universe_cfg = {
@@ -360,12 +362,19 @@ class TestReconcileCLI:
         ledger_dir.mkdir()
         ledger_path = ledger_dir / f"{mode}_ledger.json"
         ledger = PaperLedger(cash=100.0, starting_cash=150.0)
-        _open_position(ledger, "AAA", quantity=1.0, entry_price=100.0)
+        for symbol, quantity in (held or {"AAA": 1.0}).items():
+            _open_position(ledger, symbol, quantity=quantity, entry_price=100.0)
         ledger.save(ledger_path)
         return str(universe_path), str(ledger_path)
 
-    def _invoke_reconcile(self, tmp_path, broker_json: str, mode: str = "paper"):
-        universe_path, _ledger_path = self._make_universe_file(tmp_path, mode)
+    def _invoke_reconcile(
+        self,
+        tmp_path,
+        broker_json: str,
+        mode: str = "paper",
+        held: dict[str, float] | None = None,
+    ):
+        universe_path, _ledger_path = self._make_universe_file(tmp_path, mode, held)
         # Patch _load_universe and _load_ledger to use the temp paths
         import bonito.cli as cli_module
 
@@ -409,6 +418,53 @@ class TestReconcileCLI:
         """ledger=1.0 AAA, broker=1.0 AAA → perfectly in sync → exit 0."""
         result = self._invoke_reconcile(tmp_path, '{"AAA": 1.0}')
         assert result.exit_code == 0
+
+    def test_numeric_string_quantities_accepted(self, tmp_path):
+        """Robinhood returns quantities as strings ("0.145033"); copying them
+        verbatim must reconcile exactly like numbers."""
+        result = self._invoke_reconcile(tmp_path, '{"AAA": "1.0"}')
+        assert result.exit_code == 0
+
+    def test_suspect_snapshot_fails_closed_with_reread_guidance(self, tmp_path):
+        """A snapshot holding none of 2+ ledger positions (the 2026-10-02 false
+        abort) still exits 1 — never trades on it — but says it is a likely BAD
+        READ to re-fetch, not drift to 'resolve' with record-fill (the ledger is
+        fine; record-filling against a bad read would corrupt it)."""
+        result = self._invoke_reconcile(tmp_path, "{}", held={"AAA": 1.0, "BBB": 2.0})
+        assert result.exit_code == 1
+        output = ((result.stdout or "") + (result.output or "")).lower()
+        assert "likely bad positions read" in output
+        assert "resolve with `bonito live record-fill`" not in output
+
+    def test_genuine_drift_keeps_record_fill_guidance(self, tmp_path):
+        """One of two positions missing is the real unrecorded-order shape: plain
+        FATAL with the record-fill guidance, no bad-read label."""
+        result = self._invoke_reconcile(tmp_path, '{"AAA": 1.0}', held={"AAA": 1.0, "BBB": 2.0})
+        assert result.exit_code == 1
+        output = ((result.stdout or "") + (result.output or "")).lower()
+        assert "likely bad positions read" not in output
+        assert "record-fill" in output
+
+    @pytest.mark.parametrize(
+        "broker_json",
+        [
+            "not json",
+            '[{"symbol": "AAA", "quantity": "1.0"}]',  # raw MCP list, not {SYMBOL: qty}
+            '{"AAA": {"quantity": "1.0"}}',
+            '{"AAA": "abc"}',
+            '{"AAA": null}',
+            '{"AAA": true}',
+            '{"AAA": -1.0}',
+            '{"AAA": NaN}',
+            '{"AAA": "inf"}',
+        ],
+    )
+    def test_malformed_snapshot_is_a_usage_error_not_a_traceback(self, tmp_path, broker_json):
+        """A mis-built snapshot must fail as a clear usage error (exit 2) — not a
+        traceback with exit 1, which an unattended Routine reads as FATAL drift."""
+        result = self._invoke_reconcile(tmp_path, broker_json)
+        assert result.exit_code == 2
+        assert isinstance(result.exception, SystemExit)
 
 
 class TestLiveRunSettledBPCLI:

@@ -1097,6 +1097,66 @@ class TestReconcile:
         # (documents the behaviour the required-arg gate protects callers from).
         assert reconcile_positions(_fresh(), {"DELL": 10_000.0}).fatal_drift is False
 
+    def test_snapshot_holding_none_of_the_positions_is_flagged_suspect(self):
+        """The 2026-10-02 false abort: a snapshot built from `intraday_quantity`
+        (non-zero only for today's DELL buy) holds none of the ledger's positions.
+        Still FATAL — the gate never relaxes — but classified as a likely bad read,
+        because a real unrecorded order only moves the symbols it traded."""
+        from bonito.trading.live_runner import reconcile_positions
+
+        ledger = self._ledger_with("AMD", qty=0.025661)
+        _open_position(ledger, "ARM", quantity=0.054711, entry_price=100.0)
+        _open_position(ledger, "HOOD", quantity=0.145033, entry_price=100.0)
+        ledger.fills.append(_pending_sentinel("DELL", "buy", "order-dell", price=551.0))
+
+        snapshot = {"AMD": 0.0, "ARM": 0.0, "HOOD": 0.0, "DELL": 0.02969}
+        report = reconcile_positions(ledger, snapshot, max_position_usd=30.0)
+        assert report.fatal_drift is True
+        assert report.snapshot_suspect is True
+        assert report.pending_explained == ["DELL"]
+        # A failed read passed as {} is the same signature.
+        empty = reconcile_positions(ledger, {}, max_position_usd=30.0)
+        assert empty.fatal_drift is True
+        assert empty.snapshot_suspect is True
+
+    def test_partial_drift_is_not_flagged_suspect(self):
+        """The crash this gate exists for — a sell placed but never recorded —
+        moves only the symbol it traded. With the rest of the book present the
+        snapshot is credible: genuine FATAL drift, not a suspect read."""
+        from bonito.trading.live_runner import reconcile_positions
+
+        ledger = self._ledger_with("AMD", qty=0.5)
+        _open_position(ledger, "ARM", quantity=0.5, entry_price=100.0)
+        _open_position(ledger, "HOOD", quantity=0.5, entry_price=100.0)
+        report = reconcile_positions(ledger, {"AMD": 0.5, "ARM": 0.5}, max_position_usd=30.0)
+        assert report.fatal_drift is True
+        assert report.snapshot_suspect is False
+
+    def test_single_position_vanishing_is_not_flagged_suspect(self):
+        """With one open position, 'none of them present' carries no extra signal —
+        it is exactly the unrecorded-sell crash shape — so it stays plain FATAL."""
+        from bonito.trading.live_runner import reconcile_positions
+
+        report = reconcile_positions(self._ledger_with("AMD", qty=0.5), {}, max_position_usd=30.0)
+        assert report.fatal_drift is True
+        assert report.snapshot_suspect is False
+
+    def test_pending_sells_do_not_count_toward_suspect(self):
+        """Positions a pending SELL explains are legitimately gone at the broker, so
+        they are not expected there: one unexplained position next to two
+        pending-sell exits is a lone real discrepancy, not a wholesale bad read."""
+        from bonito.trading.live_runner import reconcile_positions
+
+        ledger = self._ledger_with("AMD", qty=0.5)
+        _open_position(ledger, "ARM", quantity=0.5, entry_price=100.0)
+        _open_position(ledger, "HOOD", quantity=0.5, entry_price=100.0)
+        ledger.fills.append(_pending_sentinel("ARM", "sell", "order-arm"))
+        ledger.fills.append(_pending_sentinel("HOOD", "sell", "order-hood"))
+        report = reconcile_positions(ledger, {}, max_position_usd=30.0)
+        assert report.fatal_drift is True  # AMD is genuinely unexplained
+        assert sorted(report.pending_explained) == ["ARM", "HOOD"]
+        assert report.snapshot_suspect is False
+
 
 NEVER_ENTER_STRATEGY = {
     **ALWAYS_ENTER_STRATEGY,
