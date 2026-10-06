@@ -1,5 +1,5 @@
 {
-  "cash": 99.99909677270972,
+  "cash": 593.489642841728,
   "starting_cash": 5000.0,
   "positions": {
     "MU": {
@@ -102,112 +102,12 @@
         }
       }
     },
-    "SNDK": {
-      "symbol": "SNDK",
-      "quantity": 0.296024455462812,
-      "entry_price": 1887.0400390625,
-      "entry_date": "2026-09-24T00:47:39.509149Z",
-      "high_water_mark": 1887.0400390625,
-      "strategy_name": "ema_cross_rsi_atr_regime",
-      "strategy_hash": "da16575a5622",
-      "strategy_config": {
-        "name": "ema_cross_rsi_atr_regime",
-        "description": "EMA 10/26 cross + RSI<68, 2.0x ATR(14) trailing stop, 10% TP, SPY>SMA200 regime gate. Exit rule VALIDATED 2026-06-12: removing it degrades the account replay despite negative raw attribution (docs/EXPERIMENT_LOG.md) — do not strip it without fresh replay evidence.",
-        "version": "2.0",
-        "symbols": [
-          "SPY"
-        ],
-        "timeframe": "1d",
-        "indicators": [
-          {
-            "type": "ema",
-            "name": "ema_fast",
-            "params": {
-              "period": 10
-            }
-          },
-          {
-            "type": "ema",
-            "name": "ema_slow",
-            "params": {
-              "period": 26
-            }
-          },
-          {
-            "type": "rsi",
-            "name": "rsi_14",
-            "params": {
-              "period": 14
-            }
-          }
-        ],
-        "entry_rules": [
-          {
-            "conditions": [
-              {
-                "left": "ema_fast",
-                "comparison": "gt",
-                "right": "ema_slow",
-                "lookback": null
-              },
-              {
-                "left": "close",
-                "comparison": "gt",
-                "right": "ema_slow",
-                "lookback": null
-              },
-              {
-                "left": "rsi_14",
-                "comparison": "lt",
-                "right": 68.0,
-                "lookback": null
-              }
-            ],
-            "logic": "AND",
-            "side": "long"
-          }
-        ],
-        "exit_rules": [
-          {
-            "conditions": [
-              {
-                "left": "ema_fast",
-                "comparison": "crosses_below",
-                "right": "ema_slow",
-                "lookback": null
-              }
-            ],
-            "logic": "AND",
-            "side": "long"
-          }
-        ],
-        "position_size": {
-          "type": "percent_equity",
-          "value": 98.0
-        },
-        "max_positions": 1,
-        "stop_loss": {
-          "type": "trailing_atr",
-          "value": 2.0,
-          "atr_period": 14,
-          "trigger_percent": null
-        },
-        "take_profit": {
-          "type": "percent",
-          "value": 0.1
-        },
-        "regime_filter": {
-          "symbol": "SPY",
-          "sma_period": 200
-        }
-      }
-    },
     "DELL": {
       "symbol": "DELL",
       "quantity": 1.017652877270875,
       "entry_price": 548.9199829101562,
       "entry_date": "2026-09-24T00:47:39.509247Z",
-      "high_water_mark": 570.6199951171875,
+      "high_water_mark": 575.385009765625,
       "strategy_name": "ema_cross_rsi_atr_regime",
       "strategy_hash": "da16575a5622",
       "strategy_config": {
@@ -407,7 +307,7 @@
       "quantity": 2.0152258260838516,
       "entry_price": 275.19000244140625,
       "entry_date": "2026-09-25T00:43:53.140608Z",
-      "high_water_mark": 294.8500061035156,
+      "high_water_mark": 297.75,
       "strategy_name": "ema_cross_rsi_atr_regime",
       "strategy_hash": "da16575a5622",
       "strategy_config": {
@@ -607,7 +507,7 @@
       "quantity": 0.9696744664955071,
       "entry_price": 497.92999267578125,
       "entry_date": "2026-09-26T00:48:18.686559Z",
-      "high_water_mark": 525.1799926757812,
+      "high_water_mark": 530.6199951171875,
       "strategy_name": "c_ema12-26_rsi55_atr1.0_tp20",
       "strategy_hash": "ef10b624536e",
       "strategy_config": {
@@ -707,7 +607,7 @@
       "quantity": 0.8108970733207074,
       "entry_price": 607.8699951171875,
       "entry_date": "2026-09-29T02:13:50.758891Z",
-      "high_water_mark": 631.75,
+      "high_water_mark": 653.7999877929688,
       "strategy_name": "ema_cross_rsi_atr_regime",
       "strategy_hash": "da16575a5622",
       "strategy_config": {
@@ -2321,11 +2221,22 @@
       "filled_at": "2026-09-29T02:13:50.758891Z",
       "strategy_name": "ema_cross_rsi_atr_regime",
       "broker_order_id": null
+    },
+    {
+      "symbol": "SNDK",
+      "side": "sell",
+      "quantity": 0.296024455462812,
+      "price": 1667.06005859375,
+      "notional": 493.49054606901825,
+      "reason": "stop loss triggered (intraday)",
+      "filled_at": "2026-10-06T18:43:12.564890Z",
+      "strategy_name": "ema_cross_rsi_atr_regime",
+      "broker_order_id": null
     }
   ],
-  "realized_pnl": -592.7809032272892,
+  "realized_pnl": -657.9003571582709,
   "peak_equity": 4468.86417420458,
   "halted": false,
   "halt_reason": "",
-  "updated_at": "2026-10-06T02:27:12.024233Z"
+  "updated_at": "2026-10-06T18:43:12.565174Z"
 }

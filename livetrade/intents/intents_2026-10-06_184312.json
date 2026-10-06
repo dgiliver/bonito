@@ -1,0 +1,14 @@
+[
+  {
+    "symbol": "SNDK",
+    "side": "sell",
+    "dollar_amount": null,
+    "quantity": 0.296024455462812,
+    "reason": "stop loss triggered (intraday)",
+    "signal_price": 1667.06005859375,
+    "signal_date": "2026-10-06T18:43:12.560446Z",
+    "strategy_name": "ema_cross_rsi_atr_regime",
+    "generated_at": "2026-10-06T18:43:12.560663Z",
+    "broker_order_id": null
+  }
+]
