@@ -607,7 +607,7 @@
       "quantity": 0.9696744664955071,
       "entry_price": 497.92999267578125,
       "entry_date": "2026-09-26T00:48:18.686559Z",
-      "high_water_mark": 518.260009765625,
+      "high_water_mark": 525.1799926757812,
       "strategy_name": "c_ema12-26_rsi55_atr1.0_tp20",
       "strategy_hash": "ef10b624536e",
       "strategy_config": {
@@ -707,7 +707,7 @@
       "quantity": 0.8108970733207074,
       "entry_price": 607.8699951171875,
       "entry_date": "2026-09-29T02:13:50.758891Z",
-      "high_water_mark": 630.9249877929688,
+      "high_water_mark": 631.75,
       "strategy_name": "ema_cross_rsi_atr_regime",
       "strategy_hash": "da16575a5622",
       "strategy_config": {
@@ -2327,5 +2327,5 @@
   "peak_equity": 4468.86417420458,
   "halted": false,
   "halt_reason": "",
-  "updated_at": "2026-10-03T01:21:01.036481Z"
+  "updated_at": "2026-10-06T02:27:12.024233Z"
 }
