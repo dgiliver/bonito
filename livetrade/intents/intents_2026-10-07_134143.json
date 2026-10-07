@@ -1,0 +1,14 @@
+[
+  {
+    "symbol": "HOOD",
+    "side": "sell",
+    "dollar_amount": null,
+    "quantity": 0.145033,
+    "reason": "stop loss triggered (intraday)",
+    "signal_price": 108.0,
+    "signal_date": "2026-10-07T13:41:43.425566Z",
+    "strategy_name": "ema_cross_rsi_atr_regime",
+    "generated_at": "2026-10-07T13:41:43.425861Z",
+    "broker_order_id": null
+  }
+]
