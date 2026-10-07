@@ -1990,11 +1990,22 @@
       "filled_at": "2026-10-07T13:42:02.957384Z",
       "strategy_name": "live",
       "broker_order_id": "6ac64c22-5aad-46cb-8798-e28007722bcc"
+    },
+    {
+      "symbol": "COST",
+      "side": "buy",
+      "quantity": 0.0,
+      "price": 940.5,
+      "notional": 0.0,
+      "reason": "no_fill: live fill",
+      "filled_at": "2026-10-07T20:48:22.048827Z",
+      "strategy_name": "live",
+      "broker_order_id": "6ac6b011-0246-4939-92d3-eb206aa05350"
     }
   ],
   "realized_pnl": -11.32922229729999,
   "peak_equity": 150.14103162835693,
   "halted": false,
   "halt_reason": "",
-  "updated_at": "2026-10-07T19:42:34.688365Z"
+  "updated_at": "2026-10-07T20:48:22.049082Z"
 }
