@@ -1,0 +1,14 @@
+[
+  {
+    "symbol": "TSM",
+    "side": "buy",
+    "dollar_amount": 15.65,
+    "quantity": null,
+    "reason": "entry rule matched: ema_fast gt ema_slow, close gt ema_slow, rsi_14 lt 68.0",
+    "signal_price": 457.989990234375,
+    "signal_date": "2026-10-08T04:00:00",
+    "strategy_name": "ema_cross_rsi_atr_regime",
+    "generated_at": "2026-10-08T20:48:43.846143Z",
+    "broker_order_id": null
+  }
+]
