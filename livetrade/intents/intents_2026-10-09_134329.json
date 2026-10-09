@@ -1,0 +1,14 @@
+[
+  {
+    "symbol": "RKLB",
+    "side": "sell",
+    "dollar_amount": null,
+    "quantity": 0.237706,
+    "reason": "stop loss triggered (intraday)",
+    "signal_price": 67.4800033569336,
+    "signal_date": "2026-10-09T13:43:29.693660Z",
+    "strategy_name": "ema_cross_rsi_atr_regime",
+    "generated_at": "2026-10-09T13:43:29.694038Z",
+    "broker_order_id": null
+  }
+]
