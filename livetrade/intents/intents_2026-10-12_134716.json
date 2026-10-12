@@ -1,0 +1,14 @@
+[
+  {
+    "symbol": "MU",
+    "side": "sell",
+    "dollar_amount": null,
+    "quantity": 0.016181,
+    "reason": "stop loss triggered (intraday)",
+    "signal_price": 991.5599975585938,
+    "signal_date": "2026-10-12T13:47:16.315218Z",
+    "strategy_name": "ema_cross_rsi_atr_regime",
+    "generated_at": "2026-10-12T13:47:16.315459Z",
+    "broker_order_id": null
+  }
+]
