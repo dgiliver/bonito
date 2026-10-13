@@ -76,3 +76,6 @@ research_output/
 # Claude Code
 .claude/settings.local.json
 CLAUDE.local.md
+
+# hindsight-free experiment data (scripts/experiments/2026-10-13_*)
+data/hindsight_free/

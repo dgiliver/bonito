@@ -54,6 +54,8 @@ ideas, structural changes) still follow the steps below by hand:
 
 | Date | Idea | Why it looked good | Why it failed |
 |------|------|--------------------|----------------|
+| 2026-10-13 | The deployed EMA/ATR swing strategy as a market-beater (profitability review, `docs/PROFITABILITY_REVIEW_2026-10.md`) | 2022+ account replay +559% (CAGR ~48%) vs SPY +74%, weekly research kept adopting on it | **Hindsight universe, not timing.** On a pre-registered mid-2016 NASDAQ-100 top-29 list (`scripts/experiments/2026-10-13_hindsight_free_strategy.py`, kill switch off) it made CAGR **+10.4%** vs hold-same +19.7%, QQQ +21.2%, SPY +15.3%; every stop/TP variant (none, 3×ATR, no TP) also trails SPY. On the current 45 names, holding them (+45.6% CAGR) beat the strategy (+27.7%) in 8/11 years. Out of sample it loses: live −12.4% vs SPY +3.2% (07-15→10-13), same-window replay −7.1%, paper since 09-23 −7.6% vs SPY +0.7%. Mechanism: 65% of live trades exit on the 2×ATR trailing stop (2/36 winners, −$38.65); the stock was above our exit 5 sessions later in 20/27 cases. Execution is NOT the gap (live vs replay stop exits −6.05% vs −6.04%). |
+| 2026-10-13 | Monthly cross-sectional momentum rotation (12-1 mo, top 5, EW, monthly, 10 bps) — one-shot, params fixed before running | Hindsight-free list: CAGR +33.2% vs QQQ +21.1% (10y), +24.7% vs +14.4% (2022+) | **Not adopted — inconclusive, not rejected.** Edge is concentration in a few mega-winners: excluding NVDA+TSLA → +22.0% (≈QQQ); excluding NVDA/TSLA/AVGO/NFLX → +13.0% (< QQQ). Whether NVDA/TSLA belong in a memory-built "mid-2016" list is itself the hindsight question. Next step is a true point-in-time constituent test (Phase 2A of the review). Adding an SPY>SMA200 gate made it worse (+19.1%). |
 | 2026-06-12 | Remove the EMA cross-below exit rule | Exit arm shows -$1,684 raw P&L over 34 trades | Account replay DEGRADES without it (+191.9% vs +196.5%). Attribution misses opportunity cost: those exits free capital for better re-entries |
 | 2026-06-12 | Momentum-ranked entry competition (21-day momentum decides who gets slots instead of universe list order) | Train improved +83.4%→+121.8% | Holdout collapsed to **-20.1%** and the 25% kill switch fired (DD 26.3%). Ranking by momentum buys the most extended signals and concentrates into correlated high-beta names. Classic overfit: better in-sample, fatal out-of-sample |
 | 2026-06-12 | Per-symbol grid winner for MSFT | Passed the kill filter on holdout | Holdout return was **-10.1%** — the kill filter checks structure (trades/DD/Sharpe ceiling), not profitability. Led to the profitable-holdout gate now in `cluster_research.py` |
@@ -82,6 +84,11 @@ ideas, structural changes) still follow the steps below by hand:
 
 ## Standing conclusions
 
+- **Benchmark against the index and against holding the universe, on a hindsight-free
+  universe — never only against the strategy's own replay or SPY on a hand-picked list.**
+  The 45-name universe was assembled from names that had already run up; any backtest on it
+  inherits that (2026-10-13 review: +27.7% CAGR on it vs +10.4% on a fixed 2016 list).
+  Diagnostics must also run with the kill switch off, or a halt masks the strategy's behaviour.
 - **Universe list order for entry competition is a tested decision** — do
   not "fix" it without new evidence (see momentum rejection above).
 - **The exit rule stays** even though its raw P&L is negative.
