@@ -1,0 +1,26 @@
+[
+  {
+    "symbol": "ASML",
+    "side": "sell",
+    "dollar_amount": null,
+    "quantity": 0.007765,
+    "reason": "stop loss triggered (intraday)",
+    "signal_price": 1721.449951171875,
+    "signal_date": "2026-10-13T13:43:15.595424Z",
+    "strategy_name": "c_ema12-26_rsi55_atr1.0_tp10",
+    "generated_at": "2026-10-13T13:43:15.595596Z",
+    "broker_order_id": null
+  },
+  {
+    "symbol": "BE",
+    "side": "sell",
+    "dollar_amount": null,
+    "quantity": 0.005299,
+    "reason": "stop loss triggered (intraday)",
+    "signal_price": 254.3000030517578,
+    "signal_date": "2026-10-13T13:43:15.595424Z",
+    "strategy_name": "ema_cross_rsi_atr_regime",
+    "generated_at": "2026-10-13T13:43:15.595631Z",
+    "broker_order_id": null
+  }
+]
