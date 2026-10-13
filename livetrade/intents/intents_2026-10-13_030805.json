@@ -1,0 +1,50 @@
+[
+  {
+    "symbol": "MU",
+    "side": "sell",
+    "dollar_amount": null,
+    "quantity": 0.5096062459694003,
+    "reason": "stop loss triggered",
+    "signal_price": 989.0399780273438,
+    "signal_date": "2026-10-12T04:00:00",
+    "strategy_name": "ema_cross_rsi_atr_regime",
+    "generated_at": "2026-10-13T03:08:05.479480Z",
+    "broker_order_id": null
+  },
+  {
+    "symbol": "RKLB",
+    "side": "sell",
+    "dollar_amount": null,
+    "quantity": 6.574607194927886,
+    "reason": "stop loss triggered",
+    "signal_price": 65.70999908447266,
+    "signal_date": "2026-10-12T04:00:00",
+    "strategy_name": "ema_cross_rsi_atr_regime",
+    "generated_at": "2026-10-13T03:08:05.485056Z",
+    "broker_order_id": null
+  },
+  {
+    "symbol": "SNDK",
+    "side": "sell",
+    "dollar_amount": null,
+    "quantity": 0.2922915039736936,
+    "reason": "exit rule matched",
+    "signal_price": 1487.3299560546875,
+    "signal_date": "2026-10-12T04:00:00",
+    "strategy_name": "ema_cross_rsi_atr_regime",
+    "generated_at": "2026-10-13T03:08:05.488099Z",
+    "broker_order_id": null
+  },
+  {
+    "symbol": "AMD",
+    "side": "buy",
+    "dollar_amount": 493.1,
+    "quantity": null,
+    "reason": "entry rule matched: ema_fast gt ema_slow, close gt ema_slow, rsi_14 lt 68.0",
+    "signal_price": 594.239990234375,
+    "signal_date": "2026-10-12T04:00:00",
+    "strategy_name": "ema_cross_rsi_atr_regime",
+    "generated_at": "2026-10-13T03:08:05.507578Z",
+    "broker_order_id": null
+  }
+]
