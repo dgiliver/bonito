@@ -207,7 +207,7 @@
       "quantity": 0.027716,
       "entry_price": 600.0,
       "entry_date": "2026-10-12T13:30:04.576000Z",
-      "high_water_mark": 601.6599731445312,
+      "high_water_mark": 605.530029296875,
       "strategy_name": "live",
       "strategy_hash": "da16575a5622",
       "strategy_config": {
@@ -1722,11 +1722,44 @@
       "filled_at": "2026-10-13T14:45:47.235776Z",
       "strategy_name": "live",
       "broker_order_id": "6ace4410-cc5e-4bbd-8f03-d40310b6b51a"
+    },
+    {
+      "symbol": "MRVL",
+      "side": "buy",
+      "quantity": 0.0,
+      "price": 269.4,
+      "notional": 0.0,
+      "reason": "no_fill: live fill",
+      "filled_at": "2026-10-13T20:50:01.240613Z",
+      "strategy_name": "live",
+      "broker_order_id": "6ace9975-1f3f-41a7-be61-3dc3d34f316b"
+    },
+    {
+      "symbol": "LLY",
+      "side": "buy",
+      "quantity": 0.0,
+      "price": 1168.0,
+      "notional": 0.0,
+      "reason": "no_fill: live fill",
+      "filled_at": "2026-10-13T20:50:10.695415Z",
+      "strategy_name": "live",
+      "broker_order_id": "6ace997e-2831-4e6b-84f5-0c7631866443"
+    },
+    {
+      "symbol": "AAPL",
+      "side": "buy",
+      "quantity": 0.0,
+      "price": 340.71,
+      "notional": 0.0,
+      "reason": "no_fill: live fill",
+      "filled_at": "2026-10-13T20:50:19.978673Z",
+      "strategy_name": "live",
+      "broker_order_id": "6ace9988-0ddd-4aef-b427-fc7fbe478bb9"
     }
   ],
   "realized_pnl": -19.517785847899994,
   "peak_equity": 150.14103162835693,
   "halted": false,
   "halt_reason": "",
-  "updated_at": "2026-10-13T19:43:23.321408Z"
+  "updated_at": "2026-10-13T20:50:19.978901Z"
 }
