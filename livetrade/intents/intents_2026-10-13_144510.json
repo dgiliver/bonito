@@ -1,0 +1,14 @@
+[
+  {
+    "symbol": "TSM",
+    "side": "sell",
+    "dollar_amount": null,
+    "quantity": 0.033713,
+    "reason": "stop loss triggered (intraday)",
+    "signal_price": 441.739990234375,
+    "signal_date": "2026-10-13T14:45:10.379149Z",
+    "strategy_name": "ema_cross_rsi_atr_regime",
+    "generated_at": "2026-10-13T14:45:10.379616Z",
+    "broker_order_id": null
+  }
+]
