@@ -277,3 +277,26 @@ def test_trend_exit_executes_next_open_and_reenters():
 def test_config_rejects_lookback_not_exceeding_skip():
     with pytest.raises(ValueError):
         RotationConfig(name="bad", lookback_months=1, skip_months=1)
+
+
+def test_sessions_come_from_trend_symbol_not_stray_rows():
+    """A stray Saturday row for one symbol (QQQ NaN) must not become a session /
+    signal day that forces a spurious cash week."""
+    closes = frame({"A": growth(0.002), **market()})
+    sat = pd.Timestamp("2021-06-05")  # a Saturday
+    stray = pd.DataFrame({"A": [closes["A"].iloc[-1]], "QQQ": [np.nan]}, index=[sat])
+    closes2 = pd.concat([closes, stray]).sort_index()
+    pool = PointInTimePool({date(2019, 1, 1): {"A"}})
+    r = run_rotation(cfg(), pool, closes2, closes2, date(2021, 1, 4), date(2021, 12, 31))
+    assert sat.date() not in r.dates
+    assert r.weeks_in_cash == 0
+
+
+def test_symbol_without_signal_day_close_is_not_scored_from_future_rows():
+    """NaN on the signal date (but bars later) must be excluded, not read ahead."""
+    c = growth(0.003)
+    on = DAYS[300]
+    c[300] = np.nan
+    closes = frame({"HALT": c, "OK": growth(0.001), **market()})
+    s = momentum_scores(closes, on, {"HALT", "OK"}, cfg())
+    assert "HALT" not in s and "OK" in s

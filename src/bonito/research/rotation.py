@@ -161,11 +161,12 @@ def run_rotation(
     (including the trend symbol); missing prices are NaN."""
     closes = closes.sort_index()
     opens = opens.reindex(index=closes.index, columns=closes.columns)
-    trend = closes[cfg.trend_symbol]
-    sma = trend.rolling(cfg.trend_sma, min_periods=cfg.trend_sma).mean()
     # Sessions = the trend symbol's trading days, not the union of every column's
-    # dates (a stray non-session row would otherwise become a spurious "session").
-    sessions = trend.dropna().index
+    # dates: a stray non-session row would otherwise become a spurious "session", and
+    # its NaN would poison the SMA window for the next `trend_sma` sessions.
+    trend = closes[cfg.trend_symbol].dropna()
+    sma = trend.rolling(cfg.trend_sma, min_periods=cfg.trend_sma).mean()
+    sessions = trend.index
     days = sessions[(sessions >= pd.Timestamp(start)) & (sessions <= pd.Timestamp(end))]
     signals = _signal_days(days)
 

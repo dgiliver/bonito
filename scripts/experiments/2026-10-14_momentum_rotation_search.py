@@ -75,16 +75,28 @@ COVERAGE_OUT = Path("livetrade/research/strategy_search_2026-10_coverage.json")
 MEMBER_COUNT_BOUNDS = (95, 115)  # NASDAQ-100 has ~100-108 securities
 
 
-def check_membership() -> list[str]:
-    """Integrity: one snapshot per quarter with no holes, plausible member counts."""
-    snaps = json.loads(MEMBERSHIP.read_text())["snapshots"]
+def quarter_starts(first: date, last: date) -> list[date]:
+    """Every quarter start (Jan/Apr/Jul/Oct 1st) in [first, last]."""
+    out, q = [], date(first.year, ((first.month - 1) // 3) * 3 + 1, 1)
+    while q <= last:
+        if q >= first:
+            out.append(q)
+        q = date(q.year + (q.month == 10), 1 if q.month == 10 else q.month + 3, 1)
+    return out
+
+
+def check_membership(
+    snaps: dict | None = None,
+    first_needed: date = date(2015, 1, 1),
+    last_needed: date = HOLDOUT[1],
+) -> list[str]:
+    """Integrity: a snapshot for EVERY quarter from ``first_needed`` through the last
+    quarter start on/before ``last_needed`` (so a truncated head or tail fails, not just
+    interior holes), and plausible member counts."""
+    if snaps is None:
+        snaps = json.loads(MEMBERSHIP.read_text())["snapshots"]
     problems = []
-    dates = sorted(date.fromisoformat(d) for d in snaps)
-    quarters, q = [], dates[0]
-    while q <= dates[-1]:
-        quarters.append(q)
-        q = date(q.year + (q.month == 10), (q.month % 12) + 3 if q.month != 10 else 1, 1)
-    for q in quarters:
+    for q in quarter_starts(first_needed, last_needed):
         if q.isoformat() not in snaps:
             problems.append(f"missing quarter {q}")
     lo, hi = MEMBER_COUNT_BOUNDS
@@ -198,6 +210,8 @@ def main() -> None:
     mode = "--run" if "--run" in sys.argv else "--prepare" if "--prepare" in sys.argv else None
     if mode is None:
         sys.exit("usage: --prepare | --run   (see module docstring)")
+    if mode == "--run" and OUT.exists():
+        sys.exit(f"{OUT} exists — the pre-registered test is ONE-SHOT. Not re-running.")
     problems = check_membership()
     if problems:
         sys.exit("membership integrity FAILED:\n  " + "\n  ".join(problems))
@@ -218,8 +232,8 @@ def main() -> None:
         print(f"coverage written to {COVERAGE_OUT}. No strategy was run.")
         return
 
-    if OUT.exists():
-        sys.exit(f"{OUT} exists — the pre-registered test is ONE-SHOT. Not re-running.")
+    # Sentinel first: a crash after results are printed can't be followed by a silent re-run.
+    OUT.write_text(json.dumps({"status": "started", "at": datetime.now().isoformat()}))
     report: dict = {
         "generated_at": datetime.now().isoformat(),
         "pre_registration": "docs/STRATEGY_SEARCH_2026-10.md",
