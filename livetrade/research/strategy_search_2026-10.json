@@ -1,0 +1,107 @@
+{
+ "generated_at": "2026-10-14T18:51:00.949660",
+ "pre_registration": "docs/STRATEGY_SEARCH_2026-10.md",
+ "provenance": {
+  "git_sha": "f54b7c277db75ff27f47c7cfd2df8edf9c5728d4",
+  "dirty_tree": true,
+  "data_fingerprint": "46b1eda1f20665193cb3a2b7867fd3913405c41174c189e81e9ada69a3f17f89"
+ },
+ "coverage_file": "livetrade/research/strategy_search_2026-10_coverage.json",
+ "design": {
+  "M6-T5": {
+   "strategy": {
+    "total_return_pct": 343.74,
+    "cagr_pct": 28.24,
+    "sharpe": 0.979,
+    "max_drawdown_pct": 37.43
+   },
+   "QQQ": {
+    "total_return_pct": 280.91,
+    "cagr_pct": 25.01,
+    "sharpe": 1.15,
+    "max_drawdown_pct": 28.56
+   },
+   "checks": {
+    "cagr": true,
+    "sharpe": false,
+    "dd": false
+   },
+   "passes": false,
+   "rebalances": 280,
+   "weeks_in_cash": 37,
+   "turnover": 141.684
+  },
+  "M6-T10": {
+   "strategy": {
+    "total_return_pct": 256.84,
+    "cagr_pct": 23.66,
+    "sharpe": 0.95,
+    "max_drawdown_pct": 33.0
+   },
+   "QQQ": {
+    "total_return_pct": 280.91,
+    "cagr_pct": 25.01,
+    "sharpe": 1.15,
+    "max_drawdown_pct": 28.56
+   },
+   "checks": {
+    "cagr": false,
+    "sharpe": false,
+    "dd": true
+   },
+   "passes": false,
+   "rebalances": 280,
+   "weeks_in_cash": 37,
+   "turnover": 125.8
+  },
+  "M12-T5": {
+   "strategy": {
+    "total_return_pct": 287.7,
+    "cagr_pct": 25.38,
+    "sharpe": 0.88,
+    "max_drawdown_pct": 35.38
+   },
+   "QQQ": {
+    "total_return_pct": 280.91,
+    "cagr_pct": 25.01,
+    "sharpe": 1.15,
+    "max_drawdown_pct": 28.56
+   },
+   "checks": {
+    "cagr": true,
+    "sharpe": false,
+    "dd": true
+   },
+   "passes": false,
+   "rebalances": 280,
+   "weeks_in_cash": 37,
+   "turnover": 91.888
+  },
+  "M12-T10": {
+   "strategy": {
+    "total_return_pct": 211.14,
+    "cagr_pct": 20.86,
+    "sharpe": 0.849,
+    "max_drawdown_pct": 32.4
+   },
+   "QQQ": {
+    "total_return_pct": 280.91,
+    "cagr_pct": 25.01,
+    "sharpe": 1.15,
+    "max_drawdown_pct": 28.56
+   },
+   "checks": {
+    "cagr": false,
+    "sharpe": false,
+    "dd": true
+   },
+   "passes": false,
+   "rebalances": 280,
+   "weeks_in_cash": 37,
+   "turnover": 84.453
+  }
+ },
+ "selected": null,
+ "holdout": null,
+ "verdict": "REJECTED (no variant passes the design window; holdout not run)"
+}
