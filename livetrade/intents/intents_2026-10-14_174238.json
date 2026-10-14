@@ -1,0 +1,38 @@
+[
+  {
+    "symbol": "AMAT",
+    "side": "sell",
+    "dollar_amount": null,
+    "quantity": 0.7023496087821043,
+    "reason": "stop loss triggered (intraday)",
+    "signal_price": 447.7349853515625,
+    "signal_date": "2026-10-14T17:42:38.855037Z",
+    "strategy_name": "ema_cross_rsi_atr_regime",
+    "generated_at": "2026-10-14T17:42:38.855125Z",
+    "broker_order_id": null
+  },
+  {
+    "symbol": "BE",
+    "side": "sell",
+    "dollar_amount": null,
+    "quantity": 2.0152258260838516,
+    "reason": "stop loss triggered (intraday)",
+    "signal_price": 239.1999969482422,
+    "signal_date": "2026-10-14T17:42:38.855037Z",
+    "strategy_name": "ema_cross_rsi_atr_regime",
+    "generated_at": "2026-10-14T17:42:38.855213Z",
+    "broker_order_id": null
+  },
+  {
+    "symbol": "DELL",
+    "side": "sell",
+    "dollar_amount": null,
+    "quantity": 1.017652877270875,
+    "reason": "stop loss triggered (intraday)",
+    "signal_price": 506.45001220703125,
+    "signal_date": "2026-10-14T17:42:38.855037Z",
+    "strategy_name": "ema_cross_rsi_atr_regime",
+    "generated_at": "2026-10-14T17:42:38.855312Z",
+    "broker_order_id": null
+  }
+]
