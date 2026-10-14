@@ -1,65 +1,63 @@
 """Pre-registered strategy search (docs/STRATEGY_SEARCH_2026-10.md), run exactly as registered.
 
-    python scripts/experiments/2026-10-14_momentum_rotation_search.py [--skip-ingest]
+Two phases, deliberately separate:
 
-1. Pool: point-in-time NASDAQ-100 (data/reference/ndx_membership.json, quarterly
-   Wikipedia snapshots) ∪ the 45 names from their add dates
-   (data/reference/universe_additions.json).
-2. Prices: Yahoo daily OHLC into data/research/rotation.duckdb.
-3. Four fixed variants on the DESIGN window (2016-01-04 → 2021-12-31); select the
-   highest-Sharpe variant among those passing the criterion vs QQQ there. None pass →
-   REJECTED, holdout never run.
-4. Selected variant: ONE holdout run (2022-01-03 → 2026-10-13) + ex-top-2 rerun.
-5. Writes livetrade/research/strategy_search_2026-10.json and prints the verdict.
+    python scripts/experiments/2026-10-14_momentum_rotation_search.py --prepare
+        Ingest prices and run the DATA checks only: membership integrity and price
+        coverage of every pool symbol over its membership span. No strategy run.
+        Use it to fix ticker mapping against data before the one-shot run.
 
-Data-cleaning rules, fixed before any result was computed:
-- RENAMES map historical tickers to their current Yahoo symbol (same company).
-- SECONDARY_CLASSES: one share class per company (e.g. keep GOOGL, drop GOOG), so
-  the top-N can't hold the same company twice.
-- Members whose prices can't be fetched (acquired/delisted) are listed in the
-  output as survivorship gaps; they bias results IN FAVOUR of the strategy.
+    python scripts/experiments/2026-10-14_momentum_rotation_search.py --run
+        The ONE-SHOT test. Refuses if the report already exists (no silent re-runs),
+        records git SHA / dirty flag / data fingerprint.
+        1. Four fixed variants on the DESIGN window; select the highest-Sharpe variant
+           among those passing the criterion vs QQQ there. None pass → REJECTED and the
+           holdout is never run (not even as "context").
+        2. Selected variant: ONE holdout run + an ex-top-2 rerun.
+
+Data-cleaning rules (amended before any strategy result, after the pre-run review):
+- RENAMES: ONLY ticker changes of the SAME legal entity, so a symbol is never scored
+  on another company's prices. (VIAB→PARA and MYL→VTRS were removed: Yahoo's PARA
+  history before 2019-12 is CBS, and VTRS starts at the 2020 Viatris merger.)
+- SECONDARY_CLASSES: one share class per company (keep GOOGL, drop GOOG, ...).
+- Unfetchable members are survivorship gaps; they bias results IN FAVOUR of the
+  strategy and are reported with per-year coverage.
 """
 
+import hashlib
 import json
+import subprocess
 import sys
-from datetime import date, datetime
+from datetime import date, datetime, timedelta
 from pathlib import Path
 
 import pandas as pd
 
 from bonito.data.store import MarketDataStore
 from bonito.research.benchmark_eval import MAX_DD_RATIO, curve_stats
-from bonito.research.rotation import PointInTimePool, RotationConfig, run_rotation
+from bonito.research.rotation import (
+    PointInTimePool,
+    RotationConfig,
+    RotationResult,
+    run_rotation,
+)
 
 RENAMES = {
     "FB": "META",
     "PCLN": "BKNG",
-    "MYL": "VTRS",
     "CTRP": "TCOM",
     "FISV": "FI",
     "SYMC": "GEN",
     "NLOK": "GEN",
     "DISCA": "WBD",
     "QVCA": "QRTEA",
-    "VIAB": "PARA",
-    "VIAC": "PARA",
+    "WLTW": "WTW",
     "BRK.B": "BRK-B",
 }
 SECONDARY_CLASSES = {
-    "GOOG",
-    "FOX",
-    "LBTYK",
-    "LBTYB",
-    "LILAK",
-    "DISCK",
-    "DISCB",
-    "LMCK",
-    "NWS",
-    "QVCB",
-    "LBRDK",
-    "FWONK",
-    "BATRK",
-}
+    "GOOG", "FOX", "LBTYK", "LBTYB", "LILAK", "DISCK", "DISCB", "LMCK", "NWS", "QVCB",
+    "LBRDK", "FWONK", "BATRK",
+}  # fmt: skip
 
 DESIGN = (date(2016, 1, 4), date(2021, 12, 31))
 HOLDOUT = (date(2022, 1, 3), date(2026, 10, 13))
@@ -69,18 +67,36 @@ VARIANTS = [
     RotationConfig(name="M12-T5", lookback_months=12, top_n=5),
     RotationConfig(name="M12-T10", lookback_months=12, top_n=10),
 ]
+MEMBERSHIP = Path("data/reference/ndx_membership.json")
+ADDITIONS = Path("data/reference/universe_additions.json")
 DB = Path("data/research/rotation.duckdb")
 OUT = Path("livetrade/research/strategy_search_2026-10.json")
+COVERAGE_OUT = Path("livetrade/research/strategy_search_2026-10_coverage.json")
+MEMBER_COUNT_BOUNDS = (95, 115)  # NASDAQ-100 has ~100-108 securities
+
+
+def check_membership() -> list[str]:
+    """Integrity: one snapshot per quarter with no holes, plausible member counts."""
+    snaps = json.loads(MEMBERSHIP.read_text())["snapshots"]
+    problems = []
+    dates = sorted(date.fromisoformat(d) for d in snaps)
+    quarters, q = [], dates[0]
+    while q <= dates[-1]:
+        quarters.append(q)
+        q = date(q.year + (q.month == 10), (q.month % 12) + 3 if q.month != 10 else 1, 1)
+    for q in quarters:
+        if q.isoformat() not in snaps:
+            problems.append(f"missing quarter {q}")
+    lo, hi = MEMBER_COUNT_BOUNDS
+    for d, v in snaps.items():
+        if not lo <= len(v["tickers"]) <= hi:
+            problems.append(f"{d}: {len(v['tickers'])} tickers outside {MEMBER_COUNT_BOUNDS}")
+    return problems
 
 
 def build_pool() -> PointInTimePool:
-    pool = PointInTimePool.from_files(
-        Path("data/reference/ndx_membership.json"),
-        Path("data/reference/universe_additions.json"),
-        renames=RENAMES,
-    )
-    # drop secondary share classes everywhere
-    pool._sets = [frozenset(s - SECONDARY_CLASSES) for s in pool._sets]
+    pool = PointInTimePool.from_files(MEMBERSHIP, ADDITIONS, renames=RENAMES)
+    pool.drop_symbols(SECONDARY_CLASSES)
     return pool
 
 
@@ -107,14 +123,42 @@ def load_prices(symbols: list[str], ingest: bool) -> tuple[pd.DataFrame, pd.Data
     return o[~o.index.duplicated()], c[~c.index.duplicated()], missing
 
 
-def stats_on(dates: list[date], values: list[float]):
-    return curve_stats(dates, values)
+def coverage_report(pool: PointInTimePool, closes: pd.DataFrame) -> dict:
+    """Per-snapshot share of members with a price, and per-symbol span gaps."""
+    by_snapshot = {}
+    for d, members in zip(pool._dates, pool._sets, strict=True):
+        if d < DESIGN[0] - timedelta(days=400):
+            continue
+        ts = pd.Timestamp(d)
+        window = closes.loc[ts - pd.Timedelta(days=7) : ts + pd.Timedelta(days=7)]
+        priced = [s for s in members if s in window.columns and window[s].notna().any()]
+        by_snapshot[d.isoformat()] = {
+            "members": len(members),
+            "priced": len(priced),
+            "unpriced": sorted(set(members) - set(priced)),
+        }
+    spans = {}
+    for s in pool.all_symbols():
+        in_snaps = [d for d, m in zip(pool._dates, pool._sets, strict=True) if s in m]
+        if not in_snaps or s not in closes.columns:
+            continue
+        col = closes[s].dropna()
+        first_member, last_member = in_snaps[0], in_snaps[-1]
+        late_start = col.index[0].date() > max(first_member, DESIGN[0]) + timedelta(days=45)
+        early_end = col.index[-1].date() < last_member - timedelta(days=45)
+        if late_start or early_end:
+            spans[s] = {
+                "member": [first_member.isoformat(), last_member.isoformat()],
+                "prices": [col.index[0].date().isoformat(), col.index[-1].date().isoformat()],
+            }
+    return {"by_snapshot": by_snapshot, "span_gaps": spans}
 
 
-def evaluate(result, closes: pd.DataFrame) -> dict:
-    s = stats_on(result.dates, result.equity)
-    q = closes["QQQ"].reindex(pd.DatetimeIndex([pd.Timestamp(d) for d in result.dates])).ffill()
-    b = stats_on(result.dates, list(q.values))
+def evaluate(result: RotationResult, closes: pd.DataFrame) -> dict:
+    s = curve_stats(result.dates, result.equity)
+    idx = pd.DatetimeIndex([pd.Timestamp(d) for d in result.dates])
+    q = closes["QQQ"].reindex(idx).ffill()
+    b = curve_stats(result.dates, list(q.values))
     checks = {
         "cagr": s.cagr_pct > b.cagr_pct,
         "sharpe": s.sharpe > b.sharpe,
@@ -131,49 +175,70 @@ def evaluate(result, closes: pd.DataFrame) -> dict:
     }
 
 
-def main() -> None:
-    ingest = "--skip-ingest" not in sys.argv
-    pool = build_pool()
-    symbols = sorted(pool.all_symbols() | {"QQQ", "SPY"})
-    print(
-        f"pool: {len(symbols)} symbols ever eligible; {len(pool._dates)} snapshots "
-        f"{pool._dates[0]} → {pool._dates[-1]}",
-        flush=True,
+def provenance(closes: pd.DataFrame) -> dict:
+    sha = subprocess.run(["git", "rev-parse", "HEAD"], capture_output=True, text=True).stdout
+    dirty = bool(
+        subprocess.run(["git", "status", "--porcelain"], capture_output=True, text=True).stdout
     )
-    opens, closes, missing = load_prices(symbols, ingest)
-    print(
-        f"prices: {closes.shape[1]} symbols loaded; {len(missing)} unfetchable "
-        f"(survivorship gaps): {missing}",
-        flush=True,
+    fp = hashlib.sha256(MEMBERSHIP.read_bytes() + ADDITIONS.read_bytes())
+    fp.update(pd.util.hash_pandas_object(closes.fillna(-1), index=True).values.tobytes())
+    return {"git_sha": sha.strip(), "dirty_tree": dirty, "data_fingerprint": fp.hexdigest()}
+
+
+def line(name: str, ev: dict) -> str:
+    s, q = ev["strategy"], ev["QQQ"]
+    return (
+        f"  {name:8} CAGR {s['cagr_pct']:+6.1f}% Sharpe {s['sharpe']:.2f} "
+        f"DD {s['max_drawdown_pct']:5.1f}% | QQQ {q['cagr_pct']:+6.1f}% {q['sharpe']:.2f} "
+        f"{q['max_drawdown_pct']:5.1f}% | {ev['checks']} → {'PASS' if ev['passes'] else 'fail'}"
     )
 
+
+def main() -> None:
+    mode = "--run" if "--run" in sys.argv else "--prepare" if "--prepare" in sys.argv else None
+    if mode is None:
+        sys.exit("usage: --prepare | --run   (see module docstring)")
+    problems = check_membership()
+    if problems:
+        sys.exit("membership integrity FAILED:\n  " + "\n  ".join(problems))
+
+    pool = build_pool()
+    symbols = sorted(pool.all_symbols() | {"QQQ", "SPY"})
+    print(f"pool: {len(symbols)} symbols ever eligible; {len(pool._dates)} snapshots", flush=True)
+    opens, closes, missing = load_prices(symbols, ingest=(mode == "--prepare"))
+    cov = coverage_report(pool, closes)
+    cov["unfetchable"] = missing
+    COVERAGE_OUT.parent.mkdir(parents=True, exist_ok=True)
+    COVERAGE_OUT.write_text(json.dumps(cov, indent=1))
+    worst = min(cov["by_snapshot"].items(), key=lambda kv: kv[1]["priced"] / kv[1]["members"])
+    print(f"unfetchable ({len(missing)}): {missing}")
+    print(f"lowest snapshot coverage: {worst[0]} {worst[1]['priced']}/{worst[1]['members']}")
+    print(f"span gaps ({len(cov['span_gaps'])}): {sorted(cov['span_gaps'])}")
+    if mode == "--prepare":
+        print(f"coverage written to {COVERAGE_OUT}. No strategy was run.")
+        return
+
+    if OUT.exists():
+        sys.exit(f"{OUT} exists — the pre-registered test is ONE-SHOT. Not re-running.")
     report: dict = {
         "generated_at": datetime.now().isoformat(),
         "pre_registration": "docs/STRATEGY_SEARCH_2026-10.md",
-        "survivorship_gaps": missing,
+        "provenance": provenance(closes),
+        "coverage_file": str(COVERAGE_OUT),
         "design": {},
         "selected": None,
         "holdout": None,
         "verdict": None,
     }
-
     print("\n== DESIGN window", DESIGN, "==")
     for cfg in VARIANTS:
-        r = run_rotation(cfg, pool, opens, closes, *DESIGN)
-        ev = evaluate(r, closes)
+        ev = evaluate(run_rotation(cfg, pool, opens, closes, *DESIGN), closes)
         report["design"][cfg.name] = ev
-        s, q = ev["strategy"], ev["QQQ"]
-        print(
-            f"  {cfg.name:8} CAGR {s['cagr_pct']:+6.1f}% Sharpe {s['sharpe']:.2f} "
-            f"DD {s['max_drawdown_pct']:5.1f}% | QQQ {q['cagr_pct']:+6.1f}% {q['sharpe']:.2f} "
-            f"{q['max_drawdown_pct']:5.1f}% | checks {ev['checks']} → "
-            f"{'PASS' if ev['passes'] else 'fail'}",
-            flush=True,
-        )
+        print(line(cfg.name, ev), flush=True)
 
     passing = [n for n, ev in report["design"].items() if ev["passes"]]
     if not passing:
-        report["verdict"] = "REJECTED (no variant passes the design window)"
+        report["verdict"] = "REJECTED (no variant passes the design window; holdout not run)"
     else:
         best = max(passing, key=lambda n: report["design"][n]["strategy"]["sharpe"])
         report["selected"] = best
@@ -181,32 +246,33 @@ def main() -> None:
         print(f"\nselected on design window: {best}\n== HOLDOUT (single run)", HOLDOUT, "==")
         r = run_rotation(cfg, pool, opens, closes, *HOLDOUT)
         hold = evaluate(r, closes)
-        top2 = [k for k, v in sorted(r.per_symbol_pnl.items(), key=lambda kv: -kv[1])[:2] if v > 0]
-        ex = run_rotation(cfg, pool, opens, closes, *HOLDOUT, exclude=frozenset(top2))
-        ex_ev = evaluate(ex, closes)
+        ranked = sorted(r.per_symbol_pnl.items(), key=lambda kv: -kv[1])
+        top2 = [k for k, v in ranked[:2] if v > 0]
+        ex = evaluate(
+            run_rotation(cfg, pool, opens, closes, *HOLDOUT, exclude=frozenset(top2)), closes
+        )
+        adds = set(json.loads(ADDITIONS.read_text())["additions"])
         hold["ex_top2"] = {
             "excluded": top2,
-            "cagr_pct": ex_ev["strategy"]["cagr_pct"],
-            "beats_qqq_cagr": ex_ev["strategy"]["cagr_pct"] > hold["QQQ"]["cagr_pct"],
+            "cagr_pct": ex["strategy"]["cagr_pct"],
+            "beats_qqq_cagr": ex["strategy"]["cagr_pct"] > hold["QQQ"]["cagr_pct"],
         }
+        hold["pnl_from_45_name_additions"] = round(
+            sum(v for k, v in r.per_symbol_pnl.items() if k in adds), 2
+        )
+        hold["total_pnl"] = round(sum(r.per_symbol_pnl.values()), 2)
         report["holdout"] = hold
         ok = hold["passes"] and hold["ex_top2"]["beats_qqq_cagr"]
         report["verdict"] = "ADOPTED FOR PAPER" if ok else "REJECTED (holdout)"
-        s, q = hold["strategy"], hold["QQQ"]
+        print(line(best, hold))
         print(
-            f"  {best:8} CAGR {s['cagr_pct']:+6.1f}% Sharpe {s['sharpe']:.2f} "
-            f"DD {s['max_drawdown_pct']:5.1f}% | QQQ {q['cagr_pct']:+6.1f}% {q['sharpe']:.2f} "
-            f"{q['max_drawdown_pct']:5.1f}% | checks {hold['checks']}"
-        )
-        print(
-            f"  ex-top-2 {top2}: CAGR {ex_ev['strategy']['cagr_pct']:+.1f}% "
+            f"  ex-top-2 {top2}: CAGR {ex['strategy']['cagr_pct']:+.1f}% "
             f"(beats QQQ: {hold['ex_top2']['beats_qqq_cagr']})"
         )
-
-    full_cfg = next((c for c in VARIANTS if c.name == report["selected"]), VARIANTS[2])
-    full = run_rotation(full_cfg, pool, opens, closes, DESIGN[0], HOLDOUT[1])
-    report["context_full_period"] = {"variant": full_cfg.name, **evaluate(full, closes)}
-    OUT.parent.mkdir(parents=True, exist_ok=True)
+        print(
+            f"  P&L from the 45 hand-picked additions: {hold['pnl_from_45_name_additions']} "
+            f"of {hold['total_pnl']}"
+        )
     OUT.write_text(json.dumps(report, indent=1, default=str))
     print(f"\nVERDICT: {report['verdict']}\nreport: {OUT}")
 

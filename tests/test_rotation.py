@@ -175,3 +175,105 @@ class TestRunRotation:
             exclude=frozenset({"TOP"}),
         )
         assert {s for v in r.holdings.values() for s in v} == {"NEXT"}
+
+
+# --- regression + guard tests added after the pre-run review (see commit message) ---
+
+
+def seg(points, n=None):
+    n = len(DAYS) if n is None else n
+    x = np.arange(n)
+    return np.interp(x, [p[0] for p in points], [p[1] for p in points])
+
+
+def test_missing_bar_on_reentry_never_fills_at_a_stale_price():
+    """BLOCKER regression: A is held early (~130), sold, then drifts to 250 unheld
+    and is re-selected. With A's execution-day bar missing, the engine used to "buy"
+    A at its OLD last price and book the jump as profit (79.6k → 180.3k in the probe).
+    Now A is skipped that week; the result stays close to the control run."""
+    a = seg([(0, 100), (60, 130), (80, 100), (300, 250), (len(DAYS), 260)])
+    c = seg([(0, 100), (80, 100), (300, 1000), (340, 300), (len(DAYS), 300)])
+    closes = frame({"A": a, "C": c, "QQQ": seg([(0, 100), (len(DAYS), 300)])})
+    k = cfg(lookback_months=2, skip_months=0, min_history_days=30)
+    pool = PointInTimePool({date(2019, 1, 1): {"A", "C"}})
+    span = (date(2020, 3, 2), date(2021, 12, 31))
+    control = run_rotation(k, pool, closes, closes, *span)
+    reentry = [d for d, h in control.holdings.items() if h == ["A"] and d > DAYS[300].date()]
+    ex = DAYS[DAYS.get_loc(pd.Timestamp(reentry[0])) + 1]
+    gapped = closes.copy()
+    gapped.loc[ex, "A"] = np.nan
+    r = run_rotation(k, pool, gapped, gapped, *span)
+    assert r.equity[-1] <= control.equity[-1] * 1.02
+
+
+def test_signal_buys_at_next_open_and_marks_from_there():
+    """Pins next-OPEN execution: Monday's open and close differ, so filling at the
+    close (or not trading at all) gives a different equity path."""
+    a = growth(0.002)
+    o = a.copy()
+    fri = DAYS.get_indexer([pd.Timestamp("2021-06-04")])[0]
+    o[fri + 1] = a[fri] * 1.10  # Monday opens +10%...
+    a[fri + 1] = a[fri] * 1.20  # ...and closes +20%
+    closes, opens = frame({"A": a, **market()}), frame({"A": o, **market()})
+    start = pd.Timestamp("2021-06-04").date()
+    r = run_rotation(
+        cfg(),
+        PointInTimePool({date(2019, 1, 1): {"A"}}),
+        opens,
+        closes,
+        start,
+        pd.Timestamp("2021-06-09").date(),
+        starting_cash=1000.0,
+    )
+    assert r.holdings[start] == ["A"]
+    assert r.equity[0] == pytest.approx(1000.0)  # Friday: decided, not yet traded
+    assert r.equity[1] == pytest.approx(1000.0 * 1.20 / 1.10)  # bought at open, marked at close
+
+
+def test_scores_are_invariant_to_future_data():
+    """No look-ahead: appending a wildly different future must not change scores."""
+    rng = np.random.default_rng(1)
+    cols = {s: 100 * np.cumprod(1 + rng.normal(0, 0.02, len(DAYS))) for s in "ABCD"}
+    closes = frame({**cols, **market()})
+    on = DAYS[300]
+    future = closes.copy()
+    future.loc[on < DAYS, list("ABCD")] *= rng.uniform(0.1, 10, size=(int((on < DAYS).sum()), 4))
+    k = cfg()
+    assert momentum_scores(closes.loc[:on], on, set("ABCD"), k) == momentum_scores(
+        future, on, set("ABCD"), k
+    )
+
+
+def test_stale_far_anchor_excludes_symbol():
+    """A symbol whose last price before the lookback anchor is weeks old (a long
+    data gap) is not scored on that stale price."""
+    c = growth(0.002)
+    on = DAYS[-1]
+    anchor = on - pd.DateOffset(months=6)
+    c[(anchor - pd.Timedelta(days=40) < DAYS) & (anchor + pd.Timedelta(days=5) >= DAYS)] = np.nan
+    closes = frame({"GAP": c, "OK": growth(0.001), **market()})
+    s = momentum_scores(closes, on, {"GAP", "OK"}, cfg())
+    assert "GAP" not in s and "OK" in s
+
+
+def test_trend_exit_executes_next_open_and_reenters():
+    q = growth(0.002)
+    down = (pd.Timestamp("2021-03-01") <= DAYS) & (pd.Timestamp("2021-06-01") > DAYS)
+    q[down] = q[down][0] * 0.5  # QQQ well below its SMA for three months
+    closes = frame({"A": growth(0.002), "QQQ": q})
+    r = run_rotation(
+        cfg(),
+        PointInTimePool({date(2019, 1, 1): {"A"}}),
+        closes,
+        closes,
+        date(2021, 1, 4),
+        date(2021, 12, 31),
+    )
+    cash_weeks = [d for d, h in r.holdings.items() if h == []]
+    assert cash_weeks and min(cash_weeks) >= date(2021, 3, 1)
+    assert any(h == ["A"] for d, h in r.holdings.items() if d > max(cash_weeks))  # re-entered
+
+
+def test_config_rejects_lookback_not_exceeding_skip():
+    with pytest.raises(ValueError):
+        RotationConfig(name="bad", lookback_months=1, skip_months=1)

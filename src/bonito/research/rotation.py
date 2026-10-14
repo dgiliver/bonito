@@ -24,7 +24,7 @@ from pathlib import Path
 
 import numpy as np
 import pandas as pd
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, model_validator
 
 
 class RotationConfig(BaseModel):
@@ -36,6 +36,12 @@ class RotationConfig(BaseModel):
     trend_sma: int = Field(200, ge=2)
     cost_bps: float = Field(10.0, ge=0)
     min_history_days: int = Field(252, ge=1)
+
+    @model_validator(mode="after")
+    def _lookback_exceeds_skip(self) -> "RotationConfig":
+        if self.lookback_months <= self.skip_months:
+            raise ValueError("lookback_months must exceed skip_months")
+        return self
 
 
 class PointInTimePool:
@@ -54,6 +60,10 @@ class PointInTimePool:
         i = bisect_right(self._dates, on) - 1
         base = set(self._sets[i]) if i >= 0 else set()
         return base | {s for s, d in self._additions.items() if d <= on}
+
+    def drop_symbols(self, symbols: set[str]) -> None:
+        """Remove symbols from every snapshot (e.g. secondary share classes)."""
+        self._sets = [frozenset(s - symbols) for s in self._sets]
 
     def all_symbols(self) -> set[str]:
         out = set(self._additions)
@@ -153,7 +163,10 @@ def run_rotation(
     opens = opens.reindex(index=closes.index, columns=closes.columns)
     trend = closes[cfg.trend_symbol]
     sma = trend.rolling(cfg.trend_sma, min_periods=cfg.trend_sma).mean()
-    days = closes.index[(closes.index >= pd.Timestamp(start)) & (closes.index <= pd.Timestamp(end))]
+    # Sessions = the trend symbol's trading days, not the union of every column's
+    # dates (a stray non-session row would otherwise become a spurious "session").
+    sessions = trend.dropna().index
+    days = sessions[(sessions >= pd.Timestamp(start)) & (sessions <= pd.Timestamp(end))]
     signals = _signal_days(days)
 
     cash = starting_cash
@@ -173,8 +186,11 @@ def run_rotation(
             px_open = {}
             for s in set(shares) | set(pending):
                 o = opens.at[day, s] if s in opens.columns else np.nan
-                if pd.isna(o):
-                    o = last_px.get(s, np.nan)  # no open (halt/delisting): last known close
+                if pd.isna(o) and s in shares:
+                    # A HELD name with no open (halt/delisting) is valued/sold at its last
+                    # close. A NEW name with no open is simply not bought this week (money
+                    # redistributed): never fill it at a price from an earlier holding.
+                    o = last_px[s]
                 px_open[s] = float(o)
             # mark held names from last close to this open (gap attribution)
             for s, q in shares.items():
@@ -200,6 +216,8 @@ def run_rotation(
                     pnl[s] = pnl.get(s, 0.0) - fee * share / notional
             invested = sum(new_shares[s] * px_open[s] for s in new_shares)
             cash = equity_open - invested - fee
+            for s in set(shares) - set(new_shares):
+                last_px.pop(s, None)  # sold: forget its price so it can't be reused
             shares = new_shares
             for s in shares:
                 last_px[s] = px_open[s]

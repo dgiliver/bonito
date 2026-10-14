@@ -63,3 +63,14 @@ No other variant gets run and reported as a result. Exploratory runs can only be
 
 - **ADOPTED:** it runs in the paper shadow for ≥ 8 weeks, compared against QQQ and against its own replay. The user then signs off before any live change.
 - **REJECTED:** the result is logged in `docs/EXPERIMENT_LOG.md`, and the next family is pre-registered the same way. Candidates are low-volatility, quality and ETF trend.
+
+## Amendments (2026-10-14, before any strategy result was computed)
+
+These came from an independent pre-run review of the engine, which found NEEDS_WORK. No data had been run through the strategy when they were made.
+
+1. **Engine bug fixed (BLOCKER).** A newly selected stock with no price bar on the execution day was "bought" at a stale price left over from an earlier holding, booking a phantom gain. That inflated a probe run from 79.6k to 180.3k. New names with no open are now skipped for the week, and sold names' prices are forgotten. A regression test covers it.
+2. **Same-company renames only.** VIAB/VIAC→PARA and MYL→VTRS are removed, so no symbol is ever scored on another company's prices. WLTW→WTW is added. Unmapped delistings are survivorship gaps.
+3. **Sessions come from the trend symbol's trading days**, not the union of every column's dates.
+4. **One-shot enforcement.** `--prepare` runs data checks only, with no strategy run. `--run` refuses if the report already exists, and records the git SHA, the dirty-tree flag and a data fingerprint. If no variant passes the design window, nothing is run on the holdout period at all, not even as context.
+5. **More reporting, no criterion change.** Per-snapshot price coverage, per-symbol span gaps, and the share of holdout P&L that came from the 45 hand-picked additions.
+6. **Delisting caveat.** A delisted holding is sold at its last printed price, so post-delisting losses aren't booked. That is optimistic and noted.
