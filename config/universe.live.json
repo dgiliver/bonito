@@ -80,7 +80,7 @@
     "max_daily_buys": 3,
     "min_cash_buffer_usd": 5.0,
     "allow_short": false,
-    "max_drawdown_halt": 0.25,
+    "max_drawdown_halt": 0.45,
     "position_pct_equity": 0.125
   }
 }
