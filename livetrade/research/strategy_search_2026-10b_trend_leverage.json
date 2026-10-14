@@ -1,0 +1,313 @@
+{
+ "generated_at": "2026-10-14T19:04:41.047333",
+ "pre_registration": "docs/STRATEGY_SEARCH_2026-10b_TREND_LEVERAGE.md",
+ "provenance": {
+  "git_sha": "98b361fa6dfa7d8b5b9a8cfb1e756cee5770ffc0",
+  "dirty_tree": false,
+  "dirty_paths": [],
+  "data_fingerprint": "fbb0cfed3a7c6d15bc31d599e2cffdd6887cc78dbb8afe93f354f5505cab2261"
+ },
+ "price_spans": {
+  "QQQ": [
+   "2014-06-02",
+   "2026-10-14"
+  ],
+  "QLD": [
+   "2014-06-02",
+   "2026-10-14"
+  ],
+  "TQQQ": [
+   "2014-06-02",
+   "2026-10-14"
+  ]
+ },
+ "design": {
+  "L2-QQQ": {
+   "by_sma": {
+    "200": {
+     "strategy": {
+      "total_return_pct": 759.73,
+      "cagr_pct": 43.21,
+      "sharpe": 1.129,
+      "max_drawdown_pct": 50.65
+     },
+     "QQQ": {
+      "total_return_pct": 297.78,
+      "cagr_pct": 25.92,
+      "sharpe": 1.186,
+      "max_drawdown_pct": 28.56
+     },
+     "checks": {
+      "cagr": true,
+      "sharpe": false,
+      "dd": false
+     },
+     "passes": false,
+     "rebalances": 312,
+     "turnover": 12.501
+    },
+    "150": {
+     "strategy": {
+      "total_return_pct": 770.75,
+      "cagr_pct": 43.52,
+      "sharpe": 1.142,
+      "max_drawdown_pct": 50.65
+     },
+     "QQQ": {
+      "total_return_pct": 297.78,
+      "cagr_pct": 25.92,
+      "sharpe": 1.186,
+      "max_drawdown_pct": 28.56
+     },
+     "checks": {
+      "cagr": true,
+      "sharpe": false,
+      "dd": false
+     },
+     "passes": false,
+     "rebalances": 312,
+     "turnover": 9.726
+    },
+    "250": {
+     "strategy": {
+      "total_return_pct": 730.06,
+      "cagr_pct": 42.37,
+      "sharpe": 1.112,
+      "max_drawdown_pct": 50.65
+     },
+     "QQQ": {
+      "total_return_pct": 297.78,
+      "cagr_pct": 25.92,
+      "sharpe": 1.186,
+      "max_drawdown_pct": 28.56
+     },
+     "checks": {
+      "cagr": true,
+      "sharpe": false,
+      "dd": false
+     },
+     "passes": false,
+     "rebalances": 312,
+     "turnover": 15.601
+    }
+   },
+   "passes": false
+  },
+  "L2-CASH": {
+   "by_sma": {
+    "200": {
+     "strategy": {
+      "total_return_pct": 573.28,
+      "cagr_pct": 37.48,
+      "sharpe": 1.052,
+      "max_drawdown_pct": 49.18
+     },
+     "QQQ": {
+      "total_return_pct": 297.78,
+      "cagr_pct": 25.92,
+      "sharpe": 1.186,
+      "max_drawdown_pct": 28.56
+     },
+     "checks": {
+      "cagr": true,
+      "sharpe": false,
+      "dd": false
+     },
+     "passes": false,
+     "rebalances": 280,
+     "turnover": 6.518
+    },
+    "150": {
+     "strategy": {
+      "total_return_pct": 580.78,
+      "cagr_pct": 37.74,
+      "sharpe": 1.068,
+      "max_drawdown_pct": 53.27
+     },
+     "QQQ": {
+      "total_return_pct": 297.78,
+      "cagr_pct": 25.92,
+      "sharpe": 1.186,
+      "max_drawdown_pct": 28.56
+     },
+     "checks": {
+      "cagr": true,
+      "sharpe": false,
+      "dd": false
+     },
+     "passes": false,
+     "rebalances": 278,
+     "turnover": 5.023
+    },
+    "250": {
+     "strategy": {
+      "total_return_pct": 532.08,
+      "cagr_pct": 36.04,
+      "sharpe": 1.021,
+      "max_drawdown_pct": 49.18
+     },
+     "QQQ": {
+      "total_return_pct": 297.78,
+      "cagr_pct": 25.92,
+      "sharpe": 1.186,
+      "max_drawdown_pct": 28.56
+     },
+     "checks": {
+      "cagr": true,
+      "sharpe": false,
+      "dd": false
+     },
+     "passes": false,
+     "rebalances": 283,
+     "turnover": 8.276
+    }
+   },
+   "passes": false
+  },
+  "L15-CASH": {
+   "by_sma": {
+    "200": {
+     "strategy": {
+      "total_return_pct": 362.17,
+      "cagr_pct": 29.12,
+      "sharpe": 1.067,
+      "max_drawdown_pct": 38.65
+     },
+     "QQQ": {
+      "total_return_pct": 297.78,
+      "cagr_pct": 25.92,
+      "sharpe": 1.186,
+      "max_drawdown_pct": 28.56
+     },
+     "checks": {
+      "cagr": true,
+      "sharpe": false,
+      "dd": false
+     },
+     "passes": false,
+     "rebalances": 280,
+     "turnover": 10.122
+    },
+    "150": {
+     "strategy": {
+      "total_return_pct": 365.0,
+      "cagr_pct": 29.25,
+      "sharpe": 1.084,
+      "max_drawdown_pct": 42.37
+     },
+     "QQQ": {
+      "total_return_pct": 297.78,
+      "cagr_pct": 25.92,
+      "sharpe": 1.186,
+      "max_drawdown_pct": 28.56
+     },
+     "checks": {
+      "cagr": true,
+      "sharpe": false,
+      "dd": false
+     },
+     "passes": false,
+     "rebalances": 278,
+     "turnover": 8.497
+    },
+    "250": {
+     "strategy": {
+      "total_return_pct": 340.68,
+      "cagr_pct": 28.09,
+      "sharpe": 1.036,
+      "max_drawdown_pct": 38.65
+     },
+     "QQQ": {
+      "total_return_pct": 297.78,
+      "cagr_pct": 25.92,
+      "sharpe": 1.186,
+      "max_drawdown_pct": 28.56
+     },
+     "checks": {
+      "cagr": true,
+      "sharpe": false,
+      "dd": false
+     },
+     "passes": false,
+     "rebalances": 283,
+     "turnover": 11.93
+    }
+   },
+   "passes": false
+  },
+  "L3-CASH": {
+   "by_sma": {
+    "200": {
+     "strategy": {
+      "total_return_pct": 1201.09,
+      "cagr_pct": 53.47,
+      "sharpe": 1.067,
+      "max_drawdown_pct": 65.76
+     },
+     "QQQ": {
+      "total_return_pct": 297.78,
+      "cagr_pct": 25.92,
+      "sharpe": 1.186,
+      "max_drawdown_pct": 28.56
+     },
+     "checks": {
+      "cagr": true,
+      "sharpe": false,
+      "dd": false
+     },
+     "passes": false,
+     "rebalances": 280,
+     "turnover": 5.199
+    },
+    "150": {
+     "strategy": {
+      "total_return_pct": 1227.81,
+      "cagr_pct": 53.99,
+      "sharpe": 1.081,
+      "max_drawdown_pct": 69.87
+     },
+     "QQQ": {
+      "total_return_pct": 297.78,
+      "cagr_pct": 25.92,
+      "sharpe": 1.186,
+      "max_drawdown_pct": 28.56
+     },
+     "checks": {
+      "cagr": true,
+      "sharpe": false,
+      "dd": false
+     },
+     "passes": false,
+     "rebalances": 278,
+     "turnover": 3.92
+    },
+    "250": {
+     "strategy": {
+      "total_return_pct": 1079.54,
+      "cagr_pct": 50.97,
+      "sharpe": 1.035,
+      "max_drawdown_pct": 65.76
+     },
+     "QQQ": {
+      "total_return_pct": 297.78,
+      "cagr_pct": 25.92,
+      "sharpe": 1.186,
+      "max_drawdown_pct": 28.56
+     },
+     "checks": {
+      "cagr": true,
+      "sharpe": false,
+      "dd": false
+     },
+     "passes": false,
+     "rebalances": 283,
+     "turnover": 6.828
+    }
+   },
+   "passes": false
+  }
+ },
+ "selected": null,
+ "holdout": null,
+ "verdict": "REJECTED (no variant passes the design window; holdout not run)"
+}
