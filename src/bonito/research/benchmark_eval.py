@@ -7,7 +7,8 @@ that matters, with the criterion pre-registered in docs/PROFITABILITY_REVIEW_202
 
     BEATS iff, against the reference benchmark (default QQQ):
       full window : strategy CAGR > benchmark CAGR, Sharpe > benchmark Sharpe,
-                    max drawdown <= benchmark max drawdown
+                    max drawdown <= MAX_DD_RATIO (1.25) x benchmark max drawdown
+                    (user decision 2026-10-14: "higher return, similar risk")
       sub-window  : CAGR and Sharpe both beat it again (fresh account from sub_start)
       robustness  : re-run WITHOUT the top-N P&L contributors still beats its CAGR
 
@@ -31,6 +32,8 @@ from bonito.trading.live_runner import UniverseConfig
 from bonito.trading.portfolio_backtest import ReplayStore, backtest_account
 
 TRADING_DAYS = 252
+# Drawdown allowance vs the benchmark (docs/STRATEGY_SEARCH_2026-10.md).
+MAX_DD_RATIO = 1.25
 
 
 class CurveStats(BaseModel):
@@ -96,7 +99,11 @@ class BenchmarkEval(BaseModel):
 
 
 def judge(
-    full: WindowEval, sub: WindowEval | None, ex_top: WindowEval | None, vs: str
+    full: WindowEval,
+    sub: WindowEval | None,
+    ex_top: WindowEval | None,
+    vs: str,
+    max_dd_ratio: float = MAX_DD_RATIO,
 ) -> tuple[dict[str, bool | None], str]:
     """Apply the pre-registered criterion.
 
@@ -116,7 +123,7 @@ def judge(
         if sharpe:
             out["sharpe"] = s.sharpe > b.sharpe
         if dd:
-            out["dd"] = s.max_drawdown_pct <= b.max_drawdown_pct
+            out["dd"] = s.max_drawdown_pct <= max_dd_ratio * b.max_drawdown_pct
         return out
 
     checks: dict[str, bool | None] = {}

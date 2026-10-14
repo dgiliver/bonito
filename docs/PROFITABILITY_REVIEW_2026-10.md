@@ -161,7 +161,7 @@ Human-only controls (`mode`, `live_enabled`, risk caps, `strategies/*.json`, uni
 
 Each candidate gets a criterion fixed before it runs, judged on the Phase 1 harness and logged in `docs/EXPERIMENT_LOG.md` whether adopted or rejected:
 
-> ADOPT iff CAGR **and** Sharpe beat QQQ over the 10-year point-in-time window **and** the 2022+ sub-window, the max drawdown is no worse than QQQ's, and the result survives excluding the top 2 contributors.
+> ADOPT iff CAGR **and** Sharpe beat QQQ over the 10-year point-in-time window **and** the 2022+ sub-window, the max drawdown is no worse than 1.25× QQQ's (amended 2026-10-14 by the user's "higher return, similar risk" decision — see `docs/STRATEGY_SEARCH_2026-10.md`), and the result survives excluding the top 2 contributors.
 
 - **A. Monthly cross-sectional momentum rotation.** The most promising lead (section 6). It needs the point-in-time test to rule out the NVDA/TSLA hindsight question.
 - **B. Index core plus trend overlay** (QQQ only while SPY > SMA200). Hindsight-free: 16.6% CAGR, 24% max drawdown, against QQQ's 21.2% and 35%. Choose it only if a smaller drawdown is worth about 4.6 points a year to you. It won't beat QQQ on return.

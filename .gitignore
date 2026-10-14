@@ -79,3 +79,5 @@ CLAUDE.local.md
 
 # hindsight-free experiment data (scripts/experiments/2026-10-13_*)
 data/hindsight_free/
+data/reference/.wiki_cache/
+data/research/

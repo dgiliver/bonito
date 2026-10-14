@@ -67,7 +67,8 @@ class TestJudge:
         [
             (window(stats(19, 1.2, 20), stats(20, 1.0, 30)), None, None, "full_cagr"),
             (window(stats(25, 0.9, 20), stats(20, 1.0, 30)), None, None, "full_sharpe"),
-            (window(stats(25, 1.2, 31), stats(20, 1.0, 30)), None, None, "full_dd"),
+            # 38 > 1.25 × 30 = 37.5 → fails the drawdown allowance
+            (window(stats(25, 1.2, 38), stats(20, 1.0, 30)), None, None, "full_dd"),
             (
                 window(stats(25, 1.2, 20), stats(20, 1.0, 30)),
                 window(stats(9, 0.9), stats(10, 0.7)),
@@ -218,3 +219,11 @@ def test_kill_switch_override_is_what_keeps_the_replay_trading(universe):
     )
     assert on.windows[0].halted is True
     assert off.windows[0].halted is False
+
+
+def test_drawdown_allowance_is_1_25x_the_benchmark():
+    """User decision 2026-10-14: 'higher return, similar risk' = DD ≤ 1.25× QQQ."""
+    ok = window(stats(25, 1.2, 37.5), stats(20, 1.0, 30))
+    bad = window(stats(25, 1.2, 37.6), stats(20, 1.0, 30))
+    assert judge(ok, None, None, "QQQ")[0]["full_dd"] is True
+    assert judge(bad, None, None, "QQQ")[0]["full_dd"] is False
