@@ -52,7 +52,7 @@
     "DRAM",
     "NBIS"
   ],
-  "entry_allowlist": null,
+  "entry_allowlist": [],
   "entry_blocklist": [
     "CORZ",
     "DASH",
