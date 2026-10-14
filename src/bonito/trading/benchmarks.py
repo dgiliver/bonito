@@ -30,6 +30,8 @@ HOLD_UNIVERSE = "hold-universe"
 # that refreshed just the open positions (the intraday sweep) must read "n/a",
 # not a hold of 3 cherry-picked symbols.
 MIN_UNIVERSE_COVERAGE = 0.5
+# Benchmarks older than this (calendar days) read n/a — covers weekends + a holiday.
+MAX_STALE_DAYS = 5
 
 
 def _daily(bars) -> dict[date, float]:
@@ -41,19 +43,26 @@ def _daily(bars) -> dict[date, float]:
 def hold_universe_curve(
     closes: dict[str, dict[date, float]], days: list[date]
 ) -> dict[date, float]:
-    """Equal-weight, daily-rebalanced hold of every symbol with a close on both days.
+    """Equal-weight, daily-rebalanced hold of the symbols.
 
-    Starts at 1.0 on ``days[0]``; a day where no symbol has two consecutive closes
-    carries the previous value (no fabricated return).
+    Starts at 1.0 on ``days[0]``. Each day, every symbol with a close that day
+    contributes its return from its LAST known close (so a missing bar doesn't drop
+    the move across the gap); a symbol that lists mid-window joins from its first
+    close. A day with no contributing symbol carries the previous value.
     """
     if not days:
         return {}
+    last = {s: c[days[0]] for s, c in closes.items() if days[0] in c and c[days[0]] > 0}
     curve = {days[0]: 1.0}
     value = 1.0
-    for prev, cur in zip(days[:-1], days[1:], strict=True):
-        rets = [
-            c[cur] / c[prev] - 1 for c in closes.values() if prev in c and cur in c and c[prev] > 0
-        ]
+    for cur in days[1:]:
+        rets = []
+        for s, c in closes.items():
+            if cur not in c or c[cur] <= 0:
+                continue
+            if s in last:
+                rets.append(c[cur] / last[s] - 1)
+            last[s] = c[cur]
         if rets:
             value *= 1 + sum(rets) / len(rets)
         curve[cur] = value
@@ -120,7 +129,9 @@ class MarketComparison(BaseModel):
                 bits.append(f"{label} n/a")
             else:
                 bits.append(f"{label} {ret:+.2f}% ({self.excess_pts[label]:+.2f}pts)")
-        return f"vs market since {self.since:%Y-%m-%d}: " + " | ".join(bits)
+        return f"vs market since {self.since:%Y-%m-%d} (positions at last close): " + " | ".join(
+            bits
+        )
 
 
 def compare_to_market(
@@ -129,12 +140,20 @@ def compare_to_market(
     until: date,
     series: dict[str, dict[date, float]],
     labels: tuple[str, ...] = (*BENCHMARK_SYMBOLS, HOLD_UNIVERSE),
+    max_stale_days: int = MAX_STALE_DAYS,
 ) -> MarketComparison:
-    """Line the account's return up against every benchmark over [since, until]."""
+    """Line the account's return up against every benchmark over [since, until].
+
+    A benchmark whose data ends more than ``max_stale_days`` before ``until`` reads
+    n/a: a frozen series (benchmark refresh failing) would otherwise silently show a
+    shorter window as if it were current.
+    """
     bench: dict[str, float | None] = {}
     excess: dict[str, float | None] = {}
     for label in labels:
-        ret = window_return(series.get(label, {}), since, until)
+        s = series.get(label, {})
+        fresh = bool(s) and (until - max(s)).days <= max_stale_days
+        ret = window_return(s, since, until) if fresh else None
         bench[label] = None if ret is None else round(ret * 100, 2)
         excess[label] = None if ret is None else round(account_return_pct - ret * 100, 2)
     return MarketComparison(
@@ -151,7 +170,10 @@ def ledger_market_comparison(
 ) -> MarketComparison | None:
     """Since-inception account return (equity vs starting cash) against the market.
 
-    Inception is the first fill's session. None when the ledger has no fills yet.
+    Benchmarks run from the close of the first fill's session — the same anchor as
+    `live performance` (`paper_equity_curve` starts there). Fills land around the
+    close, so the account never earned that session; crediting the benchmark with it
+    would overstate the gap. None when the ledger has no fills yet.
     """
     if not ledger.fills:
         return None
@@ -171,10 +193,13 @@ def ledger_market_comparison(
                 prices[symbol] = closes[max(closes)]
     equity = ledger.equity(prices)
     account = (equity / ledger.starting_cash - 1) * 100 if ledger.starting_cash else 0.0
-    # Benchmarks start from the close BEFORE inception so the first session counts.
-    series = benchmark_series(store, universe, first - timedelta(days=7), end)
-    anchors = [max((d for d in s if d < since), default=since) for s in series.values()]
-    return compare_to_market(account, min(anchors, default=since), end.date(), series)
+    # Query from before the first fill's DATE: bars are stamped 04:00/05:00, so asking
+    # from the fill's own timestamp (e.g. 21:32) would drop that session's bar and
+    # silently start the benchmarks a day late. window_return anchors on `since`.
+    series = benchmark_series(
+        store, universe, datetime.combine(since, datetime.min.time()) - timedelta(days=7), end
+    )
+    return compare_to_market(account, since, end.date(), series)
 
 
 def refresh_benchmarks(

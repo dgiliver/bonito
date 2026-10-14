@@ -87,6 +87,21 @@ class TestJudge:
         assert verdict == "DOES_NOT_BEAT"
         assert checks[failing] is False
 
+    def test_a_partial_run_can_never_pass(self):
+        """Review finding: with the sub-window skipped (default --start after
+        --sub-start) the verdict printed BEATS on 4 of 6 checks."""
+        full = window(stats(25, 1.2, 20), stats(20, 1.0, 30))
+        ex = window(stats(21), stats(20))
+        checks, verdict = judge(full, None, ex, "QQQ")
+        assert verdict == "INCONCLUSIVE"
+        assert checks["sub_cagr"] is None and checks["sub_sharpe"] is None
+        checks, verdict = judge(full, window(stats(15, 0.9), stats(10, 0.7)), None, "QQQ")
+        assert verdict == "INCONCLUSIVE" and checks["ex_top_cagr"] is None
+
+    def test_a_definite_failure_beats_missing_data(self):
+        checks, verdict = judge(window(stats(19, 1.2, 20), stats(20, 1.0, 30)), None, None, "QQQ")
+        assert verdict == "DOES_NOT_BEAT"
+
     def test_missing_benchmark_is_inconclusive_not_a_pass(self):
         checks, verdict = judge(window(stats(25), None), None, None, "QQQ")
         assert verdict == "INCONCLUSIVE" and checks["full_cagr"] is None
@@ -183,10 +198,23 @@ def test_end_to_end_report_with_kill_switch_off_by_default(universe):
         universe, store, day(5), day(n - 1), sub_start=day(30), exclude_top=1
     )
     assert report.kill_switch is False
-    assert not report.windows[0].halted  # max_drawdown_halt=0.01 would latch if honoured
     assert [w.label for w in report.windows] == ["full", "sub"]
     assert report.excluded_top == ["AAA"]  # the top P&L contributor
     assert report.ex_top is not None and "AAA" not in report.ex_top.per_symbol_pnl
     assert set(report.windows[0].benchmarks) >= {"SPY", "QQQ", "hold-universe"}
     assert report.verdict in {"BEATS", "DOES_NOT_BEAT"}
     assert report.yearly  # calendar-year table populated
+
+
+def test_kill_switch_override_is_what_keeps_the_replay_trading(universe):
+    """Every symbol drops 20% mid-window: with the universe's 1% halt honoured the
+    replay latches; the default (kill switch off) must not."""
+    n = 40
+    path = [100.0] * 15 + [80.0] * 5 + [100.0 + i for i in range(n - 20)]
+    store = FakeStore({s: ohlc(s, path) for s in ("AAA", "BBB", "CCC", "SPY", "QQQ")})
+    off = evaluate_vs_benchmarks(universe, store, day(5), day(n - 1), sub_start=None, exclude_top=0)
+    on = evaluate_vs_benchmarks(
+        universe, store, day(5), day(n - 1), sub_start=None, exclude_top=0, kill_switch=True
+    )
+    assert on.windows[0].halted is True
+    assert off.windows[0].halted is False

@@ -3,6 +3,7 @@
 import math
 from datetime import datetime, timedelta
 from pathlib import Path
+from typing import TYPE_CHECKING
 
 import typer
 from rich.console import Console
@@ -12,6 +13,11 @@ from rich.prompt import Prompt
 from rich.table import Table
 
 from bonito.logging import setup_logging
+
+if TYPE_CHECKING:
+    from bonito.data.store import MarketDataStore
+    from bonito.trading.live_runner import UniverseConfig
+    from bonito.trading.paper import PaperLedger
 
 app = typer.Typer(
     name="bonito",
@@ -806,6 +812,12 @@ def research_benchmark(
         console.print(table)
     if report.excluded_top:
         console.print(f"[dim]ex-top run excluded: {', '.join(report.excluded_top)}[/dim]")
+    if sub_dt is not None and not any(w.label == "sub" for w in report.windows):
+        console.print(
+            f"[yellow]sub-window start {sub_dt:%Y-%m-%d} is outside {start_dt:%Y-%m-%d} → "
+            f"{end_dt:%Y-%m-%d}, so its checks are '?' and the verdict can't be BEATS. "
+            "Pass an earlier --start or a --sub-start inside the window.[/yellow]"
+        )
     if report.timing_beats_hold_universe is not None:
         verdict_word = (
             "[green]adds value[/green]"
@@ -1100,7 +1112,7 @@ def live_refresh(
         raise typer.Exit(1)
 
 
-def _refresh_benchmarks_nonfatal(universe, store) -> None:
+def _refresh_benchmarks_nonfatal(universe: "UniverseConfig", store: "MarketDataStore") -> None:
     """Fetch SPY/QQQ for market-relative reporting. Never affects the exit code:
     `live refresh` failing fails the paper workflow's whole cycle, and a missing
     benchmark must never stop trading."""
@@ -1688,7 +1700,9 @@ def live_status(
     _print_market_line(universe, ledger, prices)
 
 
-def _print_market_line(universe, ledger, prices: dict[str, float]) -> None:
+def _print_market_line(
+    universe: "UniverseConfig", ledger: "PaperLedger", prices: dict[str, float]
+) -> None:
     """Best-effort 'vs market' line. Report-only: any failure prints nothing."""
     from datetime import UTC as _UTC
     from datetime import datetime as _dt

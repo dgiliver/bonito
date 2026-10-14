@@ -53,7 +53,24 @@ class FakeStore:
     def get_bars(self, symbol, start, end, timeframe="1d"):
         if symbol in self.raise_for:
             raise RuntimeError("store down")
-        return self.data.get(symbol)
+        b = self.data.get(symbol)
+        if b is None:
+            return None
+        # Filter by [start, end] on the bar timestamp, like the real DuckDB store.
+        keep = [i for i, t in enumerate(b.timestamps) if start <= t <= end]
+        if not keep:
+            return None
+        pick = lambda xs: [xs[i] for i in keep]  # noqa: E731
+        return BarData(
+            symbol=symbol,
+            timeframe="1d",
+            timestamps=pick(b.timestamps),
+            opens=pick(b.opens),
+            highs=pick(b.highs),
+            lows=pick(b.lows),
+            closes=pick(b.closes),
+            volumes=pick(b.volumes),
+        )
 
     def ingest_from_yahoo(self, symbol, start, end, timeframe="1d"):
         if symbol in self.raise_for:
@@ -101,9 +118,17 @@ class TestHoldUniverseCurve:
         assert curve[D[1]] == pytest.approx(1.0)
         assert curve[D[2]] == pytest.approx(1.05)
 
-    def test_symbol_without_both_closes_is_skipped_not_zeroed(self):
-        closes = {"A": {D[0]: 100, D[1]: 110}, "B": {D[1]: 50}}  # B lists on day 1
-        assert hold_universe_curve(closes, D[:2])[D[1]] == pytest.approx(1.10)
+    def test_symbol_listing_mid_window_joins_from_its_first_close(self):
+        closes = {"A": {D[0]: 100, D[1]: 110, D[2]: 110}, "B": {D[1]: 50, D[2]: 60}}
+        curve = hold_universe_curve(closes, D[:3])
+        assert curve[D[1]] == pytest.approx(1.10)  # B's listing day isn't a return
+        assert curve[D[2]] == pytest.approx(1.10 * 1.10)  # A 0%, B +20% → +10%
+
+    def test_missing_bar_keeps_the_move_across_the_gap(self):
+        """A symbol missing day 1 still contributes its day0→day2 move on day 2."""
+        closes = {"A": {D[0]: 100, D[2]: 120}, "B": {D[0]: 100, D[1]: 100, D[2]: 100}}
+        curve = hold_universe_curve(closes, D[:3])
+        assert curve[D[2]] == pytest.approx(1.10)  # (+20% + 0%) / 2
 
     def test_day_with_no_data_carries_value(self):
         closes = {"A": {D[0]: 100, D[2]: 120}}
@@ -159,7 +184,7 @@ class TestLedgerMarketComparison:
             is None
         )
 
-    def test_marks_unpriced_position_at_last_close_and_anchors_prior_close(self, tmp_path):
+    def test_marks_unpriced_at_last_close_and_anchors_first_fill_session(self, tmp_path):
         ledger = PaperLedger(cash=900.0, starting_cash=1000.0)
         ledger.fills = [
             PaperFill(
@@ -190,8 +215,19 @@ class TestLedgerMarketComparison:
         cmp = ledger_market_comparison(ledger, store, make_universe(tmp_path), {}, day(4))
         # equity 900 + 150 = 1050 → +5%, NOT +0% (entry-price fallback)
         assert cmp.account_return_pct == pytest.approx(5.0)
-        # SPY anchored on the close BEFORE the first fill (day 1 = 110) → 132/110 = +20%
-        assert cmp.benchmark_return_pct["SPY"] == pytest.approx(20.0)
+        # SPY runs from the first fill's session close (day 2 = 120), the same anchor
+        # as `live performance` — not the prior close: 132/120 = +10%
+        assert cmp.since == day(2).date()
+        assert cmp.benchmark_return_pct["SPY"] == pytest.approx(10.0)
+
+    def test_stale_benchmark_reads_na_not_a_shorter_window(self, tmp_path):
+        """A frozen series (refresh failing) must not pass for a current return."""
+        series = {"SPY": {D[0]: 100.0, D[1]: 110.0}}
+        until = D[1] + timedelta(days=30)
+        cmp = compare_to_market(0.0, D[0], until, series, labels=("SPY",))
+        assert cmp.benchmark_return_pct["SPY"] is None
+        fresh = compare_to_market(0.0, D[0], D[1] + timedelta(days=3), series, labels=("SPY",))
+        assert fresh.benchmark_return_pct["SPY"] == pytest.approx(10.0)
 
 
 class TestRefreshIsNeverFatal:
@@ -288,3 +324,24 @@ def test_dates_are_compared_as_calendar_days():
     assert window_return(
         {date(2026, 1, 1): 1.0, date(2026, 1, 2): 2.0}, date(2026, 1, 1), date(2026, 1, 2)
     ) == pytest.approx(1.0)
+
+
+def test_late_day_fill_timestamp_still_anchors_on_that_session(tmp_path):
+    """Real fills land ~21:32 while bars are stamped 05:00: querying bars from the
+    fill's timestamp dropped that session and started the benchmarks a day late
+    (status said SPY +2.75% while performance said +2.19% for the same account)."""
+    ledger = PaperLedger(cash=1000.0, starting_cash=1000.0)
+    ledger.fills = [
+        PaperFill(
+            symbol="AAA",
+            side="buy",
+            quantity=0.0,
+            price=100.0,
+            notional=0.0,
+            reason="no_fill: queued",
+            filled_at=day(2) + timedelta(hours=16),
+        )
+    ]
+    store = FakeStore({"SPY": bars("SPY", [100, 110, 120, 126, 132])})
+    cmp = ledger_market_comparison(ledger, store, make_universe(tmp_path), {}, day(4))
+    assert cmp.benchmark_return_pct["SPY"] == pytest.approx(10.0)  # 120 → 132, not 126 → 132

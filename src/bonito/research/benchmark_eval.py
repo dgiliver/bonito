@@ -98,7 +98,13 @@ class BenchmarkEval(BaseModel):
 def judge(
     full: WindowEval, sub: WindowEval | None, ex_top: WindowEval | None, vs: str
 ) -> tuple[dict[str, bool | None], str]:
-    """Apply the pre-registered criterion. Missing data → None check → INCONCLUSIVE."""
+    """Apply the pre-registered criterion.
+
+    All six checks are ALWAYS present: a window that wasn't run (sub-window outside
+    the range or disabled, ex-top skipped) or lacks data is ``None``. Any failed
+    check → DOES_NOT_BEAT; otherwise any ``None`` → INCONCLUSIVE; only all six
+    passing → BEATS. A partial run can never pass.
+    """
 
     def beats(w: WindowEval | None, *, sharpe: bool, dd: bool) -> dict[str, bool | None]:
         s = w.strategy if w else None
@@ -116,14 +122,14 @@ def judge(
     checks: dict[str, bool | None] = {}
     for k, v in beats(full, sharpe=True, dd=True).items():
         checks[f"full_{k}"] = v
-    if sub is not None:
-        for k, v in beats(sub, sharpe=True, dd=False).items():
-            checks[f"sub_{k}"] = v
-    if ex_top is not None:
-        checks["ex_top_cagr"] = beats(ex_top, sharpe=False, dd=False)["cagr"]
+    for k, v in beats(sub, sharpe=True, dd=False).items():
+        checks[f"sub_{k}"] = v
+    checks["ex_top_cagr"] = beats(ex_top, sharpe=False, dd=False)["cagr"]
+    if any(v is False for v in checks.values()):
+        return checks, "DOES_NOT_BEAT"
     if any(v is None for v in checks.values()):
         return checks, "INCONCLUSIVE"
-    return checks, "BEATS" if all(checks.values()) else "DOES_NOT_BEAT"
+    return checks, "BEATS"
 
 
 def _contributions(result, replay: ReplayStore, end: datetime) -> dict[str, float]:
