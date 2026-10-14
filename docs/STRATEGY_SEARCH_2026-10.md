@@ -76,3 +76,8 @@ These came from an independent pre-run review of the engine, which found NEEDS_W
 6. **Delisting caveat.** A delisted holding is sold at its last printed price, so post-delisting losses aren't booked. That is optimistic and noted.
 7. **Trend average computed on QQQ's real sessions only.** One stray NaN row in QQQ used to poison the 200-day average for the next 200 sessions, forcing false cash weeks. A test caught this during the second review round.
 8. **The membership check covers every quarter from 2015-Q1 to the last quarter before the holdout end**, so a truncated head or tail fails. Previously only interior holes were caught. `--run` also writes a "started" sentinel before computing, so a crash can't be followed by a silent re-run.
+9. **The FISV→FI rename is removed.** This came from the data-only `--prepare` coverage check, with no strategy run. Fiserv trades as FISV again, so the mapping made Fiserv an unpriced gap for 2016–2023.
+   - **Coverage is recorded** in `livetrade/research/strategy_search_2026-10_coverage.json`: priced members are 67–81% of each snapshot in 2015–2018, 88–91% in 2019–2021, and 92–100% in the 2022+ holdout.
+   - **What is missing:** mostly acquired companies (CELG, XLNX, ATVI, SGEN, ANSS, SPLK, ...) plus EA and WBD, whose Yahoo histories are now a single bar.
+   - **How to read the result:** the holdout is the cleaner test. The design-window comparison vs QQQ is noisier, because QQQ held names the strategy couldn't see.
+   - **Reused tickers checked:** BBBY, SPLS and SNDK now belong to different companies. Their new prices fall outside the old companies' membership spans, so the old companies are never scored on them.

@@ -1,0 +1,976 @@
+{
+ "by_snapshot": {
+  "2015-01-01": {
+   "members": 102,
+   "priced": 70,
+   "unpriced": [
+    "ALTR",
+    "ALXN",
+    "ATVI",
+    "BBBY",
+    "BRCM",
+    "CA",
+    "CELG",
+    "CERN",
+    "CMCSK",
+    "CTRX",
+    "CTXS",
+    "DISH",
+    "DTV",
+    "EA",
+    "ESRX",
+    "FOXA",
+    "GMCR",
+    "KRFT",
+    "LLTC",
+    "LMCA",
+    "LVNTA",
+    "MYL",
+    "QRTEA",
+    "SIAL",
+    "SNDK",
+    "SPLS",
+    "SRCL",
+    "VIAB",
+    "WBD",
+    "WFM",
+    "XLNX",
+    "YHOO"
+   ]
+  },
+  "2015-04-01": {
+   "members": 102,
+   "priced": 69,
+   "unpriced": [
+    "ALTR",
+    "ALXN",
+    "ATVI",
+    "BBBY",
+    "BRCM",
+    "CA",
+    "CELG",
+    "CERN",
+    "CMCSK",
+    "CTRX",
+    "CTXS",
+    "DISH",
+    "DTV",
+    "EA",
+    "ESRX",
+    "FOXA",
+    "GMCR",
+    "KRFT",
+    "LLTC",
+    "LMCA",
+    "LVNTA",
+    "MYL",
+    "QRTEA",
+    "SIAL",
+    "SNDK",
+    "SPLS",
+    "SRCL",
+    "VIAB",
+    "WBA",
+    "WBD",
+    "WFM",
+    "XLNX",
+    "YHOO"
+   ]
+  },
+  "2015-07-01": {
+   "members": 102,
+   "priced": 69,
+   "unpriced": [
+    "ALTR",
+    "ALXN",
+    "ATVI",
+    "BBBY",
+    "BRCM",
+    "CA",
+    "CELG",
+    "CERN",
+    "CMCSK",
+    "CTRX",
+    "CTXS",
+    "DISH",
+    "DTV",
+    "EA",
+    "ESRX",
+    "FOXA",
+    "GMCR",
+    "KRFT",
+    "LLTC",
+    "LMCA",
+    "LVNTA",
+    "MYL",
+    "QRTEA",
+    "SIAL",
+    "SNDK",
+    "SPLS",
+    "SRCL",
+    "VIAB",
+    "WBA",
+    "WBD",
+    "WFM",
+    "XLNX",
+    "YHOO"
+   ]
+  },
+  "2015-10-01": {
+   "members": 103,
+   "priced": 74,
+   "unpriced": [
+    "ALTR",
+    "ALXN",
+    "ATVI",
+    "BBBY",
+    "BRCM",
+    "CA",
+    "CELG",
+    "CERN",
+    "CMCSK",
+    "CTXS",
+    "DISH",
+    "EA",
+    "ESRX",
+    "FOXA",
+    "GMCR",
+    "LLTC",
+    "LMCA",
+    "LVNTA",
+    "MYL",
+    "QRTEA",
+    "SNDK",
+    "SPLS",
+    "SRCL",
+    "VIAB",
+    "WBA",
+    "WBD",
+    "WFM",
+    "XLNX",
+    "YHOO"
+   ]
+  },
+  "2016-01-01": {
+   "members": 101,
+   "priced": 75,
+   "unpriced": [
+    "ALXN",
+    "ATVI",
+    "BBBY",
+    "CA",
+    "CELG",
+    "CERN",
+    "CTXS",
+    "DISH",
+    "EA",
+    "ENDP",
+    "ESRX",
+    "FOXA",
+    "LLTC",
+    "LMCA",
+    "LVNTA",
+    "MXIM",
+    "MYL",
+    "QRTEA",
+    "SNDK",
+    "SRCL",
+    "VIAB",
+    "WBA",
+    "WBD",
+    "WFM",
+    "XLNX",
+    "YHOO"
+   ]
+  },
+  "2016-04-01": {
+   "members": 101,
+   "priced": 76,
+   "unpriced": [
+    "ALXN",
+    "ATVI",
+    "BBBY",
+    "CA",
+    "CELG",
+    "CERN",
+    "CTXS",
+    "DISH",
+    "EA",
+    "ENDP",
+    "ESRX",
+    "FOXA",
+    "LLTC",
+    "LMCA",
+    "LVNTA",
+    "MXIM",
+    "MYL",
+    "QRTEA",
+    "SRCL",
+    "VIAB",
+    "WBA",
+    "WBD",
+    "WFM",
+    "XLNX",
+    "YHOO"
+   ]
+  },
+  "2016-07-01": {
+   "members": 102,
+   "priced": 77,
+   "unpriced": [
+    "ALXN",
+    "ATVI",
+    "BBBY",
+    "CA",
+    "CELG",
+    "CERN",
+    "CTXS",
+    "DISH",
+    "EA",
+    "ENDP",
+    "ESRX",
+    "FOXA",
+    "LLTC",
+    "LMCA",
+    "LVNTA",
+    "MXIM",
+    "MYL",
+    "QRTEA",
+    "SRCL",
+    "VIAB",
+    "WBA",
+    "WBD",
+    "WFM",
+    "XLNX",
+    "YHOO"
+   ]
+  },
+  "2016-10-01": {
+   "members": 102,
+   "priced": 77,
+   "unpriced": [
+    "ALXN",
+    "ATVI",
+    "BBBY",
+    "CA",
+    "CELG",
+    "CERN",
+    "CTXS",
+    "DISH",
+    "EA",
+    "ENDP",
+    "ESRX",
+    "FOXA",
+    "LLTC",
+    "LMCA",
+    "LVNTA",
+    "MXIM",
+    "MYL",
+    "QRTEA",
+    "SRCL",
+    "VIAB",
+    "WBA",
+    "WBD",
+    "WFM",
+    "XLNX",
+    "YHOO"
+   ]
+  },
+  "2017-01-01": {
+   "members": 101,
+   "priced": 80,
+   "unpriced": [
+    "ALXN",
+    "ATVI",
+    "CA",
+    "CELG",
+    "CERN",
+    "CTXS",
+    "DISH",
+    "EA",
+    "ESRX",
+    "FOXA",
+    "HOLX",
+    "LVNTA",
+    "MXIM",
+    "MYL",
+    "QRTEA",
+    "SHPG",
+    "VIAB",
+    "WBA",
+    "WBD",
+    "XLNX",
+    "YHOO"
+   ]
+  },
+  "2017-04-01": {
+   "members": 101,
+   "priced": 80,
+   "unpriced": [
+    "ALXN",
+    "ATVI",
+    "CA",
+    "CELG",
+    "CERN",
+    "CTXS",
+    "DISH",
+    "EA",
+    "ESRX",
+    "FOXA",
+    "HOLX",
+    "LVNTA",
+    "MXIM",
+    "MYL",
+    "QRTEA",
+    "SHPG",
+    "VIAB",
+    "WBA",
+    "WBD",
+    "XLNX",
+    "YHOO"
+   ]
+  },
+  "2017-07-01": {
+   "members": 102,
+   "priced": 82,
+   "unpriced": [
+    "ALXN",
+    "ATVI",
+    "CA",
+    "CELG",
+    "CERN",
+    "CTXS",
+    "DISH",
+    "EA",
+    "ESRX",
+    "FOXA",
+    "HOLX",
+    "LVNTA",
+    "MXIM",
+    "MYL",
+    "QRTEA",
+    "SHPG",
+    "VIAB",
+    "WBA",
+    "WBD",
+    "XLNX"
+   ]
+  },
+  "2017-10-01": {
+   "members": 102,
+   "priced": 82,
+   "unpriced": [
+    "ALXN",
+    "ATVI",
+    "CA",
+    "CELG",
+    "CERN",
+    "CTXS",
+    "DISH",
+    "EA",
+    "ESRX",
+    "FOXA",
+    "HOLX",
+    "LVNTA",
+    "MXIM",
+    "MYL",
+    "QRTEA",
+    "SHPG",
+    "VIAB",
+    "WBA",
+    "WBD",
+    "XLNX"
+   ]
+  },
+  "2018-01-01": {
+   "members": 102,
+   "priced": 84,
+   "unpriced": [
+    "ALXN",
+    "ATVI",
+    "CA",
+    "CELG",
+    "CERN",
+    "CTXS",
+    "DISH",
+    "EA",
+    "ESRX",
+    "FOXA",
+    "HOLX",
+    "LVNTA",
+    "MXIM",
+    "MYL",
+    "QRTEA",
+    "SHPG",
+    "WBA",
+    "XLNX"
+   ]
+  },
+  "2018-04-01": {
+   "members": 101,
+   "priced": 83,
+   "unpriced": [
+    "ALXN",
+    "ATVI",
+    "CA",
+    "CELG",
+    "CERN",
+    "CTXS",
+    "DISH",
+    "EA",
+    "ESRX",
+    "FOXA",
+    "HOLX",
+    "LVNTA",
+    "MXIM",
+    "MYL",
+    "QRTEA",
+    "SHPG",
+    "WBA",
+    "XLNX"
+   ]
+  },
+  "2018-07-01": {
+   "members": 100,
+   "priced": 83,
+   "unpriced": [
+    "ALXN",
+    "ATVI",
+    "CA",
+    "CELG",
+    "CERN",
+    "CTXS",
+    "DISH",
+    "EA",
+    "ESRX",
+    "FOXA",
+    "HOLX",
+    "MXIM",
+    "MYL",
+    "QRTEA",
+    "SHPG",
+    "WBA",
+    "XLNX"
+   ]
+  },
+  "2018-10-01": {
+   "members": 100,
+   "priced": 84,
+   "unpriced": [
+    "ALXN",
+    "ATVI",
+    "CA",
+    "CELG",
+    "CERN",
+    "CTXS",
+    "EA",
+    "ESRX",
+    "FOXA",
+    "HOLX",
+    "MXIM",
+    "MYL",
+    "QRTEA",
+    "SHPG",
+    "WBA",
+    "XLNX"
+   ]
+  },
+  "2019-01-01": {
+   "members": 100,
+   "priced": 89,
+   "unpriced": [
+    "ALXN",
+    "ATVI",
+    "CELG",
+    "CERN",
+    "CTXS",
+    "EA",
+    "FOXA",
+    "MXIM",
+    "MYL",
+    "WBA",
+    "XLNX"
+   ]
+  },
+  "2019-04-01": {
+   "members": 102,
+   "priced": 90,
+   "unpriced": [
+    "ALXN",
+    "ATVI",
+    "CELG",
+    "CERN",
+    "CTXS",
+    "EA",
+    "MXIM",
+    "MYL",
+    "TFCF",
+    "TFCFA",
+    "WBA",
+    "XLNX"
+   ]
+  },
+  "2019-07-01": {
+   "members": 100,
+   "priced": 90,
+   "unpriced": [
+    "ALXN",
+    "ATVI",
+    "CELG",
+    "CERN",
+    "CTXS",
+    "EA",
+    "MXIM",
+    "MYL",
+    "WBA",
+    "XLNX"
+   ]
+  },
+  "2019-10-01": {
+   "members": 100,
+   "priced": 90,
+   "unpriced": [
+    "ALXN",
+    "ATVI",
+    "CELG",
+    "CERN",
+    "CTXS",
+    "EA",
+    "MXIM",
+    "MYL",
+    "WBA",
+    "XLNX"
+   ]
+  },
+  "2020-01-01": {
+   "members": 100,
+   "priced": 89,
+   "unpriced": [
+    "ALXN",
+    "ANSS",
+    "ATVI",
+    "CERN",
+    "CTXS",
+    "EA",
+    "MXIM",
+    "SGEN",
+    "SPLK",
+    "WBA",
+    "XLNX"
+   ]
+  },
+  "2020-04-01": {
+   "members": 100,
+   "priced": 89,
+   "unpriced": [
+    "ALXN",
+    "ANSS",
+    "ATVI",
+    "CERN",
+    "CTXS",
+    "EA",
+    "MXIM",
+    "SGEN",
+    "SPLK",
+    "WBA",
+    "XLNX"
+   ]
+  },
+  "2020-07-01": {
+   "members": 100,
+   "priced": 89,
+   "unpriced": [
+    "ALXN",
+    "ANSS",
+    "ATVI",
+    "CERN",
+    "CTXS",
+    "EA",
+    "MXIM",
+    "SGEN",
+    "SPLK",
+    "WBA",
+    "XLNX"
+   ]
+  },
+  "2020-10-01": {
+   "members": 100,
+   "priced": 89,
+   "unpriced": [
+    "ALXN",
+    "ANSS",
+    "ATVI",
+    "CERN",
+    "CTXS",
+    "EA",
+    "MXIM",
+    "SGEN",
+    "SPLK",
+    "WBA",
+    "XLNX"
+   ]
+  },
+  "2021-01-01": {
+   "members": 100,
+   "priced": 90,
+   "unpriced": [
+    "ALXN",
+    "ANSS",
+    "ATVI",
+    "CERN",
+    "EA",
+    "MXIM",
+    "SGEN",
+    "SPLK",
+    "WBA",
+    "XLNX"
+   ]
+  },
+  "2021-04-01": {
+   "members": 100,
+   "priced": 90,
+   "unpriced": [
+    "ALXN",
+    "ANSS",
+    "ATVI",
+    "CERN",
+    "EA",
+    "MXIM",
+    "SGEN",
+    "SPLK",
+    "WBA",
+    "XLNX"
+   ]
+  },
+  "2021-07-01": {
+   "members": 100,
+   "priced": 90,
+   "unpriced": [
+    "ALXN",
+    "ANSS",
+    "ATVI",
+    "CERN",
+    "EA",
+    "MXIM",
+    "SGEN",
+    "SPLK",
+    "WBA",
+    "XLNX"
+   ]
+  },
+  "2021-10-01": {
+   "members": 100,
+   "priced": 92,
+   "unpriced": [
+    "ANSS",
+    "ATVI",
+    "CERN",
+    "EA",
+    "SGEN",
+    "SPLK",
+    "WBA",
+    "XLNX"
+   ]
+  },
+  "2022-01-01": {
+   "members": 100,
+   "priced": 93,
+   "unpriced": [
+    "ANSS",
+    "ATVI",
+    "EA",
+    "SGEN",
+    "SPLK",
+    "WBA",
+    "XLNX"
+   ]
+  },
+  "2022-04-01": {
+   "members": 101,
+   "priced": 95,
+   "unpriced": [
+    "ANSS",
+    "ATVI",
+    "EA",
+    "SGEN",
+    "SPLK",
+    "WBA"
+   ]
+  },
+  "2022-07-01": {
+   "members": 101,
+   "priced": 95,
+   "unpriced": [
+    "ANSS",
+    "ATVI",
+    "EA",
+    "SGEN",
+    "SPLK",
+    "WBA"
+   ]
+  },
+  "2022-10-01": {
+   "members": 101,
+   "priced": 95,
+   "unpriced": [
+    "ANSS",
+    "ATVI",
+    "EA",
+    "SGEN",
+    "SPLK",
+    "WBA"
+   ]
+  },
+  "2023-01-01": {
+   "members": 100,
+   "priced": 94,
+   "unpriced": [
+    "ANSS",
+    "ATVI",
+    "EA",
+    "SGEN",
+    "WBA",
+    "WBD"
+   ]
+  },
+  "2023-04-01": {
+   "members": 100,
+   "priced": 94,
+   "unpriced": [
+    "ANSS",
+    "ATVI",
+    "EA",
+    "SGEN",
+    "WBA",
+    "WBD"
+   ]
+  },
+  "2023-07-01": {
+   "members": 100,
+   "priced": 94,
+   "unpriced": [
+    "ANSS",
+    "ATVI",
+    "EA",
+    "SGEN",
+    "WBA",
+    "WBD"
+   ]
+  },
+  "2023-10-01": {
+   "members": 100,
+   "priced": 95,
+   "unpriced": [
+    "ANSS",
+    "EA",
+    "SGEN",
+    "WBA",
+    "WBD"
+   ]
+  },
+  "2024-01-01": {
+   "members": 100,
+   "priced": 95,
+   "unpriced": [
+    "ANSS",
+    "EA",
+    "SPLK",
+    "WBA",
+    "WBD"
+   ]
+  },
+  "2024-04-01": {
+   "members": 100,
+   "priced": 96,
+   "unpriced": [
+    "ANSS",
+    "EA",
+    "WBA",
+    "WBD"
+   ]
+  },
+  "2024-07-01": {
+   "members": 100,
+   "priced": 96,
+   "unpriced": [
+    "ANSS",
+    "EA",
+    "WBA",
+    "WBD"
+   ]
+  },
+  "2024-10-01": {
+   "members": 100,
+   "priced": 97,
+   "unpriced": [
+    "ANSS",
+    "EA",
+    "WBD"
+   ]
+  },
+  "2025-01-01": {
+   "members": 100,
+   "priced": 97,
+   "unpriced": [
+    "ANSS",
+    "EA",
+    "WBD"
+   ]
+  },
+  "2025-04-01": {
+   "members": 100,
+   "priced": 97,
+   "unpriced": [
+    "ANSS",
+    "EA",
+    "WBD"
+   ]
+  },
+  "2025-07-01": {
+   "members": 100,
+   "priced": 97,
+   "unpriced": [
+    "ANSS",
+    "EA",
+    "WBD"
+   ]
+  },
+  "2025-10-01": {
+   "members": 100,
+   "priced": 98,
+   "unpriced": [
+    "EA",
+    "WBD"
+   ]
+  },
+  "2026-01-01": {
+   "members": 100,
+   "priced": 98,
+   "unpriced": [
+    "EA",
+    "WBD"
+   ]
+  },
+  "2026-04-01": {
+   "members": 100,
+   "priced": 98,
+   "unpriced": [
+    "EA",
+    "WBD"
+   ]
+  },
+  "2026-07-01": {
+   "members": 100,
+   "priced": 98,
+   "unpriced": [
+    "EA",
+    "WBD"
+   ]
+  },
+  "2026-10-01": {
+   "members": 100,
+   "priced": 100,
+   "unpriced": []
+  }
+ },
+ "span_gaps": {
+  "EA": {
+   "member": [
+    "2015-01-01",
+    "2026-07-01"
+   ],
+   "prices": [
+    "2026-08-04",
+    "2026-08-04"
+   ]
+  },
+  "SNDK": {
+   "member": [
+    "2015-01-01",
+    "2026-10-01"
+   ],
+   "prices": [
+    "2025-02-13",
+    "2026-10-14"
+   ]
+  },
+  "BBBY": {
+   "member": [
+    "2015-01-01",
+    "2016-10-01"
+   ],
+   "prices": [
+    "2026-07-17",
+    "2026-10-13"
+   ]
+  },
+  "WBD": {
+   "member": [
+    "2015-01-01",
+    "2026-10-01"
+   ],
+   "prices": [
+    "2026-10-05",
+    "2026-10-05"
+   ]
+  },
+  "SPLS": {
+   "member": [
+    "2015-01-01",
+    "2015-10-01"
+   ],
+   "prices": [
+    "2026-01-16",
+    "2026-10-14"
+   ]
+  },
+  "FOXA": {
+   "member": [
+    "2015-01-01",
+    "2021-10-01"
+   ],
+   "prices": [
+    "2019-03-12",
+    "2026-10-14"
+   ]
+  }
+ },
+ "unfetchable": [
+  "ALTR",
+  "ALXN",
+  "ANSS",
+  "ATVI",
+  "BRCM",
+  "CA",
+  "CELG",
+  "CERN",
+  "CMCSK",
+  "CTRX",
+  "CTXS",
+  "DISH",
+  "DTV",
+  "ENDP",
+  "ESRX",
+  "GMCR",
+  "HOLX",
+  "KRFT",
+  "LLTC",
+  "LMCA",
+  "LVNTA",
+  "MXIM",
+  "MYL",
+  "QRTEA",
+  "SGEN",
+  "SHPG",
+  "SIAL",
+  "SPLK",
+  "SRCL",
+  "TFCF",
+  "TFCFA",
+  "VIAB",
+  "WBA",
+  "WFM",
+  "XLNX",
+  "YHOO"
+ ]
+}

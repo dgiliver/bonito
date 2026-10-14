@@ -46,7 +46,6 @@ RENAMES = {
     "FB": "META",
     "PCLN": "BKNG",
     "CTRP": "TCOM",
-    "FISV": "FI",
     "SYMC": "GEN",
     "NLOK": "GEN",
     "DISCA": "WBD",
