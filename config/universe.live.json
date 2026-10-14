@@ -53,6 +53,7 @@
     "NBIS"
   ],
   "entry_allowlist": [],
+  "core_holding": {"symbol": "QQQ", "target_pct": 1.0},
   "entry_blocklist": [
     "CORZ",
     "DASH",
