@@ -408,8 +408,11 @@ def _restamp(ledger: PaperLedger, n_fills_before: int, day: datetime) -> None:
     """Stamp fills (and freshly opened positions) with the simulated date."""
     for fill in ledger.fills[n_fills_before:]:
         fill.filled_at = day
-        if fill.side == "buy" and fill.symbol in ledger.positions:
-            ledger.positions[fill.symbol].entry_date = day
+        pos = ledger.positions.get(fill.symbol)
+        # Only a buy that OPENED the position sets its entry date; a core-holding
+        # top-up adds to an existing position and must keep the original date.
+        if fill.side == "buy" and pos is not None and abs(pos.quantity - fill.quantity) < 1e-9:
+            pos.entry_date = day
 
 
 def _build_result(
@@ -491,15 +494,30 @@ def _build_result(
 
 
 def _closed_trades(ledger: PaperLedger) -> list[ClosedTrade]:
-    """Pair each sell fill with its entry (one position per symbol at a time)."""
-    entries: dict[str, tuple[datetime, float, str]] = {}
+    """Pair each sell fill with its entry (one position per symbol at a time).
+
+    A core holding can be bought in several lots before it is sold: those lots are
+    merged at a quantity-weighted entry price (first lot's date), matching the
+    ledger's own weighted-average accounting.
+    """
+    entries: dict[str, tuple[datetime, float, str, float]] = {}
     trades: list[ClosedTrade] = []
     for fill in ledger.fills:
         if fill.side == "buy":
-            entries[fill.symbol] = (fill.filled_at, fill.price, fill.strategy_name)
+            if fill.quantity <= 0:
+                continue
+            prior = entries.get(fill.symbol)
+            if prior is None:
+                entries[fill.symbol] = (
+                    fill.filled_at, fill.price, fill.strategy_name, fill.quantity
+                )  # fmt: skip
+            else:
+                qty = prior[3] + fill.quantity
+                price = (prior[1] * prior[3] + fill.price * fill.quantity) / qty
+                entries[fill.symbol] = (prior[0], price, prior[2], qty)
         else:
-            entry_date, entry_price, strategy_name = entries.pop(
-                fill.symbol, (fill.filled_at, fill.price, fill.strategy_name)
+            entry_date, entry_price, strategy_name, _ = entries.pop(
+                fill.symbol, (fill.filled_at, fill.price, fill.strategy_name, fill.quantity)
             )
             trades.append(
                 ClosedTrade(

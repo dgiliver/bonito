@@ -1593,7 +1593,10 @@ def live_reconcile(
     broker_positions = _parse_broker_positions(positions_json)
 
     report = reconcile_gate(
-        ledger, broker_positions, max_position_usd=universe.risk.max_position_usd
+        ledger,
+        broker_positions,
+        max_position_usd=universe.risk.max_position_usd,
+        core_symbol=universe.core_symbol,
     )
 
     if report.snapshot_suspect:

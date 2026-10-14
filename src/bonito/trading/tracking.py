@@ -299,7 +299,14 @@ def run_tracking(
     replay = ReplayStore.from_store(store, universe, end)
     result = backtest_account(universe, replay, window_start, end)
 
-    comparisons = match_fills(real_fills, replay_fill_events(result))
+    # Core-holding top-ups are mechanical cash sweeps, not strategy decisions: keep
+    # them out of decision matching (several real lots vs one replay entry would
+    # read as divergence). Equity tracking below still includes the core.
+    core = universe.core_symbol
+    comparisons = match_fills(
+        [f for f in real_fills if f.symbol.upper() != core],
+        [e for e in replay_fill_events(result) if e[0].upper() != core],
+    )
     matched = [c for c in comparisons if c.matched]
     deltas = np.array([abs(c.delta_bps) for c in matched]) if matched else np.array([])
     divergence = 1 - len(matched) / len(comparisons) if comparisons else 0.0

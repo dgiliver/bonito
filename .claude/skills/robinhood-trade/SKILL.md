@@ -166,7 +166,10 @@ logged) when the strategy's regime filter is risk-off (e.g. SPY below its
 - NEVER run `bonito live resume --yes` without explicit user sign-off.
 - NEVER trade on the margin account (••••7982); only the Agentic account.
 - NEVER exceed `risk` caps in universe.json; the code enforces them — if a
-  number looks wrong, stop and ask, don't override.
+  number looks wrong, stop and ask, don't override. **Exception:** a
+  `core holding top-up` intent (strategy `core_holding`, e.g. QQQ) is sized by
+  `core_holding.target_pct`, not `max_position_usd` — place it as emitted.
+- NEVER edit `core_holding` (human-only, like the risk caps).
 - Live mode requires BOTH `mode: "live"` and `live_enabled: true`. Flipping
   those flags requires explicit user sign-off — never do it yourself.
 - On any error placing an order: stop the run, report what filled and what

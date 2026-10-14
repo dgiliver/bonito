@@ -130,9 +130,10 @@ def _position_row(
     strategy = pos.pinned_strategy() or universe.load_strategy_for(pos.symbol)
     price = price if price is not None else pos.entry_price
 
-    stop_price = _stop_price(pos, strategy, data)
+    is_core = pos.symbol.upper() == universe.core_symbol
+    stop_price = None if is_core else _stop_price(pos, strategy, data)  # core: no stops
     tp_price = None
-    if strategy.take_profit and strategy.take_profit.type.value == "percent":
+    if not is_core and strategy.take_profit and strategy.take_profit.type.value == "percent":
         tp_price = pos.entry_price * (1 + strategy.take_profit.value)
 
     market_value = pos.quantity * price

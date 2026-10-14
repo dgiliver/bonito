@@ -192,7 +192,11 @@ Setup:
      the broker (pending sell), so the sweep doesn't touch them anyway; the
      daily cycle's step 3 resolve-pending records them tonight. This is what
      keeps the intraday sweep running instead of aborting all day after a
-     daily-cycle buy OR sell.
+     daily-cycle buy OR sell. A queued CORE-holding top-up (e.g. QQQ) fills
+     onto the already-held core: the broker shows MORE core shares than the
+     ledger; with its pending sentinel that excess is also pending-explained
+     (bounded by ledger cash, since the core isn't sized by max_position_usd).
+     The sweep never stops or profit-takes the core.
    - So a FATAL that survives the re-read is treated as GENUINE,
      unexplained drift — a real unrecorded order, or a holding too large to
      be an expected fill, the crash case — STOP and report (worded as above
@@ -289,7 +293,8 @@ Setup:
 Hard rules: never place any order that is not a plain market sell for a
 symbol step 5's sweep actually flagged; never place a `trigger: stop`
 order (confirmed rejected for fractional quantities on this account);
-never trade the margin account; never edit mode or live_enabled; never
+never trade the margin account; never edit mode, live_enabled or
+core_holding; never
 run `bonito live resolve-pending` (that is exclusively the daily
 cycle's job); never run `bonito live record-fill` except to record a
 sell this run placed in step 6 — never to "fix" a reconcile mismatch;

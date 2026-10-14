@@ -54,6 +54,10 @@ DRIFT_TOLERANCE_PCT = 0.005
 # an implausibly large broker holding can never be waved through by a same-symbol
 # sentinel's mere existence.
 PENDING_VALUE_TOLERANCE = 4.0
+# A queued CORE-holding buy is sized from ledger cash (it is exempt from
+# max_position_usd), and the ledger hasn't debited it yet — so cash bounds it. The
+# slack absorbs the open-vs-signal-close move between queueing and filling.
+CORE_PENDING_CASH_TOLERANCE = 1.25
 # Extra history ingested for regime symbols so the SMA is defined from the
 # universe start (200 trading days ≈ 10 months; 550 calendar days is safe).
 REGIME_WARMUP_DAYS = 550
@@ -1030,8 +1034,15 @@ def reconcile_positions(
     tolerance: float = 1e-4,
     drift_tolerance_pct: float = DRIFT_TOLERANCE_PCT,
     max_position_usd: float | None = None,
+    core_symbol: str | None = None,
 ) -> ReconcileReport:
     """Compare ledger positions against the broker's actual holdings.
+
+    ``core_symbol`` (core-holding mode): a queued core top-up fills overnight onto an
+    ALREADY-HELD position, so the broker shows ledger + X shares. That excess X is
+    pending-explained by a matching pending-BUY sentinel when its value fits within
+    CORE_PENDING_CASH_TOLERANCE × ledger cash (the core is sized from cash, not
+    max_position_usd). Without a sentinel, or beyond that bound, it stays FATAL.
 
     MUST run (and pass) at the start of every live session before any
     signal generation. A previous session crashing between order placement
@@ -1093,6 +1104,8 @@ def reconcile_positions(
     # direction needs no such bound: there the unexplained leg is our OWN ledger
     # position, already capped at entry by max_position_usd — the ledger row is
     # the reference, so a foreign quantity can't be injected.
+    core = core_symbol.upper() if core_symbol else None
+
     def _pending_explains(sym: str, side: str, observed_qty: float) -> bool:
         s = sym.upper()
         for f in ledger.fills:
@@ -1115,6 +1128,10 @@ def reconcile_positions(
                 return True
             if f.price <= 0:
                 continue  # malformed sentinel price — can't value it, don't wave qty through
+            if s == core:
+                if observed_qty * f.price <= CORE_PENDING_CASH_TOLERANCE * max(ledger.cash, 0.0):
+                    return True
+                continue
             if observed_qty * f.price <= PENDING_VALUE_TOLERANCE * max_position_usd:
                 return True
             # sentinel too small to account for observed_qty; keep scanning in case
@@ -1138,6 +1155,14 @@ def reconcile_positions(
         diff = abs(ledger_qty - broker_qty)
         if diff > drift_tolerance_pct * larger:
             if ledger_qty <= dust and _pending_explains(symbol, "buy", broker_qty):
+                report.pending_explained.append(symbol)
+                continue
+            if (
+                symbol == core
+                and broker_qty > ledger_qty
+                and _pending_explains(symbol, "buy", broker_qty - ledger_qty)
+            ):
+                # queued core top-up filled onto the held core (excess = the new lot)
                 report.pending_explained.append(symbol)
                 continue
             if broker_qty <= dust and _pending_explains(symbol, "sell", ledger_qty):
@@ -1166,6 +1191,7 @@ def reconcile_gate(
     *,
     max_position_usd: float,
     tolerance_pct: float = DRIFT_TOLERANCE_PCT,
+    core_symbol: str | None = None,
 ) -> ReconcileReport:
     """Thin wrapper: call reconcile_positions and return the report.
 
@@ -1190,6 +1216,7 @@ def reconcile_gate(
         broker_positions,
         drift_tolerance_pct=tolerance_pct,
         max_position_usd=max_position_usd,
+        core_symbol=core_symbol,
     )
 
 

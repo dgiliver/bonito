@@ -433,3 +433,251 @@ def test_tolerance_blocks_tiny_topups_even_with_ample_cash(tmp_path):
     ledger.cash = 51.5 + 8.5
     intents, _ = generate_intents(u, store(), ledger, as_of=AS_OF)
     assert [i for i in intents if i.side == "buy" and i.symbol == "QQQ"]
+
+
+# --- after the core-hold review (NEEDS_WORK) ------------------------------------
+
+
+def sentinel(symbol="QQQ", price=100.0, order_id="o-q", side="buy"):
+    return PaperFill(
+        symbol=symbol,
+        side=side,
+        quantity=0.0,
+        price=price,
+        notional=0.0,
+        reason="no_fill: queued",
+        filled_at=AS_OF,
+        broker_order_id=order_id,
+    )
+
+
+class TestReconcileQueuedCoreTopUp:
+    """Review MAJOR: a top-up queued overnight fills onto the HELD core; the broker
+    then shows ledger + X shares before resolve-pending runs (the intraday sweep
+    reconciles first) — that must be pending-explained, not FATAL all day."""
+
+    def gate(self, ledger, broker):
+        from bonito.trading.live_runner import reconcile_gate
+
+        return reconcile_gate(ledger, broker, max_position_usd=30.0, core_symbol="QQQ")
+
+    def held_core(self, cash=60.0, qty=2.0):
+        ledger = PaperLedger(cash=cash, starting_cash=300.0)
+        ledger.positions["QQQ"] = core_position(qty=qty)
+        return ledger
+
+    def test_excess_from_a_queued_topup_is_explained(self):
+        ledger = self.held_core()
+        ledger.fills.append(sentinel())
+        r = self.gate(ledger, {"QQQ": 2.5})  # +0.5 sh ≈ $50 ≤ 1.25 × $60 cash
+        assert not r.fatal_drift and r.pending_explained == ["QQQ"]
+
+    def test_excess_without_a_sentinel_stays_fatal(self):
+        r = self.gate(self.held_core(), {"QQQ": 2.5})
+        assert r.fatal_drift
+
+    def test_excess_beyond_cash_bound_stays_fatal(self):
+        ledger = self.held_core(cash=60.0)
+        ledger.fills.append(sentinel())
+        r = self.gate(ledger, {"QQQ": 3.0})  # +1 sh = $100 > 1.25 × $60
+        assert r.fatal_drift
+
+    def test_first_core_buy_bounded_by_cash_not_max_position_usd(self):
+        """$135 first core buy > 4 × $30 cap, but within cash → explained."""
+        ledger = PaperLedger(cash=140.0, starting_cash=150.0)
+        ledger.fills.append(sentinel())
+        r = self.gate(ledger, {"QQQ": 1.35})
+        assert not r.fatal_drift and r.pending_explained == ["QQQ"]
+
+    def test_non_core_held_symbol_excess_still_fatal(self):
+        ledger = PaperLedger(cash=60.0, starting_cash=300.0)
+        ledger.positions["AAA"] = PaperPosition(
+            symbol="AAA", quantity=2.0, entry_price=50.0, entry_date=AS_OF, high_water_mark=50.0
+        )
+        ledger.fills.append(sentinel(symbol="AAA", price=50.0))
+        r = self.gate(ledger, {"AAA": 2.2})
+        assert r.fatal_drift  # only the core may grow overnight
+
+    def test_reconcile_cli_passes_core(self, tmp_path, monkeypatch):
+        from typer.testing import CliRunner
+
+        import bonito.cli as cli
+        from bonito.cli import app
+
+        u = universe(tmp_path, mode="live")
+        ledger = self.held_core()
+        ledger.fills.append(sentinel())
+        monkeypatch.setattr(cli, "_load_universe", lambda path: u)
+        monkeypatch.setattr(cli, "_load_ledger", lambda universe: ledger)
+        r = CliRunner().invoke(app, ["live", "reconcile", '{"QQQ": 2.5}'])
+        assert r.exit_code == 0, r.output
+
+
+class TestGuardsPinnedAfterReview:
+    def test_forming_or_stale_core_bar_blocks_topup(self, tmp_path):
+        u = universe(tmp_path, entry_allowlist=[])
+        ledger = PaperLedger(cash=140.0, starting_cash=150.0)
+        stale = FakeStore(
+            {
+                "QQQ": bars("QQQ", [100.0] * 30, end=AS_OF - timedelta(days=30)),
+                "AAA": bars("AAA", [50.0] * 30),
+            }
+        )
+        assert not [
+            i for i in generate_intents(u, stale, ledger, as_of=AS_OF)[0] if i.side == "buy"
+        ]
+        forming_day = datetime(2026, 6, 8, 15, 0)  # 11:00 ET on 06-08: today's bar not settled
+        forming = FakeStore(
+            {
+                "QQQ": bars("QQQ", [100.0] * 30, end=datetime(2026, 6, 8, 4)),
+                "AAA": bars("AAA", [50.0] * 30, end=datetime(2026, 6, 8, 4)),
+            }
+        )
+        out = generate_intents(u, forming, ledger, as_of=forming_day)[0]
+        assert not [i for i in out if i.side == "buy"]
+
+    def test_replay_store_loads_core_and_counts_its_days(self, tmp_path):
+        from bonito.trading.portfolio_backtest import ReplayStore
+
+        u = universe(tmp_path)
+        s = FakeStore({"QQQ": bars("QQQ", [100.0] * 5), "AAA": bars("AAA", [50.0] * 5)})
+        rp = ReplayStore.from_store(s, u, LAST_BAR)
+        assert "QQQ" in rp.bars
+
+    def test_resolving_a_core_add_keeps_the_original_entry_date(self, tmp_path):
+        u = universe(tmp_path)
+        ledger = PaperLedger(cash=100.0, starting_cash=200.0)
+        ledger.positions["QQQ"] = core_position()
+        original = ledger.positions["QQQ"].entry_date
+        ledger.fills.append(sentinel(order_id="o-9"))
+        later = AS_OF + timedelta(days=3)
+        resolve_pending_fills(
+            u,
+            ledger,
+            {
+                "o-9": PendingOrderOutcome(
+                    state="filled", filled_quantity=0.5, average_price=100.0, executed_at=later
+                )
+            },
+        )
+        assert ledger.positions["QQQ"].entry_date == original
+
+    def test_position_atrs_skip_core(self, tmp_path):
+        from bonito.trading.live_runner import compute_position_atrs
+
+        atr_strategy = dict(
+            EXIT_HAPPY, stop_loss={"type": "trailing_atr", "value": 2.0, "atr_period": 14}
+        )
+        sp = tmp_path / "atr.json"
+        sp.write_text(json.dumps(atr_strategy))
+        u = universe(tmp_path, strategy_path=str(sp))
+        ledger = PaperLedger(cash=0.0, starting_cash=150.0)
+        ledger.positions["QQQ"] = core_position()
+        ledger.positions["AAA"] = PaperPosition(
+            symbol="AAA", quantity=1.0, entry_price=50.0, entry_date=AS_OF, high_water_mark=50.0
+        )
+        atrs = compute_position_atrs(u, ledger, store(), as_of=AS_OF)
+        assert "QQQ" not in atrs and "AAA" in atrs
+
+    def test_replay_merges_core_lots_and_keeps_entry_date(self):
+        from bonito.trading.portfolio_backtest import _closed_trades
+
+        ledger = PaperLedger(cash=0.0, starting_cash=300.0)
+        d0, d1, d2 = AS_OF, AS_OF + timedelta(days=5), AS_OF + timedelta(days=9)
+        for q, px, d in ((1.0, 100.0, d0), (1.0, 120.0, d1)):
+            ledger.fills.append(
+                PaperFill(
+                    symbol="QQQ",
+                    side="buy",
+                    quantity=q,
+                    price=px,
+                    notional=q * px,
+                    reason="t",
+                    filled_at=d,
+                )
+            )
+        ledger.fills.append(
+            PaperFill(
+                symbol="QQQ",
+                side="sell",
+                quantity=2.0,
+                price=130.0,
+                notional=260.0,
+                reason="kill switch",
+                filled_at=d2,
+            )
+        )
+        (trade,) = _closed_trades(ledger)
+        assert trade.entry_price == pytest.approx(110.0)
+        assert trade.pnl == pytest.approx(40.0)  # (130 − 110) × 2, not (130 − 120) × 2
+        assert trade.entry_date == d0
+
+    def test_tracking_does_not_count_core_topups_as_divergence(self, tmp_path):
+        from bonito.trading.tracking import run_tracking
+
+        u = universe(
+            tmp_path,
+            entry_allowlist=[],
+            core={"symbol": "QQQ"},
+            risk={"starting_cash_usd": 300.0, "min_cash_buffer_usd": 0.0},
+        )
+        start = datetime(2026, 5, 1)
+        days = [start + timedelta(days=i) for i in range(30)]
+        q = BarData(
+            symbol="QQQ",
+            timeframe="1d",
+            timestamps=days,
+            opens=[100.0] * 30,
+            highs=[100.0] * 30,
+            lows=[100.0] * 30,
+            closes=[100.0] * 30,
+            volumes=[1.0] * 30,
+        )
+        ledger = PaperLedger(cash=100.0, starting_cash=300.0)
+        for _i, d in enumerate((days[2], days[5], days[9])):
+            ledger.fills.append(
+                PaperFill(
+                    symbol="QQQ",
+                    side="buy",
+                    quantity=0.66,
+                    price=100.0,
+                    notional=66.0,
+                    reason="core",
+                    filled_at=d,
+                )
+            )
+        report = run_tracking(
+            u,
+            ledger,
+            FakeStore({"QQQ": q, "AAA": bars("AAA", [50.0] * 30, end=days[-1])}),
+            end=days[-1],
+        )
+        assert report.paper_fills == 0 and report.decision_divergence == 0.0
+
+
+def test_replay_restamp_keeps_entry_date_on_core_add_but_stamps_new_positions():
+    from bonito.trading.portfolio_backtest import _restamp
+
+    ledger = PaperLedger(cash=0.0, starting_cash=300.0)
+    ledger.positions["QQQ"] = core_position(qty=1.5)  # 1.0 held + 0.5 just added
+    original = ledger.positions["QQQ"].entry_date
+    ledger.positions["AAA"] = PaperPosition(
+        symbol="AAA", quantity=2.0, entry_price=50.0, entry_date=AS_OF, high_water_mark=50.0
+    )
+    n = len(ledger.fills)
+    for sym, q in (("QQQ", 0.5), ("AAA", 2.0)):
+        ledger.fills.append(
+            PaperFill(
+                symbol=sym,
+                side="buy",
+                quantity=q,
+                price=100.0,
+                notional=q * 100.0,
+                reason="t",
+                filled_at=AS_OF,
+            )
+        )
+    day = AS_OF + timedelta(days=4)
+    _restamp(ledger, n, day)
+    assert ledger.positions["QQQ"].entry_date == original  # add: keep
+    assert ledger.positions["AAA"].entry_date == day  # opened by this fill: stamp

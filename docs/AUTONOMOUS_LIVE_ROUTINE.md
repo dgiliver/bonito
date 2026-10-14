@@ -317,7 +317,10 @@ Setup:
    livetrade/intents/*.json and places NOTHING itself. The broker call stays
    here in the Routine (it has the MCP); the CLI stays offline — it only
    consumes the number you pass, and rejects a non-finite or negative value.
-8. Execute ONLY the intents in the newest intents file, sells before buys:
+8. Execute ONLY the intents in the newest intents file, sells before buys
+   (a `core holding top-up` buy — e.g. QQQ — is sized by the human-set
+   `core_holding.target_pct`, not `max_position_usd`, and adds to the held
+   core; place and record it like any other buy):
    for each, Robinhood review_equity_order then place_equity_order (fresh
    UUID ref_id). Then read the order's actual state (from
    place_equity_order's response, or get_equity_orders) and record it —
@@ -388,7 +391,7 @@ placed in step 8 — never to "fix" a reconcile mismatch;
 never trade the margin account; never run `bonito live resume` (it now
 requires `--yes` and, by default, re-baselines the drawdown peak to current
 equity — human-only, after explicit review); never edit
-mode or live_enabled; never use `git push --force`/`-f` or `git commit
+mode, live_enabled or core_holding; never use `git push --force`/`-f` or `git commit
 --amend` for any step in this prompt — `main` is shared with other
 automation, and a forced push can silently discard someone else's commit
 with no warning; the one narrowly-scoped exception to "never discard
