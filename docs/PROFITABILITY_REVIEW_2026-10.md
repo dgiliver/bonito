@@ -120,6 +120,16 @@ Live trading can confirm there's no gross failure; it cannot *discover* edge. Di
 - **Not commissions:** there are none, and fractional spreads are negligible at $16 positions.
 - **Not regime (SPY above or below its 200-day):** SPY was above it all window. The SMA50 gate experiment also showed regime filtering doesn't explain the live losses.
 
+## Progress
+
+| Item | Status |
+|---|---|
+| 3. Market-relative scoreboard | **Done (2026-10-14).** `live status`, `live tracking` and `live performance` now report the account against SPY, QQQ and hold-universe (equal-weight hold of the universe's own symbols). This is report-only: it never changes the tracking status, never gates trading, and benchmark download failures can't fail `live refresh`. |
+| 4. Hindsight-free evaluation | **Partly done.** `bonito research benchmark` grades a universe+strategy against the criterion below, with the kill switch off by default. `config/research/hindsight_free_2016.json` is the fixed mid-2016 list. It reproduces section 4 exactly: DOES_NOT_BEAT, failing 5 of 6 checks (only drawdown passes). **Still to do:** true point-in-time index constituents, including delisted names. |
+| 5. Research adoption gate | **Not yet, deliberately.** Gating weekly research on beating QQQ only means something once point-in-time data exists. On the hand-picked universe, "hold the universe" beats every timing variant by construction. |
+
+Run the harness with `bonito research benchmark -u config/research/hindsight_free_2016.json --ingest --start 2016-06-01`. It saves a JSON report to `livetrade/research/benchmark_eval_*.json`.
+
 ## Action plan
 
 Human-only controls (`mode`, `live_enabled`, risk caps, `strategies/*.json`, universe composition) are marked **[you]**.

@@ -5,10 +5,11 @@ reconstruction the fidelity check uses) so "what did the account actually
 do" has one source of truth across the status skill and the tracking gate.
 """
 
-from datetime import datetime
+from datetime import datetime, timedelta
 
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
+from bonito.trading.benchmarks import benchmark_series, window_return
 from bonito.trading.live_runner import UniverseConfig
 from bonito.trading.paper import PaperLedger
 from bonito.trading.tracking import paper_equity_curve
@@ -37,6 +38,12 @@ class PeriodReturn(BaseModel):
     return_pct: float
     benchmark_return_pct: float | None = None
     alpha_pct: float | None = None
+    start_date: datetime | None = None
+    end_date: datetime | None = None
+    market: dict[str, float | None] = Field(
+        default_factory=dict,
+        description="SPY/QQQ/hold-universe return over the same window, percent (report-only)",
+    )
 
 
 class PerformanceReport(BaseModel):
@@ -159,6 +166,8 @@ def period_returns(
                 return_pct=round(ret, 2),
                 benchmark_return_pct=bench_ret,
                 alpha_pct=alpha,
+                start_date=start_date,
+                end_date=end_date,
             )
         )
     return results
@@ -190,6 +199,19 @@ def build_performance_report(
             benchmark = dict(zip(bars.timestamps, bars.closes, strict=True))
 
     periods = period_returns(dates, equity, benchmark)
+    if dates:
+        try:
+            series = benchmark_series(store, universe, dates[0] - timedelta(days=7), end)
+        except Exception:
+            series = {}
+        for p in periods:
+            if p.start_date is None or p.end_date is None:
+                continue
+            # Same endpoints as the account's own window (its curve starts at the
+            # first session's close), so the comparison is like-for-like.
+            for label, s in series.items():
+                ret = window_return(s, p.start_date.date(), p.end_date.date())
+                p.market[label] = None if ret is None else round(ret * 100, 2)
     closed = closed_trades_from_fills(ledger)
     win_rate, profit_factor = trade_stats(closed)
     summary = ledger.summary(current_prices)

@@ -1,0 +1,25 @@
+{
+  "name": "hindsight-free-ndx-2016",
+  "description": "RESEARCH ONLY — never traded. The ~29 largest NASDAQ-100 names as of mid-2016, fixed BEFORE any result was seen (2026-10 profitability review), so a backtest on it can't inherit the 'picked what already went up' bias of config/universe.json. Later delistings (e.g. WBA, CELG) can't be fetched — residual survivorship that favours any strategy, so a fail here is conservative. Default strategy for every symbol (no per-symbol overrides). Use with: bonito research benchmark -u config/research/hindsight_free_2016.json --ingest",
+  "mode": "paper",
+  "live_enabled": false,
+  "symbols": [
+    "AAPL", "MSFT", "AMZN", "GOOGL", "META", "INTC", "CMCSA", "CSCO", "AMGN", "GILD",
+    "KHC", "CHTR", "QCOM", "SBUX", "COST", "PYPL", "BKNG", "TXN", "AVGO", "MDLZ",
+    "ADBE", "NVDA", "NFLX", "TMUS", "BIIB", "ADP", "REGN", "EBAY", "TSLA"
+  ],
+  "strategy_path": "strategies/deployed_strategy.json",
+  "symbol_strategies": {},
+  "entry_blocklist": [],
+  "data": {"timeframe": "1d", "start_date": "2015-01-01"},
+  "risk": {
+    "starting_cash_usd": 5000.0,
+    "max_position_usd": 2500.0,
+    "position_pct_equity": 0.125,
+    "max_positions": 8,
+    "max_daily_buys": 3,
+    "min_cash_buffer_usd": 100.0,
+    "allow_short": false,
+    "max_drawdown_halt": 0.25
+  }
+}

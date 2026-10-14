@@ -723,6 +723,110 @@ def research_clusters(
         console.print("[dim]Dry run — re-run with --apply to write assignments.[/dim]")
 
 
+@research_app.command("benchmark")
+def research_benchmark(
+    universe_path: str = typer.Option("config/universe.json", "--universe", "-u"),
+    start: str = typer.Option(
+        None, "--start", help="Default: one year after the universe's data.start_date"
+    ),
+    end: str = typer.Option(None, "--end", help="Default: today"),
+    sub_start: str = typer.Option(
+        "2022-01-03", "--sub-start", help="Second, fresh-account window. 'none' disables."
+    ),
+    vs: str = typer.Option("QQQ", "--vs", help="Reference benchmark for the verdict"),
+    keep_kill_switch: bool = typer.Option(
+        False,
+        "--keep-kill-switch",
+        help="Model the drawdown halt. Off by default: a latched halt measures 'sat in "
+        "cash', not the strategy.",
+    ),
+    exclude_top: int = typer.Option(
+        2, "--exclude-top", help="Robustness re-run without the top-N P&L contributors"
+    ),
+    ingest: bool = typer.Option(
+        False, "--ingest", help="Fetch the universe + SPY/QQQ history first"
+    ),
+    save: bool = typer.Option(True, "--save/--no-save", help="Write livetrade/research JSON"),
+) -> None:
+    """Does this strategy beat the market? Grades it against SPY, QQQ and holding the
+    same names, with the pre-registered criterion from
+    docs/PROFITABILITY_REVIEW_2026-10.md. Report-only — always exits 0.
+
+    Run it on config/research/hindsight_free_2016.json (a list fixed in advance) to
+    avoid inheriting the bias of a universe picked from recent winners.
+    """
+    from datetime import UTC as _UTC
+    from datetime import datetime as _dt
+    from datetime import timedelta as _td
+
+    from bonito.research.benchmark_eval import evaluate_vs_benchmarks, save_benchmark_eval
+
+    universe = _load_universe(universe_path)
+    store = _get_store()
+    if ingest:
+        from bonito.trading.benchmarks import refresh_benchmarks
+        from bonito.trading.live_runner import refresh_data
+
+        bad = [s for s, n in refresh_data(universe, store).items() if n < 0]
+        bad += [s for s, n in refresh_benchmarks(universe, store).items() if n < 0]
+        if bad:
+            console.print(f"[yellow]ingest failed for {', '.join(bad)}[/yellow]")
+
+    data_start = _dt.strptime(universe.data.start_date, "%Y-%m-%d")
+    start_dt = _dt.strptime(start, "%Y-%m-%d") if start else data_start + _td(days=365)
+    end_dt = _dt.strptime(end, "%Y-%m-%d") if end else _dt.now(_UTC).replace(tzinfo=None)
+    sub_dt = None if sub_start.lower() == "none" else _dt.strptime(sub_start, "%Y-%m-%d")
+
+    report = evaluate_vs_benchmarks(
+        universe,
+        store,
+        start_dt,
+        end_dt,
+        sub_start=sub_dt,
+        vs=vs.upper(),
+        kill_switch=keep_kill_switch,
+        exclude_top=exclude_top,
+    )
+
+    for w in [*report.windows, *([report.ex_top] if report.ex_top else [])]:
+        table = Table(title=f"{w.label}: {w.start} → {w.end}  ({w.trades} trades)")
+        for col in ("", "CAGR", "Sharpe", "Max DD", "Total"):
+            table.add_column(col, justify="right" if col else "left")
+        for name, st in [("strategy", w.strategy), *w.benchmarks.items()]:
+            if st is None:
+                table.add_row(name, "n/a", "n/a", "n/a", "n/a")
+            else:
+                table.add_row(
+                    name,
+                    f"{st.cagr_pct:+.1f}%",
+                    f"{st.sharpe:.2f}",
+                    f"{st.max_drawdown_pct:.1f}%",
+                    f"{st.total_return_pct:+.1f}%",
+                )
+        console.print(table)
+    if report.excluded_top:
+        console.print(f"[dim]ex-top run excluded: {', '.join(report.excluded_top)}[/dim]")
+    if report.timing_beats_hold_universe is not None:
+        verdict_word = (
+            "[green]adds value[/green]"
+            if report.timing_beats_hold_universe
+            else "[red]subtracts value[/red]"
+        )
+        console.print(f"timing vs holding the same names: {verdict_word}")
+    marks = {True: "✓", False: "✗", None: "?"}
+    checks = " ".join(f"{k}={marks[v]}" for k, v in report.checks.items())
+    color = {"BEATS": "green", "DOES_NOT_BEAT": "red", "INCONCLUSIVE": "yellow"}[report.verdict]
+    console.print(
+        Panel.fit(
+            f"[bold {color}]{report.verdict}[/bold {color}] vs {report.vs}"
+            f"{'' if report.kill_switch else ' (kill switch off)'}\n{checks}",
+            border_style=color,
+        )
+    )
+    if save:
+        console.print(f"[dim]Report saved to {save_benchmark_eval(report)}[/dim]")
+
+
 @research_app.command("regime-sweep")
 def research_regime_sweep(
     strategy_file: str = typer.Argument(..., help="Path to strategy config JSON file"),
@@ -978,7 +1082,9 @@ def live_refresh(
     from bonito.trading.live_runner import refresh_data
 
     universe = _load_universe(universe_path)
-    results = refresh_data(universe, _get_store())
+    store = _get_store()
+    results = refresh_data(universe, store)
+    _refresh_benchmarks_nonfatal(universe, store)
 
     table = Table(title="Data Refresh")
     table.add_column("Symbol")
@@ -992,6 +1098,20 @@ def live_refresh(
     if failed:
         console.print(f"[red]Failed: {', '.join(failed)}[/red]")
         raise typer.Exit(1)
+
+
+def _refresh_benchmarks_nonfatal(universe, store) -> None:
+    """Fetch SPY/QQQ for market-relative reporting. Never affects the exit code:
+    `live refresh` failing fails the paper workflow's whole cycle, and a missing
+    benchmark must never stop trading."""
+    from bonito.trading.benchmarks import refresh_benchmarks
+
+    failed = [s for s, n in refresh_benchmarks(universe, store).items() if n < 0]
+    if failed:
+        console.print(
+            f"[yellow]benchmark refresh failed for {', '.join(failed)} — market-relative "
+            "reporting will show n/a; trading is unaffected[/yellow]"
+        )
 
 
 @live_app.command("signals")
@@ -1080,6 +1200,7 @@ def live_run(
         results = refresh_data(universe, store)
         ok = sum(1 for c in results.values() if c >= 0)
         console.print(f"Refreshed {ok}/{len(results)} symbols")
+        _refresh_benchmarks_nonfatal(universe, store)
 
     ledger = _load_ledger(universe)
     try:
@@ -1564,6 +1685,24 @@ def live_status(
         {k.upper(): float(v) for k, v in _json.loads(prices_json).items()} if prices_json else {}
     )
     _print_status(ledger, prices)
+    _print_market_line(universe, ledger, prices)
+
+
+def _print_market_line(universe, ledger, prices: dict[str, float]) -> None:
+    """Best-effort 'vs market' line. Report-only: any failure prints nothing."""
+    from datetime import UTC as _UTC
+    from datetime import datetime as _dt
+
+    from bonito.trading.benchmarks import ledger_market_comparison
+
+    try:
+        cmp = ledger_market_comparison(
+            ledger, _get_store(), universe, prices, _dt.now(_UTC).replace(tzinfo=None)
+        )
+    except Exception:
+        return
+    if cmp is not None:
+        console.print(cmp.line())
 
 
 def _print_status(ledger, prices: dict[str, float]) -> None:
@@ -1691,11 +1830,20 @@ def live_performance(
     table.add_column("Return", justify="right")
     table.add_column(f"{benchmark}", justify="right")
     table.add_column("Alpha", justify="right")
+    extra = [k for k in ("QQQ", "hold-universe") if k != benchmark]
+    for k in extra:
+        table.add_column(f"vs {k}", justify="right")
     for p in report.periods:
         bench = f"{p.benchmark_return_pct:+.2f}%" if p.benchmark_return_pct is not None else "n/a"
         alpha = f"{p.alpha_pct:+.2f}pts" if p.alpha_pct is not None else "n/a"
         style = "green" if p.return_pct >= 0 else "red"
-        table.add_row(p.label, f"[{style}]{p.return_pct:+.2f}%[/{style}]", bench, alpha)
+        vs = [
+            f"{p.market[k]:+.2f}% ({p.return_pct - p.market[k]:+.2f}pts)"
+            if p.market.get(k) is not None
+            else "n/a"
+            for k in extra
+        ]
+        table.add_row(p.label, f"[{style}]{p.return_pct:+.2f}%[/{style}]", bench, alpha, *vs)
     console.print(table)
 
     stats_bits = []
@@ -2167,6 +2315,9 @@ def live_tracking(
     )
     for reason in report.reasons:
         console.print(f"  [yellow]{reason}[/yellow]")
+    if report.market is not None:
+        # Report-only. Tracking OK means "matches its own replay", NOT "beats the market".
+        console.print(report.market.line())
     unmatched = [f for f in report.fills if not f.matched]
     if unmatched:
         console.print("[dim]Decision divergences (paper fill, no replay counterpart):[/dim]")

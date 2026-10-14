@@ -34,6 +34,7 @@ from typing import Literal
 import numpy as np
 from pydantic import BaseModel, Field
 
+from bonito.trading.benchmarks import MarketComparison, ledger_market_comparison
 from bonito.trading.live_runner import UniverseConfig
 from bonito.trading.paper import PaperFill, PaperLedger
 from bonito.trading.portfolio_backtest import (
@@ -100,6 +101,12 @@ class TrackingReport(BaseModel):
     mean_daily_tracking_error_bps: float | None = None
 
     fills: list[FillComparison] = Field(default_factory=list)
+    market: MarketComparison | None = Field(
+        default=None,
+        description="Since-inception account return vs SPY/QQQ/hold-universe. REPORT-ONLY: "
+        "never read by the status logic — tracking its own replay is not the same as "
+        "beating the market (2026-10 profitability review).",
+    )
 
 
 def replay_fill_events(result: AccountBacktestResult) -> list[tuple[str, str, datetime, float]]:
@@ -362,7 +369,17 @@ def run_tracking(
         equity_gap_pct=round(equity_gap_pct, 2),
         mean_daily_tracking_error_bps=te_bps,
         fills=comparisons,
+        market=_market_or_none(ledger, store, universe, end),
     )
+
+
+def _market_or_none(ledger: PaperLedger, store, universe: UniverseConfig, end: datetime):
+    """Best-effort market comparison — any failure is "n/a", never a tracking error."""
+    try:
+        return ledger_market_comparison(ledger, store, universe, {}, end)
+    except Exception:
+        logger.warning("market comparison unavailable", exc_info=True)
+        return None
 
 
 def save_tracking_report(
