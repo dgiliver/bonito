@@ -16,7 +16,7 @@ from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from zoneinfo import ZoneInfo
 
-from pydantic import BaseModel, Field, PrivateAttr, field_validator
+from pydantic import BaseModel, Field, PrivateAttr, field_validator, model_validator
 
 from bonito.backtest.strategy import StrategyConfig
 from bonito.data.models import BarData
@@ -87,6 +87,29 @@ class RiskConfig(BaseModel):
     )
 
 
+class CoreHolding(BaseModel):
+    """A buy-and-hold core position (e.g. QQQ) managed outside the strategy.
+
+    The core symbol is never exited by strategy signals, stops or take-profit; each
+    cycle tops it up from available cash toward ``target_pct`` of equity. Sizing is
+    governed by ``target_pct`` (a human-only field, like the risk caps) — NOT by
+    ``risk.max_position_usd``, which applies to strategy positions. The kill switch
+    still applies to everything (no buys while halted; flatten on trip).
+    """
+
+    symbol: str
+    target_pct: float = Field(1.0, gt=0, le=1.0)
+    min_topup_usd: float = Field(1.0, ge=1.0, description="Smallest top-up order")
+    tolerance_pct: float = Field(
+        0.02, ge=0, lt=1, description="Top up only when below target by more than this"
+    )
+
+    @model_validator(mode="after")
+    def _upper(self) -> "CoreHolding":
+        self.symbol = self.symbol.upper()
+        return self
+
+
 class DataConfig(BaseModel):
     timeframe: str = "1d"
     start_date: str = "2022-01-01"
@@ -121,12 +144,30 @@ class UniverseConfig(BaseModel):
     )
     data: DataConfig = Field(default_factory=DataConfig)
     risk: RiskConfig = Field(default_factory=RiskConfig)
+    core_holding: CoreHolding | None = Field(
+        default=None,
+        description="Buy-and-hold core position (human-only). Never exited by the "
+        "strategy; topped up from cash; not subject to entry allow/blocklists.",
+    )
 
     _strategy_cache: dict[str, StrategyConfig] = PrivateAttr(default_factory=dict)
 
     @classmethod
     def load(cls, path: Path = DEFAULT_UNIVERSE_PATH) -> "UniverseConfig":
         return cls.model_validate_json(Path(path).read_text())
+
+    @model_validator(mode="after")
+    def _core_not_traded_by_strategy(self) -> "UniverseConfig":
+        if self.core_holding and self.core_holding.symbol in {s.upper() for s in self.symbols}:
+            raise ValueError(
+                f"core_holding {self.core_holding.symbol} must not also be in symbols — "
+                "the strategy would trade (and exit) the core position"
+            )
+        return self
+
+    @property
+    def core_symbol(self) -> str | None:
+        return self.core_holding.symbol if self.core_holding else None
 
     def load_strategy(self) -> StrategyConfig:
         return self._load_strategy_file(self.strategy_path)
@@ -186,6 +227,19 @@ def refresh_data(
             results[symbol] = -1
     if symbols is not None:
         return results
+
+    core = universe.core_symbol
+    if core and core not in results:
+        try:
+            results[core] = store.ingest_from_yahoo(
+                core,
+                start=universe.data.start_date,
+                end=end,
+                timeframe=universe.data.timeframe,  # type: ignore[arg-type]
+            )
+        except Exception:
+            logger.error(f"Failed to refresh core holding {core}", exc_info=True)
+            results[core] = -1
 
     # Regime reference symbols need extra history so the SMA is defined
     # from the universe start date onward.
@@ -260,6 +314,8 @@ def generate_intents(
 
         last_close = data.closes[-1]
         prices[symbol] = last_close
+        if symbol == universe.core_symbol:
+            continue  # core holding: priced for equity, never exited by strategy signals
 
         should_exit, reason, new_hwm = signals.latest_exit_signal(
             strategy,
@@ -334,7 +390,8 @@ def generate_intents(
         return intents, prices
 
     # --- Entries: only while caps allow ---
-    open_after_exits = len(ledger.positions) - len(sells)
+    core = universe.core_symbol
+    open_after_exits = len([s for s in ledger.positions if s != core and s not in sells])
     # Cash freed by pending sells isn't counted — entries spend only
     # currently-settled cash, which is the conservative cash-account behavior.
     # In live mode the broker's real settled buying power (T+1 in a cash account)
@@ -355,6 +412,14 @@ def generate_intents(
     else:
         spendable = min(ledger.cash, settled_buying_power)
     available = spendable - universe.risk.min_cash_buffer_usd
+    if universe.core_holding is not None:
+        core_intent = _core_topup_intent(
+            universe, store, ledger, prices, current_equity, available, start, as_of,
+            require_settled,
+        )  # fmt: skip
+        if core_intent is not None:
+            intents.append(core_intent)
+            available -= core_intent.dollar_amount or 0.0
     buys = 0
     regime_cache: dict[tuple[str, int], bool] = {}
     allowset = (
@@ -374,7 +439,7 @@ def generate_intents(
             break
         if open_after_exits + buys >= universe.risk.max_positions:
             break
-        if symbol in ledger.positions:
+        if symbol in ledger.positions or symbol.upper() == core:
             continue
         if has_pending_buy(ledger, symbol):
             # A prior cycle's buy for this symbol queued and hasn't resolved
@@ -445,6 +510,60 @@ def generate_intents(
     return intents, prices
 
 
+def _core_topup_intent(
+    universe: UniverseConfig,
+    store: MarketDataStore,
+    ledger: PaperLedger,
+    prices: dict[str, float],
+    equity: float,
+    available: float,
+    start: datetime,
+    as_of: datetime,
+    require_settled: bool,
+) -> TradeIntent | None:
+    """Buy intent bringing the core holding toward target_pct of equity, or None.
+
+    Buys only (never sells). Skipped when the gap is within tolerance, when a prior
+    core buy is still pending, when cash is short, or when the core has no fresh,
+    settled bar. Not subject to entry allow/blocklists, max_positions or
+    max_position_usd — the core is sized by its own human-set target_pct.
+    """
+    core = universe.core_holding
+    assert core is not None
+    if has_pending_buy(ledger, core.symbol):
+        logger.info(f"core {core.symbol}: pending buy unresolved, no top-up")
+        return None
+    data = store.get_bars(core.symbol, start, as_of, universe.data.timeframe)
+    if data is None or len(data) < 2:
+        logger.warning(f"core {core.symbol}: no data, no top-up")
+        return None
+    if _is_stale(data.timestamps[-1], as_of) or (
+        require_settled and _is_forming(data.timestamps[-1], as_of)
+    ):
+        logger.warning(f"core {core.symbol}: latest bar stale/forming, no top-up")
+        return None
+    price = data.closes[-1]
+    prices.setdefault(core.symbol, price)
+    held = ledger.positions.get(core.symbol)
+    held_value = held.quantity * price if held else 0.0
+    gap = core.target_pct * equity - held_value
+    threshold = max(core.min_topup_usd, core.tolerance_pct * equity, MIN_ORDER_USD)
+    if gap < threshold:
+        return None
+    dollar = min(gap, available)
+    if dollar < max(core.min_topup_usd, MIN_ORDER_USD):
+        return None
+    return TradeIntent(
+        symbol=core.symbol,
+        side="buy",
+        dollar_amount=round(dollar, 2),
+        reason=f"core holding top-up toward {core.target_pct:.0%} of equity",
+        signal_price=price,
+        signal_date=data.timestamps[-1],
+        strategy_name="core_holding",
+    )
+
+
 def _position_strategy(pos: PaperPosition, universe: UniverseConfig) -> StrategyConfig:
     """The strategy managing an open position: pinned at entry, else current."""
     pinned = pos.pinned_strategy()
@@ -495,8 +614,12 @@ def execute_paper(
     intents: list[TradeIntent],
     prices: dict[str, float],
     strategies: dict[str, StrategyConfig] | None = None,
+    core_symbol: str | None = None,
 ) -> tuple[list[PaperFill], list[str]]:
     """Fill intents against the paper ledger at the given prices.
+
+    Buys of ``core_symbol`` (the core holding) add to the existing position and are
+    never strategy-pinned; every other buy keeps the one-position-per-symbol rule.
 
     Sells run before buys so freed cash is available. Intents without a
     price are rejected, never silently dropped.
@@ -511,6 +634,7 @@ def execute_paper(
     fills: list[PaperFill] = []
     errors: list[str] = []
     strategies = strategies or {}
+    core = core_symbol.upper() if core_symbol else None
 
     ordered = [i for i in intents if i.side == "sell"] + [i for i in intents if i.side == "buy"]
     for intent in ordered:
@@ -522,8 +646,14 @@ def execute_paper(
             if intent.side == "sell":
                 fills.append(ledger.apply_sell(intent, price))
             else:
+                is_core = intent.symbol.upper() == core
                 fills.append(
-                    ledger.apply_buy(intent, price, strategy=strategies.get(intent.symbol))
+                    ledger.apply_buy(
+                        intent,
+                        price,
+                        strategy=None if is_core else strategies.get(intent.symbol),
+                        add_to_existing=is_core,
+                    )
                 )
         except ValueError as e:
             errors.append(f"{intent.symbol}: {e}")
@@ -546,6 +676,8 @@ def compute_position_atrs(
     start = datetime.strptime(universe.data.start_date, "%Y-%m-%d")
     atrs: dict[str, float] = {}
     for symbol, pos in ledger.positions.items():
+        if symbol == universe.core_symbol:
+            continue  # core holding has no stops
         strategy = _position_strategy(pos, universe)
         stop = strategy.stop_loss
         if stop is None or stop.type.value not in ("atr", "trailing_atr"):
@@ -579,6 +711,8 @@ def compute_stop_levels(
     atrs = compute_position_atrs(universe, ledger, store, as_of)
     levels: dict[str, dict] = {}
     for symbol, pos in ledger.positions.items():
+        if symbol == universe.core_symbol:
+            continue  # core holding has no stop / take-profit levels
         strategy = _position_strategy(pos, universe)
         stop_price = None
         if strategy.stop_loss:
@@ -633,6 +767,8 @@ def check_stops(
     now = datetime.now(UTC)
 
     for symbol, pos in sorted(ledger.positions.items()):
+        if symbol == universe.core_symbol:
+            continue  # core holding: never stopped out or profit-taken
         strategy = _position_strategy(pos, universe)
         price = prices.get(symbol)
         if price is None or price <= 0:
@@ -1256,7 +1392,8 @@ def resolve_pending_fills(
         notional = outcome.notional if outcome.notional is not None else round(qty * price, 2)
         try:
             if fill.side == "buy":
-                if fill.symbol in ledger.positions:
+                is_core = fill.symbol.upper() == universe.core_symbol
+                if fill.symbol in ledger.positions and not is_core:
                     raise ValueError(
                         "position already open -- cannot auto-apply; resolve manually"
                     )
@@ -1270,10 +1407,14 @@ def resolve_pending_fills(
                     strategy_name="live",
                     broker_order_id=order_id,
                 )
-                strategy = universe.load_strategy_for(fill.symbol)
-                new_fill = ledger.apply_buy(intent, price, strategy=strategy, fill_quantity=qty)
+                held_before = fill.symbol in ledger.positions
+                strategy = None if is_core else universe.load_strategy_for(fill.symbol)
+                new_fill = ledger.apply_buy(
+                    intent, price, strategy=strategy, fill_quantity=qty, add_to_existing=is_core
+                )
                 if outcome.executed_at is not None:
-                    ledger.positions[fill.symbol].entry_date = outcome.executed_at
+                    if not held_before:
+                        ledger.positions[fill.symbol].entry_date = outcome.executed_at
                     new_fill.filled_at = outcome.executed_at
             else:
                 if fill.symbol not in ledger.positions:

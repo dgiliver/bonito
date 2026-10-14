@@ -133,8 +133,14 @@ class PaperLedger(BaseModel):
         strategy: StrategyConfig | None = None,
         *,
         fill_quantity: float | None = None,
+        add_to_existing: bool = False,
     ) -> PaperFill:
         """Execute a dollar-based buy at fill_price.
+
+        ``add_to_existing`` (core holding only): add to an open position at a
+        weighted-average entry price instead of refusing. A buy whose
+        broker_order_id is already in the ledger is refused, so a re-recorded
+        fill can't double the position (the one-position rule used to be that guard).
 
         Args:
             strategy: When given, pinned to the position — exits use this
@@ -157,8 +163,21 @@ class PaperLedger(BaseModel):
             raise ValueError(f"ledger is halted ({self.halt_reason}); no new entries")
         if intent.dollar_amount is None or intent.dollar_amount <= 0:
             raise ValueError("buy intent requires a positive dollar_amount")
-        if intent.symbol in self.positions:
+        existing = self.positions.get(intent.symbol)
+        if existing is not None and not add_to_existing:
             raise ValueError(f"position already open in {intent.symbol}")
+        if (
+            add_to_existing
+            and intent.broker_order_id
+            # Only REAL fills count: a queued order's zero-qty pending sentinel carries
+            # the same order id by design and is replaced by the real fill.
+            and any(
+                f.broker_order_id == intent.broker_order_id and f.quantity > 0 for f in self.fills
+            )
+        ):
+            raise ValueError(
+                f"broker order {intent.broker_order_id} already recorded — refusing duplicate"
+            )
         if intent.dollar_amount > self.cash + 1e-9:
             raise ValueError(
                 f"insufficient cash: need ${intent.dollar_amount:.2f}, have ${self.cash:.2f}"
@@ -171,16 +190,24 @@ class PaperLedger(BaseModel):
         quantity = fill_quantity if fill_quantity is not None else intent.dollar_amount / fill_price
         self.cash -= intent.dollar_amount
         now = datetime.now(UTC)
-        self.positions[intent.symbol] = PaperPosition(
-            symbol=intent.symbol,
-            quantity=quantity,
-            entry_price=fill_price,
-            entry_date=now,
-            high_water_mark=fill_price,
-            strategy_name=intent.strategy_name,
-            strategy_hash=strategy_hash(strategy) if strategy else "",
-            strategy_config=strategy.model_dump(mode="json") if strategy else None,
-        )
+        if existing is not None:
+            total = existing.quantity + quantity
+            existing.entry_price = (
+                existing.quantity * existing.entry_price + quantity * fill_price
+            ) / total
+            existing.quantity = total
+            existing.high_water_mark = max(existing.high_water_mark, fill_price)
+        else:
+            self.positions[intent.symbol] = PaperPosition(
+                symbol=intent.symbol,
+                quantity=quantity,
+                entry_price=fill_price,
+                entry_date=now,
+                high_water_mark=fill_price,
+                strategy_name=intent.strategy_name,
+                strategy_hash=strategy_hash(strategy) if strategy else "",
+                strategy_config=strategy.model_dump(mode="json") if strategy else None,
+            )
         fill = PaperFill(
             symbol=intent.symbol,
             side="buy",

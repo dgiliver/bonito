@@ -1236,7 +1236,9 @@ def live_run(
         buy_strategies = {
             i.symbol: universe.load_strategy_for(i.symbol) for i in intents if i.side == "buy"
         }
-        fills, errors = execute_paper(ledger, intents, prices, strategies=buy_strategies)
+        fills, errors = execute_paper(
+            ledger, intents, prices, strategies=buy_strategies, core_symbol=universe.core_symbol
+        )
         for e in errors:
             console.print(f"[red]Rejected: {e}[/red]")
         console.print(f"Paper fills: {len(fills)}")
@@ -1331,7 +1333,7 @@ def _sweep_stops(universe, ledger, prices: dict[str, float], execute: bool) -> N
     console.print(f"[dim]Saved to {path}[/dim]")
 
     if execute and universe.mode == "paper":
-        fills, errors = execute_paper(ledger, intents, prices)
+        fills, errors = execute_paper(ledger, intents, prices, core_symbol=universe.core_symbol)
         for e in errors:
             console.print(f"[red]Rejected: {e}[/red]")
         console.print(f"Paper fills: {len(fills)}")
@@ -1977,10 +1979,14 @@ def live_record_fill(
             strategy_name="live",
             broker_order_id=broker_order_id,
         )
-        strategy = universe.load_strategy_for(symbol)
+        is_core = symbol.upper() == universe.core_symbol
+        strategy = None if is_core else universe.load_strategy_for(symbol)
         # D3: call apply_buy directly so execute_paper is not touched (replay surface).
+        # The core holding adds to its open position (duplicate order ids refused).
         try:
-            fill = ledger.apply_buy(intent, price, strategy=strategy, fill_quantity=shares)
+            fill = ledger.apply_buy(
+                intent, price, strategy=strategy, fill_quantity=shares, add_to_existing=is_core
+            )
         except ValueError as exc:
             console.print(f"[red]{exc}[/red]")
             raise typer.Exit(1) from None

@@ -78,6 +78,13 @@ class ReplayStore:
                 bars[symbol] = data
             else:
                 logger.warning(f"{symbol}: no stored bars — excluded from replay")
+        core = universe.core_symbol
+        if core and core not in bars:
+            data = store.get_bars(core, start, end, universe.data.timeframe)
+            if data is not None and len(data) > 0:
+                bars[core] = data
+            else:
+                logger.warning(f"{core}: no stored bars — core holding can't be replayed")
         for symbol in sorted(universe.regime_symbols() - set(universe.symbols)):
             data = store.get_bars(symbol, regime_start, end, universe.data.timeframe)
             if data is not None and len(data) > 0:
@@ -262,7 +269,9 @@ def backtest_account(
     ledger = PaperLedger(
         cash=universe.risk.starting_cash_usd, starting_cash=universe.risk.starting_cash_usd
     )
-    days = replay.trading_days(universe.symbols, start, end)
+    days = replay.trading_days(
+        [*universe.symbols, *([universe.core_symbol] if universe.core_symbol else [])], start, end
+    )
     if not days:
         raise ValueError("no trading days with data in the requested window")
 
@@ -286,7 +295,9 @@ def backtest_account(
             i.symbol: universe.load_strategy_for(i.symbol) for i in intents if i.side == "buy"
         }
         n_before = len(ledger.fills)
-        _, errors = execute_paper(ledger, intents, prices, strategies=buy_strategies)
+        _, errors = execute_paper(
+            ledger, intents, prices, strategies=buy_strategies, core_symbol=universe.core_symbol
+        )
         rejected += len(errors)
         for e in errors:
             logger.warning(f"{day.date()}: rejected intent — {e}")
@@ -331,6 +342,8 @@ def _intraday_pass(
     mirroring what repeated quote sweeps would have recorded.
     """
     for symbol, pos in sorted(ledger.positions.items()):
+        if symbol == universe.core_symbol:
+            continue  # core holding: no intraday stops / take-profit
         bar = replay.bar_at(symbol, day)
         if bar is None:
             continue
