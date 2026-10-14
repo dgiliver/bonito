@@ -345,3 +345,37 @@ def test_late_day_fill_timestamp_still_anchors_on_that_session(tmp_path):
     store = FakeStore({"SPY": bars("SPY", [100, 110, 120, 126, 132])})
     cmp = ledger_market_comparison(ledger, store, make_universe(tmp_path), {}, day(4))
     assert cmp.benchmark_return_pct["SPY"] == pytest.approx(10.0)  # 120 → 132, not 126 → 132
+
+
+def test_performance_columns_null_a_stale_benchmark(tmp_path):
+    """Same gate as `live status`: a frozen QQQ reads n/a in `live performance`."""
+    from bonito.trading.performance import build_performance_report
+
+    u = make_universe(tmp_path, symbols=("AAA",))
+    ledger = PaperLedger(cash=900.0, starting_cash=1000.0)
+    ledger.fills = [
+        PaperFill(
+            symbol="AAA",
+            side="buy",
+            quantity=1.0,
+            price=100.0,
+            notional=100.0,
+            reason="t",
+            filled_at=day(0),
+        )
+    ]
+    n = 20
+    store = FakeStore(
+        {
+            "AAA": bars("AAA", [100.0] * n),
+            "SPY": bars("SPY", [100.0] * (n - 1) + [110.0]),
+            "QQQ": bars("QQQ", [100.0, 120.0]),  # froze on day 1
+        }
+    )
+    inception = next(
+        p
+        for p in build_performance_report(u, ledger, store, {}, day(n - 1)).periods
+        if p.label == "Inception"
+    )
+    assert inception.market["SPY"] == pytest.approx(10.0)
+    assert inception.market["QQQ"] is None

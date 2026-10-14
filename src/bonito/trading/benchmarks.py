@@ -179,6 +179,7 @@ def ledger_market_comparison(
         return None
     first = min(f.filled_at for f in ledger.fills).replace(tzinfo=None)
     since = first.date()
+    day_start = datetime.combine(since, datetime.min.time())
     # Mark positions without a live quote at their last stored close, not at entry
     # price (PaperLedger.equity's fallback), so an unpriced status still compares
     # like-for-like with the benchmarks' closes.
@@ -186,7 +187,7 @@ def ledger_market_comparison(
     for symbol in ledger.positions:
         if symbol not in prices:
             try:
-                closes = _daily(store.get_bars(symbol, first, end, universe.data.timeframe))
+                closes = _daily(store.get_bars(symbol, day_start, end, universe.data.timeframe))
             except Exception:
                 closes = {}
             if closes:
@@ -196,9 +197,7 @@ def ledger_market_comparison(
     # Query from before the first fill's DATE: bars are stamped 04:00/05:00, so asking
     # from the fill's own timestamp (e.g. 21:32) would drop that session's bar and
     # silently start the benchmarks a day late. window_return anchors on `since`.
-    series = benchmark_series(
-        store, universe, datetime.combine(since, datetime.min.time()) - timedelta(days=7), end
-    )
+    series = benchmark_series(store, universe, day_start - timedelta(days=7), end)
     return compare_to_market(account, since, end.date(), series)
 
 

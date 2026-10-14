@@ -9,7 +9,7 @@ from datetime import datetime, timedelta
 
 from pydantic import BaseModel, Field
 
-from bonito.trading.benchmarks import benchmark_series, window_return
+from bonito.trading.benchmarks import MAX_STALE_DAYS, benchmark_series, window_return
 from bonito.trading.live_runner import UniverseConfig
 from bonito.trading.paper import PaperLedger
 from bonito.trading.tracking import paper_equity_curve
@@ -210,7 +210,10 @@ def build_performance_report(
             # Same endpoints as the account's own window (its curve starts at the
             # first session's close), so the comparison is like-for-like.
             for label, s in series.items():
-                ret = window_return(s, p.start_date.date(), p.end_date.date())
+                # Same staleness gate as `live status`: a frozen series must read n/a,
+                # not a shorter window passed off as this one.
+                stale = not s or (p.end_date.date() - max(s)).days > MAX_STALE_DAYS
+                ret = None if stale else window_return(s, p.start_date.date(), p.end_date.date())
                 p.market[label] = None if ret is None else round(ret * 100, 2)
     closed = closed_trades_from_fills(ledger)
     win_rate, profit_factor = trade_stats(closed)
