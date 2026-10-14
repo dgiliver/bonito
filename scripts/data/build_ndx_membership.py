@@ -23,7 +23,7 @@ from pathlib import Path
 
 API = "https://en.wikipedia.org/w/api.php"
 UA = "bonito-research/1.0 (point-in-time index membership; contact via GitHub dgiliver/bonito)"
-TITLES = ("Nasdaq-100", "List of Nasdaq-100 companies")
+TITLES = ("Nasdaq-100", "List of NASDAQ-100 companies", "List of Nasdaq-100 companies")
 
 
 CACHE = Path("data/reference/.wiki_cache")
@@ -103,6 +103,11 @@ def tickers_in_revision(revid: int) -> list[str]:
             m = re.search(r"\(([A-Z][A-Z.\-]{0,5})\)$", text)
             if m:
                 out.append(m.group(1))
+        if len(out) >= 90:
+            return sorted(set(out))
+        # ~2016-2018: the list lives in a {{columns-list}} template's wikitext, embedded
+        # in a data-mw attribute as lines like "#[[Company]] (TICKER)".
+        out = re.findall(r"\\n#[^\\]*?\(([A-Z][A-Z.\-]{0,5})\)", section)
         if len(out) >= 90:
             return sorted(set(out))
     return []
