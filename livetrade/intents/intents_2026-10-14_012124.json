@@ -1,0 +1,38 @@
+[
+  {
+    "symbol": "MRVL",
+    "side": "buy",
+    "dollar_amount": 510.67,
+    "quantity": null,
+    "reason": "entry rule matched: ema_fast gt ema_slow, close gt ema_slow, rsi_14 lt 68.0",
+    "signal_price": 265.8599853515625,
+    "signal_date": "2026-10-12T04:00:00",
+    "strategy_name": "ema_cross_rsi_atr_regime",
+    "generated_at": "2026-10-14T01:21:24.617395Z",
+    "broker_order_id": null
+  },
+  {
+    "symbol": "LLY",
+    "side": "buy",
+    "dollar_amount": 510.67,
+    "quantity": null,
+    "reason": "entry rule matched: ema_fast gt ema_slow, close gt ema_slow, rsi_14 lt 68.0",
+    "signal_price": 1182.6199951171875,
+    "signal_date": "2026-10-12T04:00:00",
+    "strategy_name": "ema_cross_rsi_atr_regime",
+    "generated_at": "2026-10-14T01:21:24.623375Z",
+    "broker_order_id": null
+  },
+  {
+    "symbol": "AMAT",
+    "side": "buy",
+    "dollar_amount": 349.44,
+    "quantity": null,
+    "reason": "entry rule matched: ema_fast gt ema_slow, close gt ema_slow, rsi_14 lt 68.0",
+    "signal_price": 497.5299987792969,
+    "signal_date": "2026-10-12T04:00:00",
+    "strategy_name": "ema_cross_rsi_atr_regime",
+    "generated_at": "2026-10-14T01:21:24.629248Z",
+    "broker_order_id": null
+  }
+]
