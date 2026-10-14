@@ -55,3 +55,15 @@ Beat QQQ on CAGR **and** Sharpe, with max drawdown ≤ **1.25×** QQQ's, measure
 
 - **ADOPTED:** the paper shadow runs for at least 8 weeks, compared against QQQ. The user signs off, and live goes through a reviewed integration (weekly Routine). The intraday stop Routine could then be retired.
 - **REJECTED:** it is logged, and the remaining options go back to the user.
+
+## Amendments (2026-10-14, before any strategy result)
+
+1. **The benchmark runs through the same engine (pre-run review BLOCKER).**
+   - **What was wrong:** QQQ was counted as held from the window's first close, but each strategy only enters at the open after its first weekly signal. Both windows open with early-January drops, so the strategy got a free head start: about +0.75%/yr CAGR on the design window and about +1.5%/yr on the holdout, even for unlevered QQQ.
+   - **The fix:** QQQ is now "held" by the same simulator, with the same first-signal entry, next-open fill and 10 bps costs.
+   - **Effect on the earlier test:** the rejected momentum search (`docs/STRATEGY_SEARCH_2026-10.md`) used the old benchmark. That bias favoured the strategy, so its REJECTED verdict stands and is conservative.
+2. **Costs are passed explicitly** (`COST_BPS = 10.0`) to both the variants and the benchmark, and exact-arithmetic tests now pin the fee.
+3. **Data and provenance checks.**
+   - The data must cover the holdout end, and anything after it is dropped (e.g. a forming intraday bar).
+   - Provenance is captured before the sentinel is written, so `dirty_tree` is meaningful.
+   - The fingerprint covers both opens and closes.

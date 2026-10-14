@@ -160,3 +160,69 @@ def test_end_to_end_l2_cash_goes_flat_in_downtrend():
     )
     i = r.dates.index(date(2021, 3, 15))
     assert np.allclose(r.equity[i:], r.equity[i])  # in cash once the trend broke
+
+
+# --- exact-arithmetic pins (added after the pre-run review) ---
+
+
+def test_fee_is_exactly_cost_bps_of_traded_notional():
+    """Flat prices, one 100% buy at 10 bps: equity = 1000 × (1 − 0.001)."""
+    closes = frame({"QQQ": np.full(len(DAYS), 100.0)})
+    r = run_allocation(
+        "t",
+        const({"QQQ": 1.0}),
+        closes,
+        closes,
+        date(2021, 1, 4),
+        date(2021, 1, 12),
+        cost_bps=10,
+        starting_cash=1000.0,
+    )
+    # Fri 01-08 decides, Mon 01-11 buys; a second identical target re-trades nothing.
+    assert r.equity[-1] == pytest.approx(1000.0 * (1 - 0.001))
+
+
+def test_fee_counts_both_legs_of_a_switch():
+    closes = frame({"QQQ": np.full(len(DAYS), 100.0), "QLD": np.full(len(DAYS), 100.0)})
+
+    def flip(day):
+        return {"QQQ": 1.0} if day < pd.Timestamp("2021-01-11") else {"QLD": 1.0}
+
+    r = run_allocation(
+        "t",
+        flip,
+        closes,
+        closes,
+        date(2021, 1, 4),
+        date(2021, 1, 19),
+        cost_bps=10,
+        starting_cash=1000.0,
+    )
+    # buy 1000 (fee 1.0) → 999; switch: sell 1000 + buy 999 → fee 1.999 → 997.001
+    assert r.equity[-1] == pytest.approx(997.001)
+
+
+def test_default_cost_is_the_preregistered_10bps():
+    import inspect
+
+    assert inspect.signature(run_allocation).parameters["cost_bps"].default == 10.0
+
+
+def test_weights_apply_exactly_per_leg():
+    q = np.full(len(DAYS), 100.0)
+    l2 = np.full(len(DAYS), 100.0)
+    i = DAYS.get_indexer([pd.Timestamp("2021-01-12")])[0]
+    q[i:] = 101.0  # QQQ +1% on 01-12
+    l2[i:] = 102.0  # QLD +2% on 01-12
+    closes = frame({"QQQ": q, "QLD": l2})
+    r = run_allocation(
+        "t",
+        const({"QQQ": 0.5, "QLD": 0.25}),
+        closes,
+        closes,
+        date(2021, 1, 4),
+        date(2021, 1, 12),
+        cost_bps=0,
+        starting_cash=1000.0,
+    )
+    assert r.equity[-1] == pytest.approx(1000.0 * (1 + 0.5 * 0.01 + 0.25 * 0.02))
