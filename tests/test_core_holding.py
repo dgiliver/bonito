@@ -681,3 +681,15 @@ def test_replay_restamp_keeps_entry_date_on_core_add_but_stamps_new_positions():
     _restamp(ledger, n, day)
     assert ledger.positions["QQQ"].entry_date == original  # add: keep
     assert ledger.positions["AAA"].entry_date == day  # opened by this fill: stamp
+
+
+def test_core_shortfall_stays_fatal_even_with_a_buy_sentinel():
+    """Broker holds LESS core than the ledger (sold/missing shares): a pending BUY
+    can't explain a shortfall — it must stay FATAL (review re-check)."""
+    from bonito.trading.live_runner import reconcile_gate
+
+    ledger = PaperLedger(cash=98.0, starting_cash=300.0)
+    ledger.positions["QQQ"] = core_position(qty=0.3, entry=500.0)
+    ledger.fills.append(sentinel(price=500.0))
+    r = reconcile_gate(ledger, {"QQQ": 0.2}, max_position_usd=30.0, core_symbol="QQQ")
+    assert r.fatal_drift and r.pending_explained == []
