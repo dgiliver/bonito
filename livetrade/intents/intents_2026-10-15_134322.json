@@ -1,0 +1,14 @@
+[
+  {
+    "symbol": "AMD",
+    "side": "sell",
+    "dollar_amount": null,
+    "quantity": 0.027716,
+    "reason": "stop loss triggered (intraday)",
+    "signal_price": 546.7999877929688,
+    "signal_date": "2026-10-15T13:43:22.032976Z",
+    "strategy_name": "ema_cross_rsi_atr_regime",
+    "generated_at": "2026-10-15T13:43:22.033228Z",
+    "broker_order_id": null
+  }
+]
