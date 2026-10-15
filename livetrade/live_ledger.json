@@ -1,5 +1,5 @@
 {
-  "cash": 65.43193389570007,
+  "cash": 35.85193389570007,
   "starting_cash": 150.0,
   "positions": {
     "COST": {
@@ -401,6 +401,16 @@
           "sma_period": 200
         }
       }
+    },
+    "QQQ": {
+      "symbol": "QQQ",
+      "quantity": 0.041153,
+      "entry_price": 718.77,
+      "entry_date": "2026-10-15T13:30:04.100000Z",
+      "high_water_mark": 718.77,
+      "strategy_name": "live",
+      "strategy_hash": "",
+      "strategy_config": null
     }
   },
   "fills": [
@@ -1868,17 +1878,6 @@
       "broker_order_id": "6ace9988-0ddd-4aef-b427-fc7fbe478bb9"
     },
     {
-      "symbol": "QQQ",
-      "side": "buy",
-      "quantity": 0.0,
-      "price": 727.77,
-      "notional": 0.0,
-      "reason": "no_fill: live fill",
-      "filled_at": "2026-10-14T20:51:13.413568Z",
-      "strategy_name": "live",
-      "broker_order_id": "6acfeb36-8d6d-41fb-878b-5b5a399d5ee2"
-    },
-    {
       "symbol": "AMD",
       "side": "sell",
       "quantity": 0.027716,
@@ -1888,11 +1887,33 @@
       "filled_at": "2026-10-15T13:43:53.614773Z",
       "strategy_name": "live",
       "broker_order_id": "6ad0d88c-e333-42e4-a922-b53dc3173f01"
+    },
+    {
+      "symbol": "QQQ",
+      "side": "buy",
+      "quantity": 0.041153,
+      "price": 718.77,
+      "notional": 29.58,
+      "reason": "live fill (resolved from queued order)",
+      "filled_at": "2026-10-15T13:30:04.100000Z",
+      "strategy_name": "live",
+      "broker_order_id": "6acfeb36-8d6d-41fb-878b-5b5a399d5ee2"
+    },
+    {
+      "symbol": "QQQ",
+      "side": "buy",
+      "quantity": 0.0,
+      "price": 727.78,
+      "notional": 0.0,
+      "reason": "no_fill: live fill",
+      "filled_at": "2026-10-15T20:50:24.538383Z",
+      "strategy_name": "live",
+      "broker_order_id": "6ad13c8b-7e85-4447-88ff-3802be3becc3"
     }
   ],
   "realized_pnl": -21.59142284789999,
   "peak_equity": 150.14103162835693,
   "halted": false,
   "halt_reason": "",
-  "updated_at": "2026-10-15T19:41:57.094875Z"
+  "updated_at": "2026-10-15T20:50:24.538666Z"
 }
