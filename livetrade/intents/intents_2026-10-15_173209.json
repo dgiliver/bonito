@@ -1,0 +1,14 @@
+[
+  {
+    "symbol": "DELL",
+    "side": "sell",
+    "dollar_amount": null,
+    "quantity": 0.8491100404846904,
+    "reason": "stop loss triggered (intraday)",
+    "signal_price": 462.7651062011719,
+    "signal_date": "2026-10-15T17:32:09.436752Z",
+    "strategy_name": "ema_cross_rsi_atr_regime",
+    "generated_at": "2026-10-15T17:32:09.436961Z",
+    "broker_order_id": null
+  }
+]

@@ -1,5 +1,5 @@
 {
-  "cash": 99.99607952815967,
+  "cash": 492.9345775895388,
   "starting_cash": 5000.0,
   "positions": {
     "MSFT": {
@@ -107,7 +107,7 @@
       "quantity": 0.5015735316307748,
       "entry_price": 946.9199829101562,
       "entry_date": "2026-10-10T01:53:14.560827Z",
-      "high_water_mark": 982.0,
+      "high_water_mark": 987.0499877929688,
       "strategy_name": "ema_cross_rsi_atr_regime",
       "strategy_hash": "da16575a5622",
       "strategy_config": {
@@ -407,107 +407,7 @@
       "quantity": 0.4318124182818311,
       "entry_price": 1182.6199951171875,
       "entry_date": "2026-10-14T01:21:24.637630Z",
-      "high_water_mark": 1211.4849853515625,
-      "strategy_name": "ema_cross_rsi_atr_regime",
-      "strategy_hash": "da16575a5622",
-      "strategy_config": {
-        "name": "ema_cross_rsi_atr_regime",
-        "description": "EMA 10/26 cross + RSI<68, 2.0x ATR(14) trailing stop, 10% TP, SPY>SMA200 regime gate. Exit rule VALIDATED 2026-06-12: removing it degrades the account replay despite negative raw attribution (docs/EXPERIMENT_LOG.md) — do not strip it without fresh replay evidence.",
-        "version": "2.0",
-        "symbols": [
-          "SPY"
-        ],
-        "timeframe": "1d",
-        "indicators": [
-          {
-            "type": "ema",
-            "name": "ema_fast",
-            "params": {
-              "period": 10
-            }
-          },
-          {
-            "type": "ema",
-            "name": "ema_slow",
-            "params": {
-              "period": 26
-            }
-          },
-          {
-            "type": "rsi",
-            "name": "rsi_14",
-            "params": {
-              "period": 14
-            }
-          }
-        ],
-        "entry_rules": [
-          {
-            "conditions": [
-              {
-                "left": "ema_fast",
-                "comparison": "gt",
-                "right": "ema_slow",
-                "lookback": null
-              },
-              {
-                "left": "close",
-                "comparison": "gt",
-                "right": "ema_slow",
-                "lookback": null
-              },
-              {
-                "left": "rsi_14",
-                "comparison": "lt",
-                "right": 68.0,
-                "lookback": null
-              }
-            ],
-            "logic": "AND",
-            "side": "long"
-          }
-        ],
-        "exit_rules": [
-          {
-            "conditions": [
-              {
-                "left": "ema_fast",
-                "comparison": "crosses_below",
-                "right": "ema_slow",
-                "lookback": null
-              }
-            ],
-            "logic": "AND",
-            "side": "long"
-          }
-        ],
-        "position_size": {
-          "type": "percent_equity",
-          "value": 98.0
-        },
-        "max_positions": 1,
-        "stop_loss": {
-          "type": "trailing_atr",
-          "value": 2.0,
-          "atr_period": 14,
-          "trigger_percent": null
-        },
-        "take_profit": {
-          "type": "percent",
-          "value": 0.1
-        },
-        "regime_filter": {
-          "symbol": "SPY",
-          "sma_period": 200
-        }
-      }
-    },
-    "DELL": {
-      "symbol": "DELL",
-      "quantity": 0.8491100404846904,
-      "entry_price": 572.469970703125,
-      "entry_date": "2026-10-15T00:46:03.891404Z",
-      "high_water_mark": 572.469970703125,
+      "high_water_mark": 1262.405029296875,
       "strategy_name": "ema_cross_rsi_atr_regime",
       "strategy_hash": "da16575a5622",
       "strategy_config": {
@@ -607,7 +507,7 @@
       "quantity": 1.4173373341236202,
       "entry_price": 342.9599914550781,
       "entry_date": "2026-10-15T00:46:03.891768Z",
-      "high_water_mark": 342.9599914550781,
+      "high_water_mark": 344.3599853515625,
       "strategy_name": "ema_cross_rsi_atr_regime",
       "strategy_hash": "da16575a5622",
       "strategy_config": {
@@ -707,7 +607,7 @@
       "quantity": 0.9772177703523375,
       "entry_price": 347.6400146484375,
       "entry_date": "2026-10-15T00:46:03.891953Z",
-      "high_water_mark": 347.6400146484375,
+      "high_water_mark": 349.1650085449219,
       "strategy_name": "ema_cross_rsi_atr_regime",
       "strategy_hash": "da16575a5622",
       "strategy_config": {
@@ -2541,11 +2441,22 @@
       "filled_at": "2026-10-15T00:46:03.891953Z",
       "strategy_name": "ema_cross_rsi_atr_regime",
       "broker_order_id": null
+    },
+    {
+      "symbol": "DELL",
+      "side": "sell",
+      "quantity": 0.8491100404846904,
+      "price": 462.7651062011719,
+      "notional": 392.9384980613791,
+      "reason": "stop loss triggered (intraday)",
+      "filled_at": "2026-10-15T17:32:09.442267Z",
+      "strategy_name": "ema_cross_rsi_atr_regime",
+      "broker_order_id": null
     }
   ],
-  "realized_pnl": -1115.883920471839,
+  "realized_pnl": -1209.03542241046,
   "peak_equity": 4468.86417420458,
   "halted": false,
   "halt_reason": "",
-  "updated_at": "2026-10-15T00:46:03.892453Z"
+  "updated_at": "2026-10-15T17:32:09.442616Z"
 }
