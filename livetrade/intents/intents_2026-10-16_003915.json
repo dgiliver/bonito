@@ -1,0 +1,14 @@
+[
+  {
+    "symbol": "META",
+    "side": "buy",
+    "dollar_amount": 392.93,
+    "quantity": null,
+    "reason": "entry rule matched: ema_fast gt ema_slow, close gt ema_slow, rsi_14 lt 68.0",
+    "signal_price": 737.5399780273438,
+    "signal_date": "2026-10-14T04:00:00",
+    "strategy_name": "ema_cross_rsi_atr_regime",
+    "generated_at": "2026-10-16T00:39:15.620055Z",
+    "broker_order_id": null
+  }
+]
