@@ -1,0 +1,38 @@
+[
+  {
+    "symbol": "AMD",
+    "side": "sell",
+    "dollar_amount": null,
+    "quantity": 0.8297994212835049,
+    "reason": "stop loss triggered (intraday)",
+    "signal_price": 539.219970703125,
+    "signal_date": "2026-10-16T17:07:48.865155Z",
+    "strategy_name": "ema_cross_rsi_atr_regime",
+    "generated_at": "2026-10-16T17:07:48.865268Z",
+    "broker_order_id": null
+  },
+  {
+    "symbol": "MRVL",
+    "side": "sell",
+    "dollar_amount": null,
+    "quantity": 1.920823095377481,
+    "reason": "stop loss triggered (intraday)",
+    "signal_price": 231.44749450683594,
+    "signal_date": "2026-10-16T17:07:48.865155Z",
+    "strategy_name": "ema_cross_rsi_atr_regime",
+    "generated_at": "2026-10-16T17:07:48.865411Z",
+    "broker_order_id": null
+  },
+  {
+    "symbol": "MSFT",
+    "side": "sell",
+    "dollar_amount": null,
+    "quantity": 0.9696744664955071,
+    "reason": "stop loss triggered (intraday)",
+    "signal_price": 525.7999877929688,
+    "signal_date": "2026-10-16T17:07:48.865155Z",
+    "strategy_name": "c_ema12-26_rsi55_atr1.0_tp20",
+    "generated_at": "2026-10-16T17:07:48.865437Z",
+    "broker_order_id": null
+  }
+]
