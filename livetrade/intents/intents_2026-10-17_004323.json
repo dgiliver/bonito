@@ -1,0 +1,38 @@
+[
+  {
+    "symbol": "AMZN",
+    "side": "buy",
+    "dollar_amount": 468.92,
+    "quantity": null,
+    "reason": "entry rule matched: ema_fast gt ema_slow, close gt ema_slow, rsi_14 lt 68.0",
+    "signal_price": 254.75999450683594,
+    "signal_date": "2026-10-15T04:00:00",
+    "strategy_name": "ema_cross_rsi_atr_regime",
+    "generated_at": "2026-10-17T00:43:23.596693Z",
+    "broker_order_id": null
+  },
+  {
+    "symbol": "RBLX",
+    "side": "buy",
+    "dollar_amount": 468.92,
+    "quantity": null,
+    "reason": "entry rule matched: ema_fast gt ema_slow, close gt ema_slow, rsi_14 lt 68.0",
+    "signal_price": 51.130001068115234,
+    "signal_date": "2026-10-15T04:00:00",
+    "strategy_name": "ema_cross_rsi_atr_regime",
+    "generated_at": "2026-10-17T00:43:23.612505Z",
+    "broker_order_id": null
+  },
+  {
+    "symbol": "ADI",
+    "side": "buy",
+    "dollar_amount": 464.03,
+    "quantity": null,
+    "reason": "entry rule matched: ema_fast gt ema_slow, close gt ema_slow, rsi_14 lt 68.0",
+    "signal_price": 403.95001220703125,
+    "signal_date": "2026-10-15T04:00:00",
+    "strategy_name": "ema_cross_rsi_atr_regime",
+    "generated_at": "2026-10-17T00:43:23.639086Z",
+    "broker_order_id": null
+  }
+]
