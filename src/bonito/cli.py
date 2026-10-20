@@ -1759,6 +1759,66 @@ def _print_status(ledger, prices: dict[str, float]) -> None:
         console.print(table)
 
 
+@live_app.command("routine-health")
+def live_routine_health(
+    universe_path: str = typer.Option("config/universe.live.json", "--universe", "-u"),
+    day: str = typer.Option(None, "--date", help="Session date YYYY-MM-DD (default: today, UTC)"),
+    min_intraday: int = typer.Option(
+        4, "--min-intraday", help="Fewest completed intraday stop-check runs before alarming"
+    ),
+    stale_pending_sessions: int = typer.Option(
+        2, "--stale-pending-sessions", help="Sessions a queued order may stay unresolved"
+    ),
+    as_json: bool = typer.Option(False, "--json", help="One JSON line on stdout, for CI"),
+) -> None:
+    """Did the live Routines run today? Dead-man's switch — alarm-only, NEVER gates.
+
+    Checks main for the daily live-cycle commit and enough intraday stop-check
+    runs, and the live ledger for queued orders left unresolved. A non-trading day
+    (no SPY bar for the date in the store — ingest SPY first) reports SKIPPED.
+    Exits 0 OK/SKIPPED, 3 ALARM, 1 cannot evaluate.
+    """
+    from datetime import UTC as _UTC
+    from datetime import date as _date
+    from datetime import datetime as _dt
+    from datetime import timedelta as _td
+
+    from bonito.trading.routine_health import check_routine_activity, commit_subjects_for_day
+
+    session = _date.fromisoformat(day) if day else _dt.now(_UTC).date()
+    universe = _load_universe(universe_path)
+    store = _get_store()
+    start = _dt.combine(session, _dt.min.time())
+    probe = store.get_bars("SPY", start - _td(days=10), start + _td(days=1), "1d")
+    if probe is None or len(probe) == 0:
+        console.print("[red]No SPY bars around that date — ingest SPY first; can't tell "
+                      "whether it was a trading day.[/red]")  # fmt: skip
+        raise typer.Exit(1)
+    trading_day = any(ts.date() == session for ts in probe.timestamps)
+    try:
+        subjects = commit_subjects_for_day(session)
+    except Exception as exc:  # noqa: BLE001 — no git history = cannot evaluate
+        console.print(f"[red]Could not read git history: {exc}[/red]")
+        raise typer.Exit(1) from None
+    ledger = _load_ledger(universe)
+    report = check_routine_activity(
+        subjects,
+        session,
+        trading_day=trading_day,
+        ledger=ledger,
+        min_intraday=min_intraday,
+        stale_pending_sessions=stale_pending_sessions,
+    )
+    if as_json:
+        typer.echo(report.model_dump_json())
+    else:
+        color = {"OK": "green", "SKIPPED": "dim", "ALARM": "red"}[report.status]
+        body = "\n".join([report.status_line(), *report.reasons, *report.stale_pending])
+        console.print(Panel.fit(body, border_style=color))
+    if report.status == "ALARM":
+        raise typer.Exit(code=3)
+
+
 @live_app.command("health")
 def live_health(
     universe_path: str = typer.Option("config/universe.json", "--universe", "-u"),

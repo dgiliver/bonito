@@ -1,0 +1,125 @@
+# Dead-man's switch for the LIVE Claude Routines.
+#
+# On 2026-10-16 Robinhood renamed the Agentic account's nickname to "MCP"; both live
+# Routines asserted the old nickname in step 1 and stopped before taking the cycle
+# lock — no commit, no alert, run status "SUCCEEDED". Four trading days passed with no
+# daily cycle and almost no stop checks before anyone noticed.
+#
+# This job checks, after each session, that the Routines left their evidence on main:
+# the daily "live cycle <date>" commit, enough completed intraday stop-check runs, and
+# no queued order left unresolved. Non-trading days (no SPY bar) are skipped.
+#
+# ALARM-ONLY: read-only checkout, never commits, never trades, never gates anything.
+
+name: Live routine health
+
+on:
+  schedule:
+    # 22:20 UTC Mon–Fri — after the daily live Routine (20:45 UTC) has had time to
+    # commit, and after Yahoo publishes the session's daily bar (holiday detection).
+    - cron: "20 22 * * 1-5"
+  workflow_dispatch:
+    inputs:
+      date:
+        description: "Session date to check (YYYY-MM-DD, default today UTC)"
+        required: false
+
+permissions:
+  contents: read
+  issues: write
+
+jobs:
+  routine-health:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0 # full history: a shallow clone would make runs look missing
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+
+      - name: Install bonito
+        run: pip install -e .
+
+      - name: Fetch SPY bars (to tell trading days from holidays)
+        run: |
+          for i in 1 2 3; do
+            bonito ingest SPY --start "$(date -u -d '-14 days' +%F)" --end "$(date -u -d '+1 day' +%F)" && exit 0
+            echo "::warning::SPY ingest failed (attempt $i), retrying in 30s"
+            sleep 30
+          done
+          echo "::warning::SPY ingest failed — routine-health will report UNKNOWN"
+
+      - name: Check live routine activity
+        id: rh
+        env:
+          CHECK_DATE: ${{ github.event.inputs.date }}
+        run: |
+          set +e
+          if [ -n "$CHECK_DATE" ]; then
+            bonito live routine-health -u config/universe.live.json --date "$CHECK_DATE" --json > /tmp/rh.json
+          else
+            bonito live routine-health -u config/universe.live.json --json > /tmp/rh.json
+          fi
+          code=$?
+          set -e
+          {
+            echo "## Live routine health (exit $code)"
+            echo '```json'
+            cat /tmp/rh.json
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+          CODE=$code python - <<'EOF' >> "$GITHUB_OUTPUT"
+          import json, os
+
+          code = os.environ["CODE"]
+          try:
+              r = json.load(open("/tmp/rh.json"))
+              status = r["status"]
+              reasons = "; ".join(r.get("reasons", [])) or "none"
+              summary = (
+                  f"{status} for {r['day']}: daily_cycle={r['daily_cycle_ran']} "
+                  f"intraday_runs={r['intraday_runs']}/{r['min_intraday']} "
+                  f"stale_pending={len(r.get('stale_pending', []))} — {reasons}"
+              )
+          except Exception as exc:
+              status = "UNKNOWN"
+              summary = f"routine-health could not evaluate (exit {code}): {exc}"
+          print(f"status={status}")
+          print("summary=" + summary.replace("\n", " "))
+          EOF
+
+      - name: Open or update the alarm issue
+        if: steps.rh.outputs.status == 'ALARM' || steps.rh.outputs.status == 'UNKNOWN'
+        continue-on-error: true
+        env:
+          GH_TOKEN: ${{ github.token }}
+          SUMMARY: ${{ steps.rh.outputs.summary }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: |
+          existing=$(gh issue list --state open --search "Live routines not running in:title" --json number --jq '.[0].number' || echo "")
+          if [ -n "$existing" ]; then
+            gh issue comment "$existing" --body "Still failing — $SUMMARY
+
+          Logs: $RUN_URL" || echo "::warning::could not comment on issue $existing"
+          else
+            gh issue create \
+              --title "Live routines not running $(date -u +%F)" \
+              --body "The live Claude Routines did not leave their expected evidence on main.
+
+          $SUMMARY
+
+          Logs: $RUN_URL
+
+          Triage:
+          - Routines: https://claude.ai/code/routines — open the latest run of \"Bonito live trading\" (daily) and \"Robinhood intraday\" and read where it stopped. A run that ends in ~1-2 minutes with no commit usually stopped at setup or step 1 (account check) before the cycle lock.
+          - Robinhood connector: still connected, and get_accounts still shows the account ending 8597 as agent-tradable?
+          - \`bonito live pending -u config/universe.live.json\` lists queued orders the daily cycle hasn't resolved.
+
+          Alarm only — nothing is gated by this check. Close this issue once the Routines run cleanly again." \
+              || echo "::warning::could not create alarm issue"
+          fi
