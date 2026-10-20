@@ -37,6 +37,7 @@ bonito live stop-levels [-u ...]                         # Per-position stop/TP 
 bonito live tracking [-u ...]                            # Paper-vs-replay fidelity check
 bonito live backtest-universe [-u ...]                   # Per-symbol strategy validation
 bonito live backtest-account [-u ...]                    # Full account-level replay
+bonito live routine-health [--date YYYY-MM-DD] [-u ...]  # Did the live Routines run? (needs full git history)
 
 # Strategy research
 bonito research auto [--apply] [-u ...]                  # Weekly: rolling holdout, graded bundles, sync live config
@@ -148,7 +149,7 @@ Test files:
 | `web/src/components/analysis/` | Chart components, indicator panels |
 | `web/src/contexts/AnalysisContext.tsx` | Chart state management |
 | `config/universe.json` | Paper trading config (33 symbols, 8 slots, dynamic sizing) |
-| `config/universe.live.json` | Live config — synced by research; mode/live_enabled human-only |
+| `config/universe.live.json` | Live config — synced by research; mode/live_enabled/core_holding/entry_allowlist/risk caps human-only |
 | `docs/EXPERIMENT_LOG.md` | Canonical record of adopted/rejected optimizations |
 | `docs/AUTONOMOUS_LIVE_ROUTINE.md` | How to run the live cycle unattended via Claude Routines |
 | `tasks/todo.md` | Pre-live checklist + current task tracking |
@@ -164,7 +165,9 @@ Test files:
 - Dynamic panel ordering; panel re-initialization fix
 
 **Live trading pipeline (complete):**
-- Paper + live ledger, intent-based execution (sells-before-buys), kill switch (25% drawdown halt)
+- Paper + live ledger, intent-based execution (sells-before-buys), kill switch (drawdown halt from peak equity; live: 45%)
+- Core-hold mode (`core_holding`): live account holds QQQ at `target_pct` of equity, topped up from settled cash; never exited by signals/stops; strategy entries paused (`entry_allowlist: []`) until a candidate beats QQQ in a pre-registered holdout
+- `bonito live routine-health`: dead-man's switch — alarms when the live Routines leave no daily/intraday commits on main (alarm-only, never gates trading)
 - Dynamic position sizing: `position_pct_equity` scales slots with equity; $2,500 hard cap
 - 33-symbol universe, 8 slots, per-symbol strategies (AAPL/GOOGL/IREN assigned)
 - Entry blocklist (`entry_blocklist`) for benched symbols; exits never gated
@@ -177,7 +180,7 @@ Test files:
 - Per-symbol grid search: 450 candidates (extended from 144); profitable-holdout gate
 - Graded fallback bundles: (swap+assignments+bench) → ... → assignments-only; first passing ships
 - Grid-edge flags: winners at search boundary surfaced in digest as human cue to extend
-- `sync_live_config()`: mirrors validated structure into universe.live.json; NEVER touches mode/live_enabled/risk caps
+- `sync_live_config()`: mirrors validated structure into universe.live.json; NEVER touches mode/live_enabled/risk caps/core_holding/entry_allowlist
 - Experiment log (`docs/EXPERIMENT_LOG.md`) — canonical record of adopted/rejected optimizations; pre-register criterion before running
 
 **Autonomous execution (complete):**
@@ -334,10 +337,12 @@ The system runs with zero daily intervention once live:
 | **Weekly research** | GitHub Actions (`weekly-research.yml`) | Saturday 13:00 UTC | GitHub issue on adoption/rejection |
 | **Live cycle** | Claude Code Routine (`/schedule weekdays at 3:45pm ET`) | Daily 3:45pm ET | None after sign-off |
 | **Intraday live stops** | Broker-side GTC stop orders | 24/7 | Cancel/replace daily via Routine |
+| **Routine health** | GitHub Actions (`live-routine-health.yml`) | Weekdays 22:20 UTC | Opens/comments a "Live routines not running" issue |
 
 **Human-only controls (never automated):**
 - `mode` and `live_enabled` in `config/universe.live.json`
-- Risk caps (`max_position_usd`, `position_pct_equity`, `max_positions`)
+- `core_holding` (symbol, `target_pct`) and `entry_allowlist` in `config/universe.live.json`
+- Risk caps (`max_position_usd`, `position_pct_equity`, `max_positions`, `max_drawdown_halt`)
 - `bonito live resume` after a kill-switch halt
 - Creating the Routine (`/schedule` from a local Claude Code terminal)
 
