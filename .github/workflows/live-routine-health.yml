@@ -77,8 +77,10 @@ jobs:
           import json, os
 
           code = os.environ["CODE"]
+          day = os.environ.get("CHECK_DATE") or ""
           try:
               r = json.load(open("/tmp/rh.json"))
+              day = r["day"]
               status = r["status"]
               reasons = "; ".join(r.get("reasons", [])) or "none"
               summary = (
@@ -90,6 +92,7 @@ jobs:
               status = "UNKNOWN"
               summary = f"routine-health could not evaluate (exit {code}): {exc}"
           print(f"status={status}")
+          print(f"day={day}")
           print("summary=" + summary.replace("\n", " "))
           EOF
 
@@ -99,6 +102,7 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
           SUMMARY: ${{ steps.rh.outputs.summary }}
+          DAY: ${{ steps.rh.outputs.day }}
           RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
         run: |
           existing=$(gh issue list --state open --search "Live routines not running in:title" --json number --jq '.[0].number' || echo "")
@@ -108,7 +112,7 @@ jobs:
           Logs: $RUN_URL" || echo "::warning::could not comment on issue $existing"
           else
             gh issue create \
-              --title "Live routines not running $(date -u +%F)" \
+              --title "Live routines not running ${DAY:-$(date -u +%F)}" \
               --body "The live Claude Routines did not leave their expected evidence on main.
 
           $SUMMARY
