@@ -1,0 +1,14 @@
+[
+  {
+    "symbol": "QQQ",
+    "side": "buy",
+    "dollar_amount": 15.08,
+    "quantity": null,
+    "reason": "core holding top-up toward 100% of equity",
+    "signal_price": 717.6300048828125,
+    "signal_date": "2026-10-20T04:00:00",
+    "strategy_name": "core_holding",
+    "generated_at": "2026-10-20T20:47:58.683149Z",
+    "broker_order_id": null
+  }
+]

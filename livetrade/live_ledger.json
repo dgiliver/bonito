@@ -1,5 +1,5 @@
 {
-  "cash": 35.85193389570007,
+  "cash": 20.08193389570007,
   "starting_cash": 150.0,
   "positions": {
     "COST": {
@@ -404,10 +404,10 @@
     },
     "QQQ": {
       "symbol": "QQQ",
-      "quantity": 0.041153,
-      "entry_price": 718.77,
+      "quantity": 0.062886,
+      "entry_price": 721.133860318672,
       "entry_date": "2026-10-15T13:30:04.100000Z",
-      "high_water_mark": 718.77,
+      "high_water_mark": 725.61,
       "strategy_name": "live",
       "strategy_hash": "",
       "strategy_config": null
@@ -1902,18 +1902,29 @@
     {
       "symbol": "QQQ",
       "side": "buy",
-      "quantity": 0.0,
-      "price": 727.78,
-      "notional": 0.0,
-      "reason": "no_fill: live fill",
-      "filled_at": "2026-10-15T20:50:24.538383Z",
+      "quantity": 0.021733,
+      "price": 725.61,
+      "notional": 15.77,
+      "reason": "live fill (resolved from queued order)",
+      "filled_at": "2026-10-16T13:30:00.377000Z",
       "strategy_name": "live",
       "broker_order_id": "6ad13c8b-7e85-4447-88ff-3802be3becc3"
+    },
+    {
+      "symbol": "QQQ",
+      "side": "buy",
+      "quantity": 0.0,
+      "price": 720.1,
+      "notional": 0.0,
+      "reason": "no_fill: live fill",
+      "filled_at": "2026-10-20T20:48:17.788387Z",
+      "strategy_name": "live",
+      "broker_order_id": "6ad7d38b-4ed4-4e7c-af63-e86be967391e"
     }
   ],
   "realized_pnl": -21.59142284789999,
   "peak_equity": 150.14103162835693,
   "halted": false,
   "halt_reason": "",
-  "updated_at": "2026-10-20T19:35:16.627899Z"
+  "updated_at": "2026-10-20T20:48:17.788576Z"
 }
