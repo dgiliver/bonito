@@ -129,3 +129,19 @@ class TestGitHistory:
         monkeypatch.chdir(clone)
         with pytest.raises(RuntimeError, match="shallow clone"):
             _require_history_reaches(datetime(2026, 10, 15), "HEAD")
+
+
+def test_trading_path_never_imports_routine_health():
+    """Alarm-only: the decision path must not depend on the dead-man's switch."""
+    import inspect
+
+    import bonito.trading.live_runner as lr
+
+    assert "routine_health" not in inspect.getsource(lr)
+
+
+def test_uses_the_canonical_pending_definition():
+    """A non-'no_fill' zero-qty fill isn't a pending order (live_runner's rule)."""
+    ledger = PaperLedger(cash=1, starting_cash=1)
+    ledger.fills.append(sentinel(datetime(2026, 10, 1), reason="manual zero-qty note"))
+    assert check_routine_activity(GOOD, DAY, trading_day=True, ledger=ledger).status == "OK"

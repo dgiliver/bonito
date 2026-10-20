@@ -25,6 +25,7 @@ from typing import Literal
 import numpy as np
 from pydantic import BaseModel, Field
 
+from bonito.trading.live_runner import _is_pending_sentinel  # the canonical definition
 from bonito.trading.paper import PaperLedger
 
 MIN_INTRADAY_RUNS = 4  # of ~7 scheduled per session; tolerates a couple of lock contentions
@@ -48,12 +49,6 @@ class RoutineHealthReport(BaseModel):
             f"intraday_runs={self.intraday_runs}/{self.min_intraday} "
             f"stale_pending={len(self.stale_pending)}"
         )
-
-
-def _is_pending_sentinel(fill) -> bool:
-    return (
-        fill.quantity == 0 and bool(fill.broker_order_id) and "resolved=" not in (fill.reason or "")
-    )
 
 
 def check_routine_activity(
