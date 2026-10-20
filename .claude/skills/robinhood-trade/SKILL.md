@@ -62,8 +62,9 @@ git pull origin <current-branch>   # pick up latest ledger state
      `livetrade/paper_ledger.json` automatically. Done — go to step 4.
 3. **Live mode only** (`mode: "live"` AND `live_enabled: true`):
    - Resolve the account: `get_accounts` → the account with
-     `agentic_allowed: true` (nickname "Agentic"). NEVER trade the default
-     margin account.
+     `agentic_allowed: true` whose number ends in 8597. Don't rely on the
+     nickname (display text; it changed "Agentic" → "MCP" in Oct 2026).
+     NEVER trade the default margin account.
    - Check `get_portfolio` buying power covers the buy intents.
    - For each intent in the newest `livetrade/intents/*.json`:
      - Sells first, then buys.

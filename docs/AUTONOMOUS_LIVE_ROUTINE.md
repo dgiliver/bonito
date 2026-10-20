@@ -218,11 +218,13 @@ Setup:
   a standalone export.
 
 1. Resolve the account: Robinhood get_accounts → the one with
-   agentic_allowed: true (nickname "Agentic", ••••8597). NEVER the margin
-   account (••••7982). Assert ALL THREE of: masked number ends in 8597 AND
-   agentic_allowed == true AND nickname == "Agentic". If any check fails,
-   STOP immediately, place nothing, and report the mismatch — this is the
-   same fail-closed posture as every other step below.
+   agentic_allowed: true (••••8597). NEVER the margin account (••••7982).
+   Assert BOTH of: account number ends in 8597 AND agentic_allowed ==
+   true. Do NOT check the nickname — it is display text Robinhood or the
+   user can change (it changed "Agentic" → "MCP" in Oct 2026 and silently
+   stopped every run). If either check fails, STOP immediately, place
+   nothing, and report the mismatch — this is the same fail-closed posture
+   as every other step below.
 2. Acquire the cycle lock (prevents this run overlapping another run of
    this Routine or the hourly intraday one — Routines have no built-in
    guarantee against overlapping sessions):

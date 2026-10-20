@@ -124,10 +124,11 @@ Setup:
   between steps — each may run as a separate shell.
 
 1. Resolve the account: Robinhood get_accounts -> the one with
-   agentic_allowed: true (nickname "Agentic", ...8597). Assert ALL THREE of:
-   masked number ends in 8597 AND agentic_allowed == true AND nickname ==
-   "Agentic". Any check fails -> STOP immediately, do nothing, report the
-   mismatch.
+   agentic_allowed: true (...8597). Assert BOTH of: account number ends in
+   8597 AND agentic_allowed == true. Do NOT check the nickname — it is
+   display text that can change (it changed "Agentic" -> "MCP" in Oct 2026
+   and silently stopped every run). Either check fails -> STOP immediately,
+   do nothing, report the mismatch.
 2. Acquire the cycle lock (shared with the daily Routine — prevents two
    runs acting on the same ledger concurrently):
    - `.venv/bin/bonito live lock-acquire intraday
