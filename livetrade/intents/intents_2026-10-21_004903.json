@@ -1,0 +1,26 @@
+[
+  {
+    "symbol": "AMZN",
+    "side": "buy",
+    "dollar_amount": 463.06,
+    "quantity": null,
+    "reason": "entry rule matched: ema_fast gt ema_slow, close gt ema_slow, rsi_14 lt 68.0",
+    "signal_price": 262.45001220703125,
+    "signal_date": "2026-10-19T04:00:00",
+    "strategy_name": "ema_cross_rsi_atr_regime",
+    "generated_at": "2026-10-21T00:49:03.074712Z",
+    "broker_order_id": null
+  },
+  {
+    "symbol": "UNH",
+    "side": "buy",
+    "dollar_amount": 365.63,
+    "quantity": null,
+    "reason": "entry rule matched: ema_fast gt ema_slow, close gt ema_slow, rsi_14 lt 68.0",
+    "signal_price": 406.8800048828125,
+    "signal_date": "2026-10-19T04:00:00",
+    "strategy_name": "ema_cross_rsi_atr_regime",
+    "generated_at": "2026-10-21T00:49:03.085508Z",
+    "broker_order_id": null
+  }
+]
