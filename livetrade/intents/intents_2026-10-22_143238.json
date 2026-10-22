@@ -1,0 +1,14 @@
+[
+  {
+    "symbol": "LLY",
+    "side": "sell",
+    "dollar_amount": null,
+    "quantity": 0.013931,
+    "reason": "take profit triggered (intraday)",
+    "signal_price": 1303.780029296875,
+    "signal_date": "2026-10-22T14:32:38.022065Z",
+    "strategy_name": "ema_cross_rsi_atr_regime",
+    "generated_at": "2026-10-22T14:32:38.022327Z",
+    "broker_order_id": null
+  }
+]
