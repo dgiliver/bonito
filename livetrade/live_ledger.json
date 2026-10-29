@@ -1664,11 +1664,22 @@
       "filled_at": "2026-10-28T14:01:17.752267Z",
       "strategy_name": "live",
       "broker_order_id": "6ae2001f-774b-480b-ac77-560010d0a21a"
+    },
+    {
+      "symbol": "QQQ",
+      "side": "buy",
+      "quantity": 0.0,
+      "price": 706.99,
+      "notional": 0.0,
+      "reason": "no_fill: live fill",
+      "filled_at": "2026-10-29T20:49:30.763767Z",
+      "strategy_name": "live",
+      "broker_order_id": "6ae3b14e-2329-453a-84f6-d76c78f47a9c"
     }
   ],
   "realized_pnl": -21.839424166899988,
   "peak_equity": 150.14103162835693,
   "halted": false,
   "halt_reason": "",
-  "updated_at": "2026-10-29T19:36:16.514687Z"
+  "updated_at": "2026-10-29T20:49:30.764063Z"
 }
