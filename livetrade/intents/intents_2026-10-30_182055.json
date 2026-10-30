@@ -1,0 +1,38 @@
+[
+  {
+    "symbol": "LLY",
+    "side": "sell",
+    "dollar_amount": null,
+    "quantity": 0.3712689356679127,
+    "reason": "take profit triggered (intraday)",
+    "signal_price": 1423.4100341796875,
+    "signal_date": "2026-10-30T18:20:55.295050Z",
+    "strategy_name": "ema_cross_rsi_atr_regime",
+    "generated_at": "2026-10-30T18:20:55.295195Z",
+    "broker_order_id": null
+  },
+  {
+    "symbol": "MSFT",
+    "side": "sell",
+    "dollar_amount": null,
+    "quantity": 0.906002887304353,
+    "reason": "stop loss triggered (intraday)",
+    "signal_price": 520.780029296875,
+    "signal_date": "2026-10-30T18:20:55.295050Z",
+    "strategy_name": "c_ema12-26_rsi55_atr1.0_tp20",
+    "generated_at": "2026-10-30T18:20:55.295214Z",
+    "broker_order_id": null
+  },
+  {
+    "symbol": "RBLX",
+    "side": "sell",
+    "dollar_amount": null,
+    "quantity": 9.171132216001839,
+    "reason": "stop loss triggered (intraday)",
+    "signal_price": 41.880001068115234,
+    "signal_date": "2026-10-30T18:20:55.295050Z",
+    "strategy_name": "ema_cross_rsi_atr_regime",
+    "generated_at": "2026-10-30T18:20:55.295230Z",
+    "broker_order_id": null
+  }
+]
