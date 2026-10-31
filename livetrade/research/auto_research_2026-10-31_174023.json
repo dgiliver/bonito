@@ -1,0 +1,62 @@
+{
+  "generated_at": "2026-10-31T17:40:23.853789",
+  "universe_path": "config/universe.json",
+  "start": "2022-01-01T00:00:00",
+  "holdout": "2025-05-09T17:24:41.818298",
+  "end": "2026-10-31T17:24:41.818298",
+  "outcome": "rejected",
+  "adopted_bundle": null,
+  "reasons": [
+    "[assignments+bench] train Sharpe degrades: 0.628 < 1.129",
+    "[assignments+bench] train introduces kill failures: ['DD 25%>25%']",
+    "[assignments+bench] holdout Sharpe degrades: 0.000 < 2.629",
+    "[assignments+bench] holdout introduces kill failures: ['trades 0<11']",
+    "[assignments-only] train Sharpe degrades: 0.682 < 1.129",
+    "[assignments-only] train introduces kill failures: ['DD 25%>25%']",
+    "[assignments-only] holdout Sharpe degrades: 0.000 < 2.629",
+    "[assignments-only] holdout introduces kill failures: ['trades 0<11']"
+  ],
+  "previous_assignments": {
+    "ASML": "strategies/auto_ASML_9dfc85e38e1c.json",
+    "MSFT": "strategies/auto_MSFT_ef10b624536e.json"
+  },
+  "candidate_assignments": {
+    "AMZN": "strategies/auto_AMZN_cfb42acff369.json",
+    "COST": "strategies/auto_COST_f82d3d17366e.json",
+    "DELL": "strategies/auto_DELL_b4c03905a417.json",
+    "LLY": "strategies/auto_LLY_407451ed37c9.json"
+  },
+  "added": [
+    "AMZN",
+    "COST",
+    "DELL",
+    "LLY"
+  ],
+  "removed": [
+    "ASML",
+    "MSFT"
+  ],
+  "updated": [],
+  "default_swap": null,
+  "default_swapped": false,
+  "benched": [
+    "AAOI",
+    "ALAB",
+    "ASML",
+    "DRAM",
+    "NBIS",
+    "NVDA"
+  ],
+  "unbenched": [
+    "ORCL"
+  ],
+  "grid_edge_flags": [
+    "COST: winner at grid edge (ema=(5, 13))",
+    "DELL: winner at grid edge (ema=(20, 50))",
+    "LLY: winner at grid edge (rsi<75)"
+  ],
+  "comparisons": [],
+  "baseline_final_equity": 31910.81,
+  "candidate_final_equity": null,
+  "report_path": "livetrade/research/cluster_report_2026-10-31_173221.json"
+}
