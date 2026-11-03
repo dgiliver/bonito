@@ -1,0 +1,14 @@
+[
+  {
+    "symbol": "AAPL",
+    "side": "sell",
+    "dollar_amount": null,
+    "quantity": 1.4173373341236202,
+    "reason": "stop loss triggered (intraday)",
+    "signal_price": 330.3299865722656,
+    "signal_date": "2026-11-03T19:54:45.903754Z",
+    "strategy_name": "ema_cross_rsi_atr_regime",
+    "generated_at": "2026-11-03T19:54:45.903831Z",
+    "broker_order_id": null
+  }
+]
