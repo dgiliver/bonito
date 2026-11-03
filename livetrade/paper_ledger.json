@@ -1,5 +1,5 @@
 {
-  "cash": 1900.444179704357,
+  "cash": 2260.2870727824293,
   "starting_cash": 5000.0,
   "positions": {
     "AAPL": {
@@ -202,112 +202,12 @@
         }
       }
     },
-    "UNH": {
-      "symbol": "UNH",
-      "quantity": 0.8986187465891986,
-      "entry_price": 406.8800048828125,
-      "entry_date": "2026-10-21T00:49:03.092472Z",
-      "high_water_mark": 424.9800109863281,
-      "strategy_name": "ema_cross_rsi_atr_regime",
-      "strategy_hash": "da16575a5622",
-      "strategy_config": {
-        "name": "ema_cross_rsi_atr_regime",
-        "description": "EMA 10/26 cross + RSI<68, 2.0x ATR(14) trailing stop, 10% TP, SPY>SMA200 regime gate. Exit rule VALIDATED 2026-06-12: removing it degrades the account replay despite negative raw attribution (docs/EXPERIMENT_LOG.md) — do not strip it without fresh replay evidence.",
-        "version": "2.0",
-        "symbols": [
-          "SPY"
-        ],
-        "timeframe": "1d",
-        "indicators": [
-          {
-            "type": "ema",
-            "name": "ema_fast",
-            "params": {
-              "period": 10
-            }
-          },
-          {
-            "type": "ema",
-            "name": "ema_slow",
-            "params": {
-              "period": 26
-            }
-          },
-          {
-            "type": "rsi",
-            "name": "rsi_14",
-            "params": {
-              "period": 14
-            }
-          }
-        ],
-        "entry_rules": [
-          {
-            "conditions": [
-              {
-                "left": "ema_fast",
-                "comparison": "gt",
-                "right": "ema_slow",
-                "lookback": null
-              },
-              {
-                "left": "close",
-                "comparison": "gt",
-                "right": "ema_slow",
-                "lookback": null
-              },
-              {
-                "left": "rsi_14",
-                "comparison": "lt",
-                "right": 68.0,
-                "lookback": null
-              }
-            ],
-            "logic": "AND",
-            "side": "long"
-          }
-        ],
-        "exit_rules": [
-          {
-            "conditions": [
-              {
-                "left": "ema_fast",
-                "comparison": "crosses_below",
-                "right": "ema_slow",
-                "lookback": null
-              }
-            ],
-            "logic": "AND",
-            "side": "long"
-          }
-        ],
-        "position_size": {
-          "type": "percent_equity",
-          "value": 98.0
-        },
-        "max_positions": 1,
-        "stop_loss": {
-          "type": "trailing_atr",
-          "value": 2.0,
-          "atr_period": 14,
-          "trigger_percent": null
-        },
-        "take_profit": {
-          "type": "percent",
-          "value": 0.1
-        },
-        "regime_filter": {
-          "symbol": "SPY",
-          "sma_period": 200
-        }
-      }
-    },
     "COST": {
       "symbol": "COST",
       "quantity": 0.48105787896539404,
       "entry_price": 982.72998046875,
       "entry_date": "2026-10-29T01:56:02.183745Z",
-      "high_water_mark": 1019.2899780273438,
+      "high_water_mark": 1040.550048828125,
       "strategy_name": "ema_cross_rsi_atr_regime",
       "strategy_hash": "da16575a5622",
       "strategy_config": {
@@ -2383,11 +2283,22 @@
       "filled_at": "2026-10-30T18:20:55.299889Z",
       "strategy_name": "ema_cross_rsi_atr_regime",
       "broker_order_id": null
+    },
+    {
+      "symbol": "UNH",
+      "side": "sell",
+      "quantity": 0.8986187465891986,
+      "price": 400.44000244140625,
+      "notional": 359.8428930780721,
+      "reason": "stop loss triggered",
+      "filled_at": "2026-11-03T03:39:40.760467Z",
+      "strategy_name": "ema_cross_rsi_atr_regime",
+      "broker_order_id": null
     }
   ],
-  "realized_pnl": -1311.0558202956413,
+  "realized_pnl": -1316.8429272175692,
   "peak_equity": 4468.86417420458,
   "halted": false,
   "halt_reason": "",
-  "updated_at": "2026-10-30T18:20:55.300061Z"
+  "updated_at": "2026-11-03T03:39:40.761033Z"
 }

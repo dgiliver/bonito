@@ -1,0 +1,14 @@
+[
+  {
+    "symbol": "UNH",
+    "side": "sell",
+    "dollar_amount": null,
+    "quantity": 0.8986187465891986,
+    "reason": "stop loss triggered",
+    "signal_price": 400.44000244140625,
+    "signal_date": "2026-11-02T05:00:00",
+    "strategy_name": "ema_cross_rsi_atr_regime",
+    "generated_at": "2026-11-03T03:39:40.564095Z",
+    "broker_order_id": null
+  }
+]
