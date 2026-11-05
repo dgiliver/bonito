@@ -1,0 +1,26 @@
+[
+  {
+    "symbol": "AAPL",
+    "side": "buy",
+    "dollar_amount": 463.03,
+    "quantity": null,
+    "reason": "entry rule matched: ema_fast gt ema_slow, close gt ema_slow, rsi_14 lt 68.0",
+    "signal_price": 349.510009765625,
+    "signal_date": "2026-11-04T05:00:00",
+    "strategy_name": "ema_cross_rsi_atr_regime",
+    "generated_at": "2026-11-05T02:42:19.923843Z",
+    "broker_order_id": null
+  },
+  {
+    "symbol": "RBLX",
+    "side": "buy",
+    "dollar_amount": 463.03,
+    "quantity": null,
+    "reason": "entry rule matched: ema_fast gt ema_slow, close gt ema_slow, rsi_14 lt 68.0",
+    "signal_price": 49.310001373291016,
+    "signal_date": "2026-11-04T05:00:00",
+    "strategy_name": "ema_cross_rsi_atr_regime",
+    "generated_at": "2026-11-05T02:42:19.945888Z",
+    "broker_order_id": null
+  }
+]
