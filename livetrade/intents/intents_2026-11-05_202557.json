@@ -1,0 +1,14 @@
+[
+  {
+    "symbol": "ADI",
+    "side": "sell",
+    "dollar_amount": null,
+    "quantity": 1.1487312439098942,
+    "reason": "stop loss triggered (intraday)",
+    "signal_price": 372.135009765625,
+    "signal_date": "2026-11-05T20:25:57.703605Z",
+    "strategy_name": "ema_cross_rsi_atr_regime",
+    "generated_at": "2026-11-05T20:25:57.703722Z",
+    "broker_order_id": null
+  }
+]
