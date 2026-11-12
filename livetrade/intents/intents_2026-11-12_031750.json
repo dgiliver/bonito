@@ -1,0 +1,14 @@
+[
+  {
+    "symbol": "COST",
+    "side": "sell",
+    "dollar_amount": null,
+    "quantity": 0.48105787896539404,
+    "reason": "take profit triggered",
+    "signal_price": 1087.6099853515625,
+    "signal_date": "2026-11-11T05:00:00",
+    "strategy_name": "ema_cross_rsi_atr_regime",
+    "generated_at": "2026-11-12T03:17:50.229714Z",
+    "broker_order_id": null
+  }
+]
