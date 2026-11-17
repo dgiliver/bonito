@@ -1,0 +1,14 @@
+[
+  {
+    "symbol": "RKLB",
+    "side": "sell",
+    "dollar_amount": null,
+    "quantity": 7.486754577264826,
+    "reason": "exit rule matched",
+    "signal_price": 57.369998931884766,
+    "signal_date": "2026-11-16T05:00:00",
+    "strategy_name": "ema_cross_rsi_atr_regime",
+    "generated_at": "2026-11-17T04:43:28.046249Z",
+    "broker_order_id": null
+  }
+]
