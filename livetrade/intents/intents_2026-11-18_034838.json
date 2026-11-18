@@ -1,0 +1,14 @@
+[
+  {
+    "symbol": "RBLX",
+    "side": "sell",
+    "dollar_amount": null,
+    "quantity": 8.920349100995592,
+    "reason": "exit rule matched",
+    "signal_price": 44.0,
+    "signal_date": "2026-11-17T05:00:00",
+    "strategy_name": "ema_cross_rsi_atr_regime",
+    "generated_at": "2026-11-18T03:48:38.399493Z",
+    "broker_order_id": null
+  }
+]
