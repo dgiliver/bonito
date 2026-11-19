@@ -1,0 +1,26 @@
+[
+  {
+    "symbol": "UNH",
+    "side": "sell",
+    "dollar_amount": null,
+    "quantity": 1.1438779477977679,
+    "reason": "exit rule matched",
+    "signal_price": 349.9100036621094,
+    "signal_date": "2026-11-18T05:00:00",
+    "strategy_name": "ema_cross_rsi_atr_regime",
+    "generated_at": "2026-11-19T03:46:36.742630Z",
+    "broker_order_id": null
+  },
+  {
+    "symbol": "AVGO",
+    "side": "buy",
+    "dollar_amount": 439.02,
+    "quantity": null,
+    "reason": "entry rule matched: ema_fast gt ema_slow, close gt ema_slow, rsi_14 lt 68.0",
+    "signal_price": 354.04998779296875,
+    "signal_date": "2026-11-18T05:00:00",
+    "strategy_name": "ema_cross_rsi_atr_regime",
+    "generated_at": "2026-11-19T03:46:36.811250Z",
+    "broker_order_id": null
+  }
+]
