@@ -1,0 +1,55 @@
+{
+  "generated_at": "2026-11-21T20:07:17.824134",
+  "universe_path": "config/universe.json",
+  "start": "2022-01-01T00:00:00",
+  "holdout": "2025-05-30T19:51:48.229588",
+  "end": "2026-11-21T19:51:48.229588",
+  "outcome": "rejected",
+  "adopted_bundle": null,
+  "reasons": [
+    "[assignments+bench] train Sharpe degrades: 1.080 < 1.142",
+    "[assignments-only] train Sharpe degrades: 1.013 < 1.142"
+  ],
+  "previous_assignments": {
+    "ASML": "strategies/auto_ASML_9dfc85e38e1c.json",
+    "MSFT": "strategies/auto_MSFT_ef10b624536e.json"
+  },
+  "candidate_assignments": {
+    "AMZN": "strategies/auto_AMZN_cfb42acff369.json",
+    "COST": "strategies/auto_COST_f82d3d17366e.json",
+    "LLY": "strategies/auto_LLY_407451ed37c9.json",
+    "MSFT": "strategies/auto_MSFT_ef10b624536e.json"
+  },
+  "added": [
+    "AMZN",
+    "COST",
+    "LLY"
+  ],
+  "removed": [
+    "ASML"
+  ],
+  "updated": [],
+  "default_swap": null,
+  "default_swapped": false,
+  "benched": [
+    "AAOI",
+    "ALAB",
+    "ASML",
+    "DRAM",
+    "NBIS",
+    "NVDA",
+    "UNH"
+  ],
+  "unbenched": [
+    "ORCL"
+  ],
+  "grid_edge_flags": [
+    "COST: winner at grid edge (ema=(5, 13))",
+    "LLY: winner at grid edge (rsi<75)",
+    "MSFT: winner at grid edge (atr=1)"
+  ],
+  "comparisons": [],
+  "baseline_final_equity": 30788.0,
+  "candidate_final_equity": null,
+  "report_path": "livetrade/research/cluster_report_2026-11-21_195919.json"
+}
