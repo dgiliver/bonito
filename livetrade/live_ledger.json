@@ -1,11 +1,11 @@
 {
-  "cash": 19.651758088700067,
+  "cash": 5.0017580887000666,
   "starting_cash": 150.0,
   "positions": {
     "QQQ": {
       "symbol": "QQQ",
-      "quantity": 0.15166400000000002,
-      "entry_price": 713.4739143798132,
+      "quantity": 0.17436700000000002,
+      "entry_price": 704.5936147940837,
       "entry_date": "2026-10-15T13:30:04.100000Z",
       "high_water_mark": 725.61,
       "strategy_name": "live",
@@ -1590,11 +1590,11 @@
     {
       "symbol": "QQQ",
       "side": "buy",
-      "quantity": 0.0,
-      "price": 636.57,
-      "notional": 0.0,
-      "reason": "no_fill: live fill",
-      "filled_at": "2026-11-26T20:47:34.245544Z",
+      "quantity": 0.022703,
+      "price": 645.2701,
+      "notional": 14.65,
+      "reason": "live fill (resolved from queued order)",
+      "filled_at": "2026-11-27T14:30:01.550000Z",
       "strategy_name": "live",
       "broker_order_id": "6b089ae0-1e50-4657-9fb8-686797345e38"
     }
@@ -1603,5 +1603,5 @@
   "peak_equity": 150.14103162835693,
   "halted": false,
   "halt_reason": "",
-  "updated_at": "2026-11-27T20:31:30.110645Z"
+  "updated_at": "2026-11-27T20:46:31.384654Z"
 }
